@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GenAI Flow — Learn Generative AI, Visually</title>
+<meta name="description" content="An interactive, animated course that takes you from 'what is a token' to shipping a RAG-powered agent.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<canvas id="bg-particles" class="bg-particles" aria-hidden="true"></canvas>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark"><span>◆</span></div>
+    <div>
+      <div class="brand-name">GenAI Flow</div>
+      <div class="brand-sub">from tokens to agents</div>
+    </div>
+  </div>
+
+  <div class="progress-block">
+    <div class="progress-top">
+      <span>Progress</span><span id="progress-label">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="xp-row">
+      <span class="xp-badge" id="xp-badge">0 XP</span>
+      <button class="reset-btn" id="reset-btn" title="Clear saved progress">reset</button>
+    </div>
+  </div>
+
+  <nav class="chapter-nav" id="chapter-nav" aria-label="Chapters"></nav>
+
+  <div class="sidebar-foot">
+    <kbd>&larr;</kbd><kbd>&rarr;</kbd> to navigate
+  </div>
+</aside>
+
+<button class="menu-toggle" id="menu-toggle" aria-label="Toggle chapters">&#9776;</button>
+
+<!-- ============ MAIN ============ -->
+<main class="main" id="main">
+<div class="stage" id="stage">
+
+<!-- ============================================================= -->
+<!-- 0. WELCOME                                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="welcome" data-title="Welcome" data-icon="&#10022;" data-group="Start here">
+  <div class="hero">
+    <div class="hero-tag">interactive course · no signup · no server</div>
+    <h1 class="hero-title">How <span class="grad">Generative AI</span><br>actually works</h1>
+    <p class="hero-sub">
+      Fourteen chapters. Every idea is something you can <b>touch</b> — drag a slider,
+      break a prompt, watch a model pick its next word in slow motion.
+      Nothing here stays a black box.
+    </p>
+
+    <div class="hero-anim">
+      <svg viewBox="0 0 640 180" class="flow-svg" id="hero-flow">
+        <defs>
+          <linearGradient id="gradFlow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#7c5cff"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#34d399"/>
+          </linearGradient>
+        </defs>
+        <path id="flow-path" d="M40,90 C170,20 250,160 380,90 S560,40 600,90" fill="none" stroke="url(#gradFlow)" stroke-width="2" stroke-dasharray="6 6" opacity=".45"/>
+        <g id="hero-nodes"></g>
+        <circle r="6" fill="#fff"><animateMotion dur="4s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#22d3ee"><animateMotion dur="4s" begin="1.3s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#7c5cff"><animateMotion dur="4s" begin="2.6s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+      </svg>
+      <div class="hero-flow-labels">
+        <span>your words</span><span>tokens</span><span>vectors</span><span>attention</span><span>next word</span>
+      </div>
+    </div>
+
+    <div class="hero-cards">
+      <div class="hcard"><div class="hcard-ico">🎛️</div><h4>Play with it</h4><p>Sliders, a live tokenizer, a sampler you can watch think.</p></div>
+      <div class="hcard"><div class="hcard-ico">🎬</div><h4>See it move</h4><p>Animated pipelines for training, RAG and agent loops.</p></div>
+      <div class="hcard"><div class="hcard-ico">🧭</div><h4>Know what to build</h4><p>Prompt vs RAG vs fine-tune — decided, not guessed.</p></div>
+    </div>
+
+    <button class="btn btn-lg" data-goto="next">Start the course <span class="arr">&rarr;</span></button>
+    <p class="hero-note">Progress saves in your browser. Close the tab, come back, keep going.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 1. WHAT IS GENAI                                              -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="what" data-title="What is GenAI?" data-icon="1" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 1 · Foundations</div>
+    <h2>Software that <span class="grad">guesses</span> instead of following orders</h2>
+    <p class="lead">Traditional code does exactly what you wrote. A generative model does what its training makes most likely. That one difference explains almost everything that follows — the magic and the failure modes.</p>
+  </header>
+
+  <div class="three-up">
+    <div class="pcard reveal">
+      <div class="pcard-badge">1970s &rarr;</div>
+      <h3>Rules</h3>
+      <p class="pcard-desc">A human writes every condition by hand.</p>
+      <pre class="code">if word == "hola":
+    return "hello"</pre>
+      <div class="pcard-foot"><span class="pill good">Predictable</span><span class="pill bad">Brittle</span></div>
+    </div>
+    <div class="pcard reveal">
+      <div class="pcard-badge">2000s &rarr;</div>
+      <h3>Classic ML</h3>
+      <p class="pcard-desc">You show labelled examples; it learns to <b>classify</b>.</p>
+      <pre class="code">model.fit(emails, ["spam","ok"])
+model.predict(new_email)
+# -> "spam"</pre>
+      <div class="pcard-foot"><span class="pill good">Learns patterns</span><span class="pill bad">Fixed menu of answers</span></div>
+    </div>
+    <div class="pcard reveal hot">
+      <div class="pcard-badge">2020s &rarr;</div>
+      <h3>Generative AI</h3>
+      <p class="pcard-desc">Learns from oceans of text; <b>creates</b> new output, one piece at a time.</p>
+      <pre class="code">llm("write a haiku about spam")
+# -> three original lines</pre>
+      <div class="pcard-foot"><span class="pill good">Open-ended</span><span class="pill bad">Probabilistic</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎮 Try it: be the language model</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">A model has exactly one job: predict what comes next. Play a round — pick the word you think is most likely, then see what a model would have said.</p>
+    <div id="guess-game" class="guess-game"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">💡</div>
+    <div><b>The whole trick.</b> Predict the next piece of text, over and over, extremely well. Do that at enough scale and it looks like reasoning, translation, coding and conversation — because all of those <i>are</i> text that follows text.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Rules → you encode the logic. ML → it learns the boundary. GenAI → it generates new content.</li>
+      <li>The model isn't looking anything up. It produces the most plausible continuation.</li>
+      <li>Plausible ≠ true. Grounding, RAG and evals all exist because of that gap.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 2. TOKENS                                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="tokens" data-title="Tokens" data-icon="2" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 2 · Foundations</div>
+    <h2>Models don't read words. They read <span class="grad">tokens</span>.</h2>
+    <p class="lead">Before anything else happens, your text is chopped into chunks called tokens, and each chunk becomes a number. Tokens are the unit of cost, the unit of speed, and the unit of the context limit. Get comfortable here and half of GenAI stops being mysterious.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>✂️ Live tokenizer</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Type anything. Watch it split. Notice how common words are a single token, rare words shatter into pieces, and the leading space belongs to the token.</p>
+    <textarea id="tok-input" class="input-area" rows="3" spellcheck="false">Generative AI is unbelievably straightforward once you can see the tokens.</textarea>
+    <div class="chip-row">
+      <button class="chip" data-tok="The cat sat on the mat.">plain english</button>
+      <button class="chip" data-tok="Antidisestablishmentarianism is unpronounceable.">rare long words</button>
+      <button class="chip" data-tok="def fib(n): return n if n &lt; 2 else fib(n-1) + fib(n-2)">code</button>
+      <button class="chip" data-tok="🚀 emoji + café + 東京 + naïve">unicode</button>
+      <button class="chip" data-tok="Invoice 1234567890 total $42,000.55 due 2026-08-18">numbers</button>
+    </div>
+    <div id="tok-out" class="tok-out"></div>
+    <div class="stat-row" id="tok-stats"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📏 Rules of thumb</h3></div>
+      <ul class="fact-list">
+        <li><b>1 token ≈ 4 characters</b> of English</li>
+        <li><b>1 token ≈ ¾ of a word</b> → 100 tokens ≈ 75 words</li>
+        <li>A page of prose ≈ <b>500 tokens</b></li>
+        <li>Code and non-English text burn <b>more</b> tokens per idea</li>
+        <li>You pay for input tokens <b>and</b> output tokens</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🧨 Why this bites people</h3></div>
+      <ul class="fact-list">
+        <li>"Count the r's in strawberry" is hard because the model never sees letters — it sees <span class="mono">str · aw · berry</span>.</li>
+        <li>Rhyming and spelling puzzles are tokenizer problems, not intelligence problems.</li>
+        <li>A 200-page PDF won't fit in context. That's a token budget problem, and it's exactly why RAG exists (Chapter 10).</li>
+        <li>Non-English languages can cost 2–3× more tokens for the same sentence.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🔤</div>
+    <div><b>Token → ID → vector.</b> "cat" might be token <span class="mono">#4937</span>. That number is only an address; the meaning lives in the vector it points to. That's the next chapter.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 3. EMBEDDINGS                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="embeddings" data-title="Embeddings" data-icon="3" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 3 · Foundations</div>
+    <h2>Meaning as <span class="grad">coordinates</span></h2>
+    <p class="lead">Every token becomes a long list of numbers — a vector. Similar meanings land near each other. That's the whole idea, and it powers semantic search, recommendations, RAG, and the model's own sense of what words mean.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🗺️ The meaning map</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Real embeddings have hundreds or thousands of dimensions. Here is a hand-built 2D version so you can see the shape of it. Pick a word to find its nearest neighbours.</p>
+    <div class="embed-wrap">
+      <canvas id="embed-canvas" width="900" height="520" role="img" aria-label="2D map of word embeddings"></canvas>
+      <div class="embed-side">
+        <div class="embed-search">
+          <label for="embed-select">Find neighbours of</label>
+          <select id="embed-select"></select>
+        </div>
+        <div id="embed-neighbors" class="neighbors"></div>
+        <div class="embed-legend" id="embed-legend"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>➕ Vector arithmetic</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The famous one. Directions in the space carry meaning — there's a "royalty" direction and a "gender" direction. Run it and watch the arrows.</p>
+    <div id="vec-math" class="vec-math"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📐 Cosine similarity</h3></div>
+      <p class="panel-sub">How "near" gets measured: the angle between two vectors, not the distance. 1.0 = same direction, 0 = unrelated, −1 = opposite.</p>
+      <pre class="code">sim(a, b) = (a · b) / (|a| · |b|)
+
+sim("dog", "puppy")     -> 0.86
+sim("dog", "database")  -> 0.07</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🎯 Where you'll use this</h3></div>
+      <ul class="fact-list">
+        <li><b>Semantic search</b> — "how do I cancel" finds "subscription termination"</li>
+        <li><b>RAG retrieval</b> — pick the right paragraphs to feed the model</li>
+        <li><b>Clustering</b> — group support tickets nobody labelled</li>
+        <li><b>Dedup &amp; recommendations</b> — near neighbours are near-duplicates</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 4. ATTENTION                                                  -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="attention" data-title="Attention" data-icon="4" data-group="Inside the model">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 4 · Inside the model</div>
+    <h2>Attention: every word <span class="grad">looks at</span> every other word</h2>
+    <p class="lead">The 2017 idea that unlocked all of this. When the model processes a word, it decides how much every other word matters for understanding it. "It" looks back and finds what "it" refers to — and nobody wrote a rule for that. It was learned.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>👁️ Attention explorer</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Pick a sentence, then hover or tap a word. Line brightness = how strongly that word attends to each other word.</p>
+    <div class="chip-row" id="attn-picker"></div>
+    <div id="attn-viz" class="attn-viz"></div>
+    <div id="attn-note" class="attn-note"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏗️ One transformer block, animated</h3></div>
+    <p class="panel-sub">Stack this block 30–100 times and you have a modern LLM. Each pass refines the meaning of every token using its neighbours.</p>
+    <div class="block-anim" id="block-anim">
+      <div class="blk"><span class="blk-n">1</span><b>Embed</b><small>tokens → vectors</small></div>
+      <div class="blk-arrow"></div>
+      <div class="blk"><span class="blk-n">2</span><b>+ Position</b><small>order gets encoded</small></div>
+      <div class="blk-arrow"></div>
+      <div class="blk"><span class="blk-n">3</span><b>Self-attention</b><small>tokens mix context</small></div>
+      <div class="blk-arrow"></div>
+      <div class="blk"><span class="blk-n">4</span><b>Feed-forward</b><small>think about it</small></div>
+      <div class="blk-arrow"></div>
+      <div class="blk"><span class="blk-n">5</span><b>× N layers</b><small>repeat, deepen</small></div>
+      <div class="blk-arrow"></div>
+      <div class="blk"><span class="blk-n">6</span><b>Predict</b><small>score every token</small></div>
+    </div>
+    <button class="btn btn-ghost" id="block-play">▶ Run a forward pass</button>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">⚡</div>
+    <div><b>Why it scaled.</b> Attention compares all tokens at once instead of reading strictly left to right like older RNNs. Parallel = GPU-friendly = you can train on the internet. The cost: work grows with the <i>square</i> of the sequence length, which is why long context is expensive.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 5. GENERATION / SAMPLING                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="generation" data-title="Generation" data-icon="5" data-group="Inside the model">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 5 · Inside the model</div>
+    <h2>Watch it write, one token at a <span class="grad">time</span></h2>
+    <p class="lead">The model outputs a probability for every token in its vocabulary. Something picks one. That pick is appended to the input and the whole thing runs again. Temperature and top-p control <i>how</i> the pick is made — the knob people most often get wrong.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎲 The sampler</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Step through generation and watch the candidate distribution reshape as you move the sliders.</p>
+
+    <div class="sampler-controls">
+      <div class="ctrl">
+        <label for="temp">Temperature <span class="val" id="temp-val">0.70</span></label>
+        <input type="range" id="temp" min="0" max="1.5" step="0.05" value="0.7">
+        <div class="ctrl-hint" id="temp-hint"></div>
+      </div>
+      <div class="ctrl">
+        <label for="topp">Top-p <span class="val" id="topp-val">0.90</span></label>
+        <input type="range" id="topp" min="0.1" max="1" step="0.05" value="0.9">
+        <div class="ctrl-hint">Only consider the smallest set of top tokens whose probabilities add up to p. Greyed-out bars are cut.</div>
+      </div>
+    </div>
+
+    <div class="gen-stage">
+      <div class="gen-text" id="gen-text"></div>
+      <div class="gen-cands" id="gen-cands"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="gen-step">Generate next token</button>
+      <button class="btn btn-ghost" id="gen-auto">▶ Auto-run</button>
+      <button class="btn btn-ghost" id="gen-reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="three-up">
+    <div class="pcard"><h3>temp = 0</h3><p class="pcard-desc">Always the top token. Repeatable, safe, dull. Use for extraction, classification, JSON output.</p></div>
+    <div class="pcard"><h3>temp ≈ 0.7</h3><p class="pcard-desc">The default sweet spot. Natural writing, still coherent.</p></div>
+    <div class="pcard"><h3>temp &gt; 1.2</h3><p class="pcard-desc">Chaos. Brainstorming and poetry — or word salad. Rarely what you want in production.</p></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🧠</div>
+    <div><b>Hallucination lives here.</b> There is no highly-weighted "I don't know" token by default — only "the most plausible next word". Fluent and wrong is the natural failure mode, not a bug you can fix with a stern prompt alone.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 6. TRAINING LIFECYCLE                                         -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="training" data-title="How models are trained" data-icon="6" data-group="Inside the model">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 6 · Inside the model</div>
+    <h2>From <span class="grad">raw internet</span> to helpful assistant</h2>
+    <p class="lead">A base model trained on raw text is a very good autocomplete and a terrible assistant. Three stages turn one into the other. Click through them.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏭 The training pipeline</h3><span class="panel-tag">interactive</span></div>
+    <div class="train-track" id="train-track"></div>
+    <div class="train-detail" id="train-detail"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💸 What it costs</h3></div>
+      <ul class="fact-list">
+        <li>Pretraining a frontier model: <b>thousands of GPUs, months, $10M–$1B+</b></li>
+        <li>Fine-tuning an existing model: <b>hours to days, $10–$10k</b></li>
+        <li>Prompting: <b>free, instant, right now</b></li>
+      </ul>
+      <p class="panel-sub" style="margin-top:14px">This is why 99% of teams never train a model. You start at the cheap end and only move left when you have proof you must.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🧬 Vocabulary you'll hear</h3></div>
+      <dl class="deflist">
+        <dt>Parameters</dt><dd>The learned numbers. "70B" = 70 billion of them. More ≈ more capable and more expensive.</dd>
+        <dt>Base model</dt><dd>Pretrained only. Completes text; doesn't follow instructions.</dd>
+        <dt>Instruct / chat model</dt><dd>Base + SFT + preference tuning. What you actually call.</dd>
+        <dt>Open weights</dt><dd>You can download and run it yourself (Llama, Mistral, Qwen…).</dd>
+        <dt>Reasoning model</dt><dd>Trained to spend extra tokens thinking before answering.</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 7. PROMPTING                                                  -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="prompting" data-title="Prompt engineering" data-icon="7" data-group="Building with it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 7 · Building with it</div>
+    <h2>The prompt is your <span class="grad">program</span></h2>
+    <p class="lead">You can't edit the weights, so the prompt is the only lever you have at runtime. Good prompting isn't magic words — it's supplying the context a competent new hire would need, in a form the model can't misread.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧪 Prompt lab</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Toggle ingredients on and off. Watch the prompt assemble on the left and the answer quality change on the right.</p>
+    <div class="lab">
+      <div class="lab-controls" id="lab-controls"></div>
+      <div class="lab-panes">
+        <div class="lab-pane">
+          <div class="lab-pane-title">Prompt sent</div>
+          <pre class="code code-live" id="lab-prompt"></pre>
+        </div>
+        <div class="lab-pane">
+          <div class="lab-pane-title">What you get back</div>
+          <div class="lab-output" id="lab-output"></div>
+          <div class="score-wrap"><div class="score-bar"><div class="score-fill" id="lab-score-fill"></div></div><span id="lab-score-label">0/100</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📚 Techniques worth knowing</h3></div>
+    <div class="tech-grid" id="tech-grid"></div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">⚠️</div>
+    <div><b>Prompt injection.</b> The moment your prompt includes text from users, web pages or files, that text can try to give the model instructions. Never let retrieved content carry authority — keep instructions and data clearly separated, and never wire an untrusted string straight into a tool that can spend money or delete things.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 8. CONTEXT WINDOW                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="context" data-title="Context &amp; memory" data-icon="8" data-group="Building with it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 8 · Building with it</div>
+    <h2>The model has <span class="grad">no memory</span></h2>
+    <p class="lead">Every API call is a fresh brain with amnesia. "Conversation" is an illusion created by resending the entire chat history each turn. Everything you resend has to fit in the context window — and you pay for it every single turn.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪟 Context window simulator</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Send messages and watch the window fill. When it overflows, something has to go — that's when a chatbot "forgets" what you told it at the start.</p>
+    <div class="ctx-meter">
+      <div class="ctx-bar" id="ctx-bar"></div>
+      <div class="ctx-labels"><span id="ctx-used">0 tokens</span><span id="ctx-limit">limit 800</span></div>
+    </div>
+    <div class="ctx-log" id="ctx-log"></div>
+    <div class="btn-row">
+      <button class="btn" id="ctx-send">Send another turn</button>
+      <button class="btn btn-ghost" id="ctx-big">Paste a long document</button>
+      <button class="btn btn-ghost" id="ctx-reset">↺ Reset</button>
+    </div>
+    <div class="ctx-strategy" id="ctx-strategy"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧯 When context runs out</h3></div>
+      <ul class="fact-list">
+        <li><b>Truncate</b> — drop the oldest turns. Cheap, and it forgets.</li>
+        <li><b>Summarise</b> — compress old turns into a paragraph. Keeps the gist.</li>
+        <li><b>Retrieve</b> — store everything outside, pull back only what's relevant. That's RAG.</li>
+        <li><b>Structured memory</b> — write facts to a database, inject the ones that matter.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🕳️ "Lost in the middle"</h3></div>
+      <p class="panel-sub">Big context windows are not a free pass. Models reliably attend to the <b>start</b> and the <b>end</b> of a long input and get hazy in the middle.</p>
+      <div class="lim-chart" id="lim-chart"></div>
+      <p class="panel-sub">Put the instruction last, the critical facts first, and don't dump 200 pages when 3 paragraphs would do.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 9. RAG                                                        -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="rag" data-title="RAG" data-icon="9" data-group="Building with it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 9 · Building with it</div>
+    <h2><span class="grad">RAG</span>: give the model an open book</h2>
+    <p class="lead">Retrieval-Augmented Generation. The model doesn't know your company's refund policy and never will. So don't ask it to remember — look the policy up first and paste it into the prompt. This is the single most common GenAI architecture in production.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔁 The RAG pipeline, animated</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Ask one of the questions. Watch the whole retrieval path run, stage by stage.</p>
+    <div class="chip-row" id="rag-questions"></div>
+    <div class="rag-pipe" id="rag-pipe"></div>
+    <div class="rag-panes">
+      <div class="rag-pane">
+        <div class="lab-pane-title">Knowledge base <span class="dim">(chunks, ranked by similarity)</span></div>
+        <div id="rag-chunks" class="rag-chunks"></div>
+      </div>
+      <div class="rag-pane">
+        <div class="lab-pane-title">Final prompt &amp; answer</div>
+        <pre class="code code-live" id="rag-prompt">Ask a question to run the pipeline.</pre>
+        <div class="rag-answer" id="rag-answer"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧱 Build it in 5 steps</h3></div>
+      <ol class="steps">
+        <li><b>Chunk</b> your documents (≈200–800 tokens, with overlap).</li>
+        <li><b>Embed</b> each chunk into a vector.</li>
+        <li><b>Store</b> vectors in a vector DB (pgvector, Qdrant, Pinecone, FAISS).</li>
+        <li><b>Retrieve</b> the top-k chunks for the user's question.</li>
+        <li><b>Generate</b> — stuff those chunks into the prompt and cite them.</li>
+      </ol>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🩺 When RAG goes wrong</h3></div>
+      <ul class="fact-list">
+        <li><b>Bad chunking</b> — the answer got split across two chunks. Most common cause.</li>
+        <li><b>Vector-only search</b> — misses exact IDs, error codes, names. Combine with keyword search (hybrid).</li>
+        <li><b>No reranker</b> — top-k by cosine is rough; a reranker re-sorts by real relevance.</li>
+        <li><b>Stale index</b> — the doc changed, the vector didn't.</li>
+        <li><b>No citations</b> — you can't debug what you can't trace.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🎯</div>
+    <div><b>Retrieval quality is the product.</b> If the right chunk isn't retrieved, no model and no prompt can save the answer. Debug retrieval before you blame the LLM.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 10. CHOOSING AN APPROACH                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="choose" data-title="Prompt vs RAG vs tune" data-icon="10" data-group="Building with it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 10 · Building with it</div>
+    <h2>Which lever do you actually <span class="grad">pull</span>?</h2>
+    <p class="lead">Almost every "we need to train our own model" conversation ends with "actually we needed better retrieval". Here's the ladder — start at the top, only go down when you've proven you must.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧭 Decision helper</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Answer three questions, get a recommendation and a reason.</p>
+    <div id="decider" class="decider"></div>
+  </div>
+
+  <div class="ladder" id="ladder"></div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 11. AGENTS                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="agents" data-title="Agents &amp; tools" data-icon="11" data-group="Building with it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 11 · Building with it</div>
+    <h2>Give it <span class="grad">hands</span></h2>
+    <p class="lead">A chat model only produces text. An agent is that same model in a loop, allowed to call tools — search, a database, an API, your codebase — look at the results, and decide what to do next. Same brain, plus the ability to act and check its work.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🤖 Agent loop, live</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Give it a task and step through the loop. Every "thought → action → observation" round is one more LLM call, and that's where latency and cost come from.</p>
+    <div class="chip-row" id="agent-tasks"></div>
+    <div class="agent-wrap">
+      <div class="agent-loop" id="agent-loop">
+        <div class="loop-node" data-n="think"><span>🧠</span><b>Think</b></div>
+        <div class="loop-node" data-n="act"><span>🔧</span><b>Act</b></div>
+        <div class="loop-node" data-n="observe"><span>👀</span><b>Observe</b></div>
+        <svg class="loop-ring" viewBox="0 0 200 200"><circle cx="100" cy="100" r="78" fill="none" stroke="rgba(124,92,255,.25)" stroke-width="2" stroke-dasharray="5 7"/></svg>
+      </div>
+      <div class="agent-trace" id="agent-trace"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="agent-step">Next step</button>
+      <button class="btn btn-ghost" id="agent-auto">▶ Run to completion</button>
+      <button class="btn btn-ghost" id="agent-reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧰 What a tool actually is</h3></div>
+      <p class="panel-sub">A JSON description of a function. The model doesn't run it — it emits a request, <b>your code</b> runs it and hands back the result.</p>
+      <pre class="code">{
+  "name": "get_weather",
+  "description": "Current weather for a city",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "city": {"type": "string"}
+    },
+    "required": ["city"]
+  }
+}</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🚧 Agents in the real world</h3></div>
+      <ul class="fact-list">
+        <li>Errors <b>compound</b>: 95% per step is 60% over 10 steps.</li>
+        <li>Cap the loop. Always. Runaway agents burn money fast.</li>
+        <li>Keep dangerous tools behind human approval (deletes, payments, sends).</li>
+        <li>Fewer, sharper tools beat thirty vague ones.</li>
+        <li>Log every step — an agent you can't replay is an agent you can't fix.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 12. EVALUATION                                                -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="eval" data-title="Evaluation &amp; risk" data-icon="12" data-group="Shipping it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 12 · Shipping it</div>
+    <h2>How do you know it's <span class="grad">any good</span>?</h2>
+    <p class="lead">"It looked great in the demo" is not a quality bar. The same input can produce a different output every run, so you need evaluation the way normal software needs tests — otherwise every prompt tweak is a coin flip.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🕵️ Spot the hallucination</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Each answer sounds confident. Click the part you think is invented.</p>
+    <div id="halluc" class="halluc"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📊 Ways to measure</h3></div>
+      <dl class="deflist">
+        <dt>Golden set</dt><dd>30–200 real inputs with known-good answers. Run them on every change. This is 80% of the value.</dd>
+        <dt>LLM-as-judge</dt><dd>A model grades outputs against a rubric. Scales well; calibrate it against humans first.</dd>
+        <dt>Exact / structural checks</dt><dd>Valid JSON? Schema matches? Citation actually exists? Cheap and deterministic — do these first.</dd>
+        <dt>Human review</dt><dd>Slow, expensive, still the ground truth. Sample it continuously.</dd>
+        <dt>Online signals</dt><dd>Thumbs, edits, escalations to a human, retry rate.</dd>
+      </dl>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🛡️ Risks to design around</h3></div>
+      <ul class="fact-list">
+        <li><b>Hallucination</b> → ground with RAG, demand citations, allow "I don't know".</li>
+        <li><b>Prompt injection</b> → separate instructions from data, never auto-run destructive tools.</li>
+        <li><b>Data leakage</b> → redact PII before it leaves your systems; know your provider's retention.</li>
+        <li><b>Bias</b> → training data carries the world's biases; test across groups.</li>
+        <li><b>Silent regressions</b> → pin model versions, re-run evals when you upgrade.</li>
+        <li><b>Over-trust</b> → show sources, show uncertainty, keep a human on high-stakes calls.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 13. SHIPPING                                                  -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="ship" data-title="Ship it" data-icon="13" data-group="Shipping it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 13 · Shipping it</div>
+    <h2>From demo to <span class="grad">production</span></h2>
+    <p class="lead">The prototype takes an afternoon. The last 20% — cost, latency, failure handling, evals — takes the rest. Here's what that 20% is made of.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧮 Cost &amp; latency calculator</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Rates vary by provider and model, so type in whatever your provider charges per million tokens. The point is the shape of the maths, not any one price.</p>
+    <div class="calc" id="calc"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>✅ Production checklist</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Tick these off. It saves in your browser.</p>
+    <div class="checklist" id="checklist"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏗️ A reference architecture</h3></div>
+    <div class="arch" id="arch"></div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 14. QUIZ                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Shipping it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 14 · Finish line</div>
+    <h2>Prove it to <span class="grad">yourself</span></h2>
+    <p class="lead">Twelve questions covering everything above. No time limit, instant explanations, and you can retake it.</p>
+  </header>
+
+  <div class="panel">
+    <div id="quiz" class="quiz"></div>
+  </div>
+
+  <div class="panel glossary-panel">
+    <div class="panel-head"><h3>📖 Glossary</h3></div>
+    <input type="search" id="gloss-search" class="input-line" placeholder="filter terms…">
+    <div class="glossary" id="glossary"></div>
+  </div>
+</section>
+
+</div><!-- /stage -->
+
+<div class="pager" id="pager">
+  <button class="btn btn-ghost" data-goto="prev">&larr; Back</button>
+  <div class="pager-dots" id="pager-dots"></div>
+  <button class="btn" data-goto="next">Next &rarr;</button>
+</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/content.js"></script>
+<script src="js/demos.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

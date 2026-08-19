@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI System Design Flow — Design ML and LLM Systems That Survive Production</title>
+<meta name="description" content="An interactive course on AI/ML system design: metrics, labels, features and skew, the model ladder, retrieval funnels, latency budgets, capacity, A/B testing, feedback loops, RAG at scale, LLM serving, and four canonical designs.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📐</text></svg>">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<canvas id="bg-particles" class="bg-particles" aria-hidden="true"></canvas>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark"><span>◈</span></div>
+    <div>
+      <div class="brand-name">AI System Design</div>
+      <div class="brand-sub">metrics to production</div>
+    </div>
+  </div>
+
+  <div class="progress-block">
+    <div class="progress-top">
+      <span>Progress</span><span id="progress-label">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="xp-row">
+      <span class="xp-badge" id="xp-badge">0 XP</span>
+      <button class="reset-btn" id="reset-btn" title="Clear saved progress">reset</button>
+    </div>
+  </div>
+
+  <nav class="chapter-nav" id="chapter-nav" aria-label="Chapters"></nav>
+
+  <div class="sidebar-foot">
+    <kbd>&larr;</kbd><kbd>&rarr;</kbd> to navigate
+  </div>
+</aside>
+
+<button class="menu-toggle" id="menu-toggle" aria-label="Toggle chapters">&#9776;</button>
+
+<!-- ============ MAIN ============ -->
+<main class="main" id="main">
+<div class="stage" id="stage">
+
+<!-- ============================================================= -->
+<!-- 0. WELCOME                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="welcome" data-title="Welcome" data-icon="&#10022;" data-group="Start here">
+  <div class="hero">
+    <div class="hero-tag">interactive course · no signup · no server</div>
+    <h1 class="hero-title">Designing AI systems<br>that survive <span class="grad">contact with users</span></h1>
+    <p class="hero-sub">
+      The model is the easy part. What actually decides whether an AI product works is
+      duller and more human: what you chose to measure, where your examples came from,
+      how long users will wait, and whether the thing quietly gets worse over time.
+      <b>No experience assumed</b> — Chapter 1 is just the vocabulary, and every idea after
+      it is attached to a calculator or a simulator you can push until it breaks.
+    </p>
+
+    <div class="hero-anim">
+      <svg viewBox="0 0 640 180" class="flow-svg" id="hero-flow">
+        <defs>
+          <linearGradient id="gradFlow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#14b8a6"/><stop offset="50%" stop-color="#2dd4bf"/><stop offset="100%" stop-color="#fb7185"/>
+          </linearGradient>
+        </defs>
+        <path id="flow-path" d="M40,90 C170,20 250,160 380,90 S560,40 600,90" fill="none" stroke="url(#gradFlow)" stroke-width="2" stroke-dasharray="6 6" opacity=".45"/>
+        <g id="hero-nodes"></g>
+        <circle r="6" fill="#fff"><animateMotion dur="4s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#2dd4bf"><animateMotion dur="4s" begin="1.3s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#fb7185"><animateMotion dur="4s" begin="2.6s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+      </svg>
+      <div class="hero-flow-labels">
+        <span>clarify</span><span>metric</span><span>data</span><span>serve</span><span>operate</span>
+      </div>
+    </div>
+
+    <div class="hero-cards">
+      <div class="hcard"><div class="hcard-ico">🍕</div><h4>One example throughout</h4><p>We design one food-delivery app across the whole course — its feed, its search, its payments, its support chat.</p></div>
+      <div class="hcard"><div class="hcard-ico">🧮</div><h4>Arithmetic, not magic</h4><p>Every calculator has a worked example above it with small friendly numbers. Do it by hand once and the slider makes sense.</p></div>
+      <div class="hcard"><div class="hcard-ico">🪤</div><h4>The traps, shown</h4><p>Watch a feed collapse, a metric get gamed, a model cheat on its exam. Far more memorable than being warned.</p></div>
+    </div>
+
+    <button class="btn btn-lg" data-goto="next">Start with the vocabulary <span class="arr">&rarr;</span></button>
+    <p class="hero-note">Progress saves in your browser. Every chapter opens with a jargon-free summary — if you only read those, you still come away with the ideas.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 1. THE VOCABULARY                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="vocab" data-title="The words first" data-icon="1" data-group="Framing it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 1 · Framing it</div>
+    <h2>None of this is hard. The <span class="grad">words</span> are just unfamiliar.</h2>
+    <p class="lead">Every field has a private vocabulary, and this one is dense. "The p99 is 3 seconds at 4k QPS so we cache the embeddings" is a perfectly ordinary sentence in this world and complete noise if nobody has told you what those words mean. So: ten minutes, eighteen words, plain English and an everyday comparison for each.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🍕 One app, four problems</h3></div>
+    <p class="panel-sub">Rather than a new example every chapter, we design <b>one food-delivery app</b> the whole way through. You have used something like it, so you already know how it is meant to behave — which means you can spend your attention on the design ideas instead of on the domain.</p>
+    <div class="resgrid" id="running-example"></div>
+    <div class="callout" style="margin-top:18px">
+      <div class="callout-ico">🎯</div>
+      <div>These four look like completely different products. By Chapter 14 you will see they are the same nine steps with different nouns — and that skeleton is the thing actually worth carrying away.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📖 Eighteen words</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Short definition on each card. Open the everyday version if the short one does not land — the comparison is usually what makes it stick.</p>
+    <div class="jgrid" id="jargon"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Check it landed</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Six situations described in ordinary language. Which word is each one describing?</p>
+    <div id="jargon-drill"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">💡</div>
+    <div><b>You do not need to memorise these.</b> Every chapter from here opens with a jargon-free box, and the glossary at the end is searchable. Come back whenever a sentence stops making sense — that is what this chapter is for, and needing it twice is normal.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 2. THE FRAMEWORK                                              -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="framework" data-title="The framework" data-icon="2" data-group="Framing it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 2 · Framing it</div>
+    <h2>The first five minutes decide <span class="grad">the whole design</span></h2>
+    <p class="lead">Every AI system design goes wrong in the same way: someone picks a model before anyone has said what "good" means, how much traffic there is, or how fast the answer must come back. Those three plus "what data do we have" are the constraints. Everything else is a consequence.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Try it: what do you ask first?</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub"><b>The prompt:</b> <i>"Design a system that recommends what to watch next."</i> You get three questions before you have to start designing. Choose them.</p>
+    <div id="clarify"></div>
+    <div class="btn-row">
+      <button class="btn" id="clarify-go" disabled>Ask these three</button>
+      <span class="ctrl-hint mono" id="clarify-count">0 / 3 chosen</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧭 The nine steps</h3></div>
+    <p class="panel-sub">This is the order. Skipping ahead is the most common mistake, and it is always expensive — a model chosen before the metric is a model optimised for the wrong thing.</p>
+    <div class="ladder" id="framework"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">💡</div>
+    <div><b>Say the numbers out loud.</b> "40 million daily users, 30 requests each, 3× peak" is 40,000 QPS — and 40,000 QPS rules out scoring a large model per request before you have written a line. Most architectural decisions fall straight out of arithmetic you can do in your head, which is why the clarifying questions come first.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 2. METRICS                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="metrics" data-title="Metrics" data-icon="3" data-group="Framing it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 3 · Framing it</div>
+    <h2>Every proxy metric is <span class="grad">gameable</span></h2>
+    <p class="lead">You cannot train against "user satisfaction", so you pick something measurable that correlates with it. The system then optimises the proxy, including in the ways you did not intend. This is not a modelling problem — it is the central design decision, and the fix is always a guardrail, never a better proxy.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📏 Pick the metric</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Five situations. In each, one option is defensible and the rest are the ones that get chosen in real meetings.</p>
+    <div id="metric-cases"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔗 Offline proxy → online truth</h3></div>
+    <p class="panel-sub">Offline metrics are what you can compute on every commit. Online metrics are what actually happened. The last column is why they disagree.</p>
+    <div class="mtabwrap"><div id="metric-pairs"></div></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🎯 A usable metric set</h3></div>
+      <ul class="fact-list">
+        <li><b>One north star.</b> The business outcome. Usually slow to move and hard to attribute — that is fine, it is the thing you actually want.</li>
+        <li><b>One or two proxies.</b> Fast-moving, trainable, and known to be gameable. This is what the model optimises.</li>
+        <li><b>Three to five guardrails.</b> Latency, error rate, complaint rate, revenue, coverage. Metrics you refuse to regress even for a north-star win.</li>
+        <li><b>A segment breakdown.</b> Aggregate wins routinely hide a destroyed minority segment — new users, the query tail, one market.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>⚠️ Goodhart, concretely</h3></div>
+      <ul class="fact-list">
+        <li><b>Optimise CTR</b> → you get clickbait. The model found the cheapest way to earn a click.</li>
+        <li><b>Optimise watch time</b> → you get autoplay and long videos, whether or not anyone wanted them.</li>
+        <li><b>Optimise resolution rate</b> → the assistant stops escalating and people suffer politely.</li>
+        <li><b>Optimise "helpful" ratings</b> → you get flattery, because agreeable answers rate well.</li>
+        <li><b>Optimise recall on fraud</b> → you block half your good customers to catch one more fraudster.</li>
+      </ul>
+      <div class="callout warn" style="margin-top:14px">
+        <div class="callout-ico">🛡️</div>
+        <div>The pattern is always the same, and so is the fix: pair every proxy with the guardrail that catches its specific abuse. Never expect a better proxy to save you.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 3. LABELS                                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="labels" data-title="Data &amp; labels" data-icon="4" data-group="Data">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 4 · Data</div>
+    <h2>Your labels are <span class="grad">someone's behaviour</span>, not the truth</h2>
+    <p class="lead">A click is not "this was relevant" — it is "this was first, and the thumbnail was interesting". Every label source trades volume against bias against cost, and choosing one is choosing which systematic error your model will learn.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏷️ Five sources, three trade-offs</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Open the trade-off on each. Most production systems use two or three at once — implicit feedback for volume, human annotation for the golden set that tells you whether the implicit signal is lying.</p>
+    <div class="lab-grid" id="label-cards"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪤 Five traps in label data</h3></div>
+    <div class="glossary" id="label-traps"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🎲</div>
+    <div><b>The cheapest thing you can do for label quality</b> is randomise a tiny slice of traffic — 1% shown in random order — and log it. That slice is unbiased by your current model, which makes it the only data you can trust for measuring position bias, evaluating a new ranker offline, and answering "would users have liked the thing we never showed them". It costs a fraction of a percent of engagement and it is worth more than any modelling change.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 4. FEATURES AND SKEW                                          -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="features" data-title="Features &amp; skew" data-icon="5" data-group="Data">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 5 · Data</div>
+    <h2>The two bugs that make a great model <span class="grad">useless</span></h2>
+    <p class="lead"><b>Leakage</b> makes your offline metric a lie. <b>Training/serving skew</b> makes your production metric a disappointment. Both are silent, both are common, and both are found by asking one question of every feature: <i>when does this value actually become known?</i></p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔍 Judge the feature</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Eight features from a real-ish churn and ranking model. Safe, skewed, or leaking? Two of them are genuinely nasty.</p>
+    <div id="skew-cards"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>⏱️ Point-in-time correctness</h3></div>
+      <p class="panel-sub">The single most important idea in feature engineering, and the one most often got wrong by a plain SQL join:</p>
+      <pre class="code">-- ✗ leaks the future: today's value on a 2024 row
+SELECT e.*, u.total_spend
+FROM   events e JOIN users u USING (user_id);
+
+-- ✓ as-of join: the value as it was at event time
+SELECT e.*, f.total_spend
+FROM   events e
+ASOF JOIN user_features f
+  ON  f.user_id = e.user_id
+  AND f.valid_at &lt;= e.event_time;</pre>
+      <p class="panel-sub" style="margin-top:12px">If your feature store does not do this for you, you are doing it by hand on every training run — and you will forget once.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🛠️ Five fixes</h3></div>
+      <div class="glossary" id="skew-fixes"></div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">📝</div>
+    <div><b>The one habit that removes this whole chapter's problems:</b> log the exact feature vector you served with every prediction, and train on those logs. Skew becomes impossible by construction, because training data is by definition what serving produced. It costs you storage and it saves you an incident per quarter.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 5. THE MODEL LADDER                                           -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="ladder" data-title="The model ladder" data-icon="6" data-group="Modelling">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 6 · Modelling</div>
+    <h2>Climb only as far as the metric <span class="grad">justifies</span></h2>
+    <p class="lead">Five rungs, each roughly an order of magnitude more expensive to serve than the last. The right rung is not the highest one you can build — it is the lowest one that clears the bar. Most teams overshoot by two, and pay for it every day in serving cost.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪜 Pick a task, find the rung</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Five real tasks. Watch the recommended rung move — and note that it lands on "heuristic" and "LLM" for different problems on the same ladder.</p>
+    <div class="chip-row" id="ladder-tasks"></div>
+    <div id="ladder-out"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five rules</h3></div>
+      <div class="glossary" id="ladder-rules"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🔄 The LLM inverts the economics</h3></div>
+      <p class="panel-sub">Classic ML is expensive to build and cheap to run. LLMs are the reverse, and that changes where each one wins:</p>
+      <ul class="fact-list">
+        <li><b>High volume, narrow task</b> → classic ML. 40,000 QPS of ticket classification through an LLM is an absurd bill for a task logistic regression handles.</li>
+        <li><b>Low volume, high variety</b> → LLM. Fifty different one-off extraction tasks are fifty models you will never build, and one prompt each.</li>
+        <li><b>Prototype up, serve down.</b> Use an LLM to prove the task is solvable and to generate labels; distil into a small model for serving. This is the highest-leverage pattern on the ladder.</li>
+        <li><b>No labels at all</b> → LLM, always. It is the only rung that works from zero, which is often the whole argument.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 6. THE FUNNEL                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="funnel" data-title="Retrieval funnel" data-icon="7" data-group="Serving">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 7 · Serving</div>
+    <h2>You cannot score a million items. <span class="grad">Nobody can.</span></h2>
+    <p class="lead">So every large ranking system has the same shape: a cheap stage that cuts millions to hundreds optimising only for recall, a real model that ranks those, and an expensive model over the final few dozen. Roughly 100× fewer items and 100× more compute per item at each step.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎣 Tune the funnel</h3><span class="panel-tag">interactive</span></div>
+    <div data-worked="funnel"></div>
+    <p class="panel-sub">Now move the stage sizes yourself and watch quality and latency fight. Try dropping candidates to 100 and note that no amount of ranking recovers it.</p>
+    <div class="sampler-controls three-ctrl">
+      <div class="ctrl">
+        <label for="f-k1">candidates retrieved <span class="mono" id="f-k1-v">1000</span></label>
+        <input type="range" id="f-k1" min="50" max="3000" step="50" value="1000">
+      </div>
+      <div class="ctrl">
+        <label for="f-k2">kept after ranking <span class="mono" id="f-k2-v">50</span></label>
+        <input type="range" id="f-k2" min="5" max="300" step="5" value="50">
+      </div>
+      <div class="ctrl">
+        <label for="f-k3">returned to the user <span class="mono" id="f-k3-v">20</span></label>
+        <input type="range" id="f-k3" min="1" max="60" step="1" value="20">
+      </div>
+    </div>
+    <div id="funnel-out"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five things about funnels</h3></div>
+      <div class="glossary" id="funnel-notes"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🧊 What gets precomputed</h3></div>
+      <p class="panel-sub">The request path should compute as little as it possibly can. Everything else moves offline:</p>
+      <ul class="fact-list">
+        <li><b>Item embeddings</b> — nightly batch. Items change far more slowly than requests arrive.</li>
+        <li><b>The ANN index</b> — rebuilt on a schedule, with incremental upserts for fresh items.</li>
+        <li><b>User embeddings</b> — batch for the long tail, recomputed online only for users with fresh activity.</li>
+        <li><b>Whole ranked feeds</b> — for inactive users, computed offline and served from a cache. They are most of your users and almost none of your traffic.</li>
+        <li><b>What cannot be precomputed:</b> anything depending on the current request — session context, the query itself, real-time inventory.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 7. LATENCY BUDGET                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="latency" data-title="Latency budgets" data-icon="8" data-group="Serving">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 8 · Serving</div>
+    <h2>Spend the budget like <span class="grad">money</span></h2>
+    <p class="lead">You have an SLO. Every component takes a slice, and the slices must add up to less than it — at p99, not p50. Design the budget before you design the system and the architecture largely writes itself, because most options are already ruled out.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⏱️ Build the budget</h3><span class="panel-tag">interactive</span></div>
+    <div data-worked="latency"></div>
+    <p class="panel-sub">Now toggle components on and off. Turn on the LLM call and watch a 200ms budget become impossible — which is exactly the conversation that should happen before anyone builds it.</p>
+    <div class="ctrl" style="max-width:340px;margin-bottom:18px">
+      <label for="budget-slo">p99 SLO <span class="mono" id="budget-slo-v">200ms</span></label>
+      <input type="range" id="budget-slo" min="50" max="3000" step="25" value="200">
+    </div>
+    <div class="budget-wrap">
+      <div class="checklist" id="budget-parts"></div>
+      <div id="budget-out"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Five things about tails</h3></div>
+    <div class="glossary" id="latency-lessons"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">✂️</div>
+    <div><b>When you are over budget, in order of what to try:</b> move work offline (precompute), cut the work per request (smaller candidate set, smaller model), parallelise what is independent, cache aggressively, and only then optimise code. The first two usually win by an order of magnitude; the last one wins by 20% after a fortnight.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 8. CAPACITY                                                   -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="capacity" data-title="Capacity &amp; scale" data-icon="9" data-group="Serving">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 9 · Serving</div>
+    <h2>Arithmetic you should be able to do <span class="grad">in your head</span></h2>
+    <p class="lead">Users × requests ÷ seconds × peak factor = QPS. Concurrency ÷ latency = QPS per replica. Those two lines answer most capacity questions in a design conversation, and getting them wrong by 10× is the difference between a service and an outage.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧮 Capacity calculator</h3><span class="panel-tag">interactive</span></div>
+    <div data-worked="capacity"></div>
+    <p class="panel-sub">Now change one input at a time and watch which one moves the server count. The answer is almost always the cache hit rate.</p>
+    <div class="calc" id="capacity"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Five things about scaling</h3></div>
+    <div class="glossary" id="capacity-notes"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🔪 When one box is not enough</h3></div>
+      <ul class="fact-list">
+        <li><b>Replicate stateless things.</b> Model servers and API nodes scale horizontally for free. Do this first, always.</li>
+        <li><b>Shard stateful things.</b> A 200M-document index does not fit on one machine — shard by document, scatter the query, gather the results.</li>
+        <li><b>Scatter-gather has a tail cost.</b> Querying 20 shards means waiting for the slowest of 20. Hedge, or accept partial results after a deadline.</li>
+        <li><b>Replicate each shard too.</b> Sharding is for capacity; replication is for availability. You need both, and the multiplication is your real machine count.</li>
+        <li><b>Route by tenant when you can.</b> It bounds the blast radius of one noisy customer, and it makes per-tenant limits enforceable.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🧊 The caching hierarchy</h3></div>
+      <ul class="fact-list">
+        <li><b>Result cache</b> — the whole response, keyed by a normalised request. Highest value, hardest to invalidate.</li>
+        <li><b>Feature cache</b> — user and item features. Bounded staleness is nearly always acceptable and nobody notices.</li>
+        <li><b>Embedding cache</b> — text → vector. Deterministic and immutable, so it never needs invalidating. Free money.</li>
+        <li><b>Model output cache</b> — for LLMs especially, where identical prompts are common and each miss is expensive.</li>
+        <li><b>Negative caching</b> — remember "no results" too, or your most expensive queries are the ones that find nothing.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 9. EVALUATION                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="eval" data-title="Offline → online" data-icon="10" data-group="Proving it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 10 · Proving it</div>
+    <h2>Offline is cheap. Online is <span class="grad">true.</span></h2>
+    <p class="lead">Offline metrics run on every commit and tell you the model learned something. Only live traffic tells you users are better off. The discipline is a ladder: cheap gates first, and the expensive test last, on the few changes that survived.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪜 The evaluation ladder</h3></div>
+    <div class="ladder" id="eval-ladder"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧪 A/B sizing calculator</h3><span class="panel-tag">interactive</span></div>
+    <div data-worked="ab"></div>
+    <p class="panel-sub">The question every design review asks and nobody has done the arithmetic for: how long must this run? Then set the peeking slider and watch your false-positive rate leave the building.</p>
+    <div class="sampler-controls">
+      <div class="ctrl">
+        <label for="ab-base">baseline conversion <span class="mono" id="ab-base-v">4.0%</span></label>
+        <input type="range" id="ab-base" min="0.2" max="40" step="0.2" value="4">
+      </div>
+      <div class="ctrl">
+        <label for="ab-mde">effect you want to detect <span class="mono" id="ab-mde-v">+3.0% relative</span></label>
+        <input type="range" id="ab-mde" min="0.5" max="25" step="0.5" value="3">
+      </div>
+      <div class="ctrl">
+        <label for="ab-traffic">users / day in the test <span class="mono" id="ab-traffic-v">200k / day</span></label>
+        <input type="range" id="ab-traffic" min="1000" max="2000000" step="1000" value="200000">
+      </div>
+      <div class="ctrl">
+        <label for="ab-looks">how often you check <span class="mono" id="ab-looks-v">once, at the end</span></label>
+        <input type="range" id="ab-looks" min="1" max="30" step="1" value="1">
+      </div>
+    </div>
+    <div id="ab-out"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Five ways an A/B test lies</h3></div>
+    <div class="glossary" id="ab-notes"></div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 10. FEEDBACK LOOPS                                            -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="loops" data-title="Feedback loops" data-icon="11" data-group="Proving it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 11 · Proving it</div>
+    <h2>The system that <span class="grad">poisons its own</span> training data</h2>
+    <p class="lead">A recommender only sees feedback for what it showed. Items it never shows get no clicks, look bad, and get shown even less. Nothing alerts, no metric goes red — the catalogue just quietly collapses onto whatever was popular the week you launched.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🌀 Watch the loop close</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Sixty items, ten slots, twenty-five rounds. The model ranks by smoothed CTR — <span class="mono">(clicks + α) / (impressions + β)</span> — which is what nearly everyone actually ships. Left is greedy; right has exploration. Each bar is how much of the catalogue has ever been seen by anyone.</p>
+    <div class="ctrl" style="max-width:340px;margin-bottom:18px">
+      <label for="loop-eps">exploration traffic <span class="mono" id="loop-eps-v">0%</span></label>
+      <input type="range" id="loop-eps" min="0" max="40" step="5" value="0">
+    </div>
+    <div id="loop-out"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Six things about drift and loops</h3></div>
+    <div class="glossary" id="loop-notes"></div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">🔍</div>
+    <div><b>How you find this in production:</b> track catalogue coverage (what fraction of items got any impression this week), the Gini coefficient of impressions, and the age distribution of what you serve. All three go the wrong way long before any engagement metric does — which is the whole point of monitoring them.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 11. RAG AT SCALE                                              -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="ragscale" data-title="RAG at scale" data-icon="12" data-group="LLM systems">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 12 · LLM systems</div>
+    <h2>Retrieval quality is the <span class="grad">ceiling</span></h2>
+    <p class="lead">If the right chunk never reaches the prompt, no model and no prompt wording produces the right answer. Most "the model hallucinated" incidents are retrieval failures wearing a generation costume — and they are cheaper to fix once you know that.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎛️ RAG knobs, and what they cost</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Push k up and watch recall improve while cost climbs linearly forever. Then turn on the reranker and pull k back down — that is the move.</p>
+    <div class="rag-grid">
+      <div>
+        <div class="sampler-controls one-col" id="rag-knobs"></div>
+        <div class="checklist one-col" id="rag-toggles" style="margin-top:14px"></div>
+      </div>
+      <div id="rag-out"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Six things about RAG in production</h3></div>
+    <div class="glossary" id="rag-scale-notes"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🏗️ The indexing pipeline</h3></div>
+      <ul class="fact-list">
+        <li><b>Ingest → parse → chunk → embed → upsert.</b> Every stage needs to be re-runnable for one document, not just for the whole corpus.</li>
+        <li><b>Content hash per chunk.</b> Re-embed only what changed. Full rebuilds get expensive fast at 200k documents.</li>
+        <li><b>Tombstone deletes.</b> A retracted document that stays in the index is the worst kind of bug — confidently wrong, correctly cited.</li>
+        <li><b>Version the embedding model.</b> Changing it invalidates the whole index. Plan a dual-write and a backfill, not a swap.</li>
+        <li><b>Keep metadata on every chunk.</b> Source, tenant, product, date. It powers filters, citations and "why did we answer that".</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🚨 Failure modes specific to RAG</h3></div>
+      <ul class="fact-list">
+        <li><b>Retrieved-but-ignored.</b> The right chunk was in the prompt and the model answered from priors anyway. Check groundedness, not just recall.</li>
+        <li><b>Stale index.</b> Correct answer, out of date. Alert on index lag, not just on errors.</li>
+        <li><b>Tenant bleed.</b> A missing filter returns another customer's document. Enforce the filter server-side; never trust the caller to pass it.</li>
+        <li><b>Injection via documents.</b> Anything a user can edit and the system later retrieves is an instruction channel. Treat retrieved text as data.</li>
+        <li><b>Silent truncation.</b> The context exceeded the window and the retrieved chunks were the part that got dropped. Log the rendered prompt length.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 12. LLM SERVING                                               -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="llmserving" data-title="LLM serving &amp; cost" data-icon="13" data-group="LLM systems">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 13 · LLM systems</div>
+    <h2>Where the money and the <span class="grad">milliseconds</span> go</h2>
+    <p class="lead">LLM systems have an unusual cost curve: per-request, variable, and dominated by tokens you often did not need to send. The three levers that matter are routing traffic to the cheapest model that can handle it, caching aggressively, and keeping the prompt small.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🚦 Model cascade simulator</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Route easy traffic to a small model, escalate the rest. Now drop the router accuracy to 60% and watch the savings disappear — the escalated slice pays for two calls.</p>
+    <div class="sampler-controls three-ctrl">
+      <div class="ctrl">
+        <label for="cas-share">routed to the small model <span class="mono" id="cas-share-v">70%</span></label>
+        <input type="range" id="cas-share" min="0" max="100" step="5" value="70">
+      </div>
+      <div class="ctrl">
+        <label for="cas-acc">router accuracy <span class="mono" id="cas-acc-v">90%</span></label>
+        <input type="range" id="cas-acc" min="50" max="99" step="1" value="90">
+      </div>
+      <div class="ctrl">
+        <label for="cas-cache">cache hit rate <span class="mono" id="cas-cache-v">20%</span></label>
+        <input type="range" id="cas-cache" min="0" max="80" step="5" value="20">
+      </div>
+    </div>
+    <div id="cascade-out"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔧 Six levers</h3></div>
+    <div class="glossary" id="serving-levers"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💸 Where the tokens actually go</h3></div>
+      <ul class="fact-list">
+        <li><b>Retrieved context</b> is usually the largest line in a RAG bill, and <span class="mono">k</span> is the knob nobody tunes.</li>
+        <li><b>Conversation history</b> grows every turn. Turn 20 resends turns 1–19 unless you trim or summarise.</li>
+        <li><b>The system prompt</b> is small but paid on every single request. Cache the prefix.</li>
+        <li><b>Output tokens</b> cost several times input. "Be concise" is a genuine cost optimisation, not just a style note.</li>
+        <li><b>Retries and agent loops</b> multiply everything above. Cap them in code.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📊 What to put on the dashboard</h3></div>
+      <ul class="fact-list">
+        <li><b>Cost per request, p50 and p95.</b> The mean hides the runaway loop that spends your month in a night.</li>
+        <li><b>Tokens in / out per request,</b> broken down by prompt section. This is where you find the 4k-token system prompt nobody meant to ship.</li>
+        <li><b>Cache hit rate</b> per cache layer. A hit rate that drops is usually a prefix that stopped being stable.</li>
+        <li><b>Time to first token,</b> not just total latency. It is what users actually perceive.</li>
+        <li><b>Escalation and retry rate.</b> Both are quality signals disguised as cost signals.</li>
+        <li><b>Spend per tenant,</b> with caps enforced in code well before the invoice arrives.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 13. CANONICAL DESIGNS                                         -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="designs" data-title="Canonical designs" data-icon="14" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 14 · Putting it together</div>
+    <h2>Four systems, <span class="grad">end to end</span></h2>
+    <p class="lead">The same nine steps applied to four very different problems. Read the gotcha on every stage — those are the parts that are obvious in hindsight and expensive in advance.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏗️ Walk a design</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Pick a system and step through it. Try to predict the gotcha before you reveal each stage.</p>
+    <div class="chip-row" id="design-tabs"></div>
+    <div id="design-out"></div>
+    <div class="btn-row">
+      <button class="btn" id="design-next">Next stage</button>
+      <button class="btn btn-ghost" id="design-all">Reveal all</button>
+      <button class="btn btn-ghost" id="design-reset">↺ Reset</button>
+      <span class="ctrl-hint mono" id="design-count"></span>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🔁</div>
+    <div><b>Notice what repeats.</b> All four begin with a metric argument, all four have a retrieval or candidate stage, all four are bottlenecked by label quality, and all four need a fallback for when the model is unavailable. The domains look nothing alike; the skeleton is identical. That skeleton is what you are actually learning.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 14. OPERATE IT                                                -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="operate" data-title="Operate it" data-icon="15" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 15 · Putting it together</div>
+    <h2>Launch is the <span class="grad">start</span> of the work</h2>
+    <p class="lead">Traditional software mostly keeps working. An AI system degrades on its own: the world moves, the data drifts, adversaries adapt, and its own outputs contaminate its next training set. The operating plan is part of the design, not a follow-up ticket.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏛️ The pieces</h3></div>
+    <div class="arch" id="arch"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🚀 The rollout ladder</h3></div>
+      <div class="ladder" id="rollout"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🩹 Failure modes and fallbacks</h3></div>
+      <p class="panel-sub">Every one of these needs a written answer before launch. "It shouldn't happen" is not one.</p>
+      <div class="glossary" id="fail-modes"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>✅ Pre-launch checklist</h3><span class="panel-tag">saves</span></div>
+    <p class="panel-sub">Twelve things that separate a demo from something you can leave running. Ticks persist in this browser.</p>
+    <div class="checklist" id="checklist"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">📉</div>
+    <div><b>Plan for the second model, not just the first.</b> Almost everything painful about ML in production — skew, leakage, biased logs, an un-rollbackable deploy, an eval set that does not exist — is only painful because someone shipped v1 without the machinery to safely ship v2. Build the logging, the golden set and the rollback path before the first launch; they are far cheaper then.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 15. QUIZ                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 16 · Finish line</div>
+    <h2>Prove it to <span class="grad">yourself</span></h2>
+    <p class="lead">Twelve questions across everything above. No time limit, instant explanations, retake it as often as you like.</p>
+  </header>
+
+  <div class="panel">
+    <div id="quiz" class="quiz"></div>
+  </div>
+
+  <div class="panel glossary-panel">
+    <div class="panel-head"><h3>📖 Glossary</h3></div>
+    <input type="search" id="gloss-search" class="input-line" placeholder="filter terms…">
+    <div class="glossary" id="glossary"></div>
+  </div>
+</section>
+
+</div><!-- /stage -->
+
+<div class="pager" id="pager">
+  <button class="btn btn-ghost" data-goto="prev">&larr; Back</button>
+  <div class="pager-dots" id="pager-dots"></div>
+  <button class="btn" data-goto="next">Next &rarr;</button>
+</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/content.js"></script>
+<script src="js/demos.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

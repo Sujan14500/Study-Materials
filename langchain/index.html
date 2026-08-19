@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LangChain Flow — Learn LangChain &amp; LangGraph, Visually</title>
+<meta name="description" content="An interactive course on LangChain: runnables, LCEL, prompt templates, output parsers, splitters, retrieval, RAG, memory, agents and LangGraph.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦜</text></svg>">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<canvas id="bg-particles" class="bg-particles" aria-hidden="true"></canvas>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark"><span>⛓</span></div>
+    <div>
+      <div class="brand-name">LangChain Flow</div>
+      <div class="brand-sub">runnables to graphs</div>
+    </div>
+  </div>
+
+  <div class="progress-block">
+    <div class="progress-top">
+      <span>Progress</span><span id="progress-label">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="xp-row">
+      <span class="xp-badge" id="xp-badge">0 XP</span>
+      <button class="reset-btn" id="reset-btn" title="Clear saved progress">reset</button>
+    </div>
+  </div>
+
+  <nav class="chapter-nav" id="chapter-nav" aria-label="Chapters"></nav>
+
+  <div class="sidebar-foot">
+    <kbd>&larr;</kbd><kbd>&rarr;</kbd> to navigate
+  </div>
+</aside>
+
+<button class="menu-toggle" id="menu-toggle" aria-label="Toggle chapters">&#9776;</button>
+
+<!-- ============ MAIN ============ -->
+<main class="main" id="main">
+<div class="stage" id="stage">
+
+<!-- ============================================================= -->
+<!-- 0. WELCOME                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="welcome" data-title="Welcome" data-icon="&#10022;" data-group="Start here">
+  <div class="hero">
+    <div class="hero-tag">interactive course · no signup · no server</div>
+    <h1 class="hero-title">LangChain, without<br>the <span class="grad">cargo cult</span></h1>
+    <p class="hero-sub">
+      One interface — <b>Runnable</b> — explains nearly the whole library. Learn that, and
+      LCEL, retrievers, agents and LangGraph stop being separate things to memorise.
+      Thirteen chapters, every concept attached to something you can type into,
+      drag, or deliberately break. Including an honest chapter on when <i>not</i> to use it.
+    </p>
+
+    <div class="hero-anim">
+      <svg viewBox="0 0 640 180" class="flow-svg" id="hero-flow">
+        <defs>
+          <linearGradient id="gradFlow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#38bdf8"/><stop offset="50%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#22c55e"/>
+          </linearGradient>
+        </defs>
+        <path id="flow-path" d="M40,90 C170,20 250,160 380,90 S560,40 600,90" fill="none" stroke="url(#gradFlow)" stroke-width="2" stroke-dasharray="6 6" opacity=".45"/>
+        <g id="hero-nodes"></g>
+        <circle r="6" fill="#fff"><animateMotion dur="4s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#a78bfa"><animateMotion dur="4s" begin="1.3s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#22c55e"><animateMotion dur="4s" begin="2.6s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+      </svg>
+      <div class="hero-flow-labels">
+        <span>prompt</span><span>model</span><span>parser</span><span>retriever</span><span>graph</span>
+      </div>
+    </div>
+
+    <div class="hero-cards">
+      <div class="hcard"><div class="hcard-ico">🔗</div><h4>Build a chain</h4><p>Click components together and watch the data change shape at every step.</p></div>
+      <div class="hcard"><div class="hcard-ico">✂️</div><h4>Tune retrieval</h4><p>A live text splitter and a real similarity search over a tiny knowledge base.</p></div>
+      <div class="hcard"><div class="hcard-ico">🕸️</div><h4>Step a graph</h4><p>Watch LangGraph state mutate through a retry loop an LCEL chain cannot express.</p></div>
+    </div>
+
+    <button class="btn btn-lg" data-goto="next">Start the course <span class="arr">&rarr;</span></button>
+    <p class="hero-note">Progress saves in your browser. Code examples are Python and current LangChain (LCEL, <span class="mono">langchain-core</span>).</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 1. WHY LANGCHAIN                                              -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="why" data-title="Why LangChain?" data-icon="1" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 1 · Foundations</div>
+    <h2>A framework is a <span class="grad">trade</span>, not a gift</h2>
+    <p class="lead">LangChain gives you one interface over every model provider, plus the plumbing for retrieval, tools, streaming and tracing. In return you take on an abstraction layer to learn and to upgrade. Whether that is a good trade depends entirely on what you are building — so let's compute it rather than argue about it.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⚖️ What do you actually need?</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Tick what your project requires. The line counts are rough but the ratios are honest — they reflect the plumbing you would otherwise write and maintain yourself.</p>
+    <div class="checklist" id="why-needs"></div>
+    <div id="why-out" style="margin-top:20px"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧩 The one idea: Runnable</h3></div>
+      <p class="panel-sub">Every LangChain component — prompts, models, parsers, retrievers, tools, whole chains, entire graphs — implements the same interface:</p>
+      <pre class="code">runnable.invoke(input)      # one in, one out
+runnable.stream(input)      # yields chunks
+runnable.batch([a, b, c])   # concurrent
+await runnable.ainvoke(x)   # async
+
+runnable.with_retry()
+runnable.with_fallbacks([other])
+runnable.with_config(run_name="grade")</pre>
+      <p class="panel-sub" style="margin-top:12px">That uniformity is the whole design. It is why <span class="mono">|</span> works, why streaming reaches every step, and why a chain of chains is just another chain. Learn this one interface and most of the library stops needing to be memorised.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📦 What's in the box</h3></div>
+      <ul class="fact-list">
+        <li><b>Model interface</b> — chat models, embeddings, one API across providers.</li>
+        <li><b>Prompts</b> — declared templates with named, validated variables.</li>
+        <li><b>Output parsers</b> — string, JSON, or schema-validated objects.</li>
+        <li><b>Retrieval</b> — loaders, splitters, embeddings, 40+ vector stores.</li>
+        <li><b>Tools &amp; agents</b> — a tested tool-calling loop instead of your own.</li>
+        <li><b>LangGraph</b> — stateful graphs with cycles, checkpoints and interrupts.</li>
+        <li><b>LangSmith</b> — tracing and evaluation, usable on its own.</li>
+      </ul>
+      <div class="callout" style="margin-top:14px">
+        <div class="callout-ico">🎯</div>
+        <div>Install per-provider packages, not one giant one. <span class="mono">langchain-core</span> plus <span class="mono">langchain-anthropic</span> is a much smaller surface than <span class="mono">langchain[all]</span> — and it upgrades far more calmly.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 2. MODELS AND MESSAGES                                        -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="models" data-title="Models &amp; messages" data-icon="2" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 2 · Foundations</div>
+    <h2>Everything is a <span class="grad">list of messages</span></h2>
+    <p class="lead">A chat model takes a list of messages and returns one message. That is the entire contract, and it is identical across every provider LangChain supports — which is exactly what makes swapping them a one-line change.</p>
+  </header>
+
+  <div class="msg-grid" id="msg-types"></div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧱 Build a conversation</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Add messages and watch the payload grow. There is no hidden state anywhere — what you see here is precisely what gets sent, on every single call.</p>
+    <div class="chip-row" id="msg-build"></div>
+    <div id="msg-out"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🔀 Swapping providers</h3></div>
+      <pre class="code">from langchain_anthropic import ChatAnthropic
+model = ChatAnthropic(model="claude-opus-5", temperature=0)
+
+# same interface, different package:
+# from langchain_openai import ChatOpenAI
+# model = ChatOpenAI(model="...", temperature=0)
+
+model.invoke([
+    SystemMessage("You are a terse SRE assistant."),
+    HumanMessage("Why did checkout page us at 22:14?"),
+])
+# -> AIMessage(content="...", usage_metadata={...})</pre>
+      <p class="panel-sub" style="margin-top:12px">The chain built on top of <span class="mono">model</span> does not change at all. That portability is one of the strongest arguments for the framework — and it is the one people most often discover they needed <i>after</i> hard-coding a provider.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🎛️ Constructor knobs worth knowing</h3></div>
+      <div class="glossary" id="model-knobs"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 3. PROMPT TEMPLATES                                           -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="prompts" data-title="Prompt templates" data-icon="3" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 3 · Foundations</div>
+    <h2>A prompt with a <span class="grad">contract</span></h2>
+    <p class="lead">An f-string is a string. A template is an object that declares its inputs, validates that you supplied them, composes with the rest of the chain, and shows up in your traces as a step you can inspect. The difference matters most at 2am.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📝 Template lab</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Edit the template or the variables. Clear a variable to see what a missing input actually does — and note that you find out immediately, not from a confused model.</p>
+    <div class="chip-row" id="tpl-presets"></div>
+    <div class="tpl-grid">
+      <div>
+        <div class="lab-pane-title">template</div>
+        <textarea id="tpl-input" class="ta" spellcheck="false"></textarea>
+        <div class="lab-pane-title" style="margin-top:14px">variables</div>
+        <div class="calc" id="tpl-vars"></div>
+      </div>
+      <div id="tpl-out"></div>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💬 The message form</h3></div>
+      <p class="panel-sub">Most real prompts are built from messages rather than one string, so roles and history stay intact:</p>
+      <pre class="code">from langchain_core.prompts import (
+    ChatPromptTemplate, MessagesPlaceholder)
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a support engineer at {company}."),
+    MessagesPlaceholder("history"),
+    ("human", "{question}"),
+])
+
+prompt.invoke({
+    "company": "Northwind",
+    "history": [HumanMessage("hi"), AIMessage("hello")],
+    "question": "SSO keeps bouncing me",
+})</pre>
+      <p class="panel-sub" style="margin-top:12px">Note <span class="mono">MessagesPlaceholder</span> takes a real <i>list</i> of messages. Flattening a transcript into one string throws away the role structure the model relies on.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five rules</h3></div>
+      <div class="glossary" id="tpl-rules"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 4. LCEL                                                       -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="lcel" data-title="LCEL — the pipe" data-icon="4" data-group="Composing">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 4 · Composing</div>
+    <h2>What the <span class="grad">pipe</span> actually does</h2>
+    <p class="lead"><span class="mono">prompt | model | parser</span> builds a <b>RunnableSequence</b>: each step's output is the next step's input. Because the result is itself a Runnable, you get streaming, batching, async, retries and fallbacks across the whole chain for free — and you can drop it inside a bigger chain without ceremony.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔗 Chain builder</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Add or remove components and watch two things: the generated code, and the shape of the data at each hop. Put them in a nonsensical order to see the type mismatch LCEL will not catch until you invoke.</p>
+    <div class="chip-row" id="lcel-bank"></div>
+    <div class="lchain" id="lcel-chain"></div>
+    <div id="lcel-out" style="margin-top:18px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔀 Four wiring patterns</h3></div>
+    <p class="panel-sub">Nearly every LangChain application is some combination of these four.</p>
+    <div class="three-up" id="lcel-wiring"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🛠️ What every Runnable gives you</h3></div>
+    <div class="glossary" id="lcel-methods"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">⚠️</div>
+    <div><b>The honest downside.</b> LCEL is dynamically typed glue. A mismatch between two steps surfaces at invoke time, often as a confusing error deep inside a lambda. Keep chains short, name every step with <span class="mono">.with_config(run_name=...)</span>, and test steps in isolation — <span class="mono">prompt.invoke(x)</span> works on its own, and bisecting a chain is much faster than staring at it.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 5. OUTPUT PARSERS                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="parsers" data-title="Structured output" data-icon="5" data-group="Composing">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 5 · Composing</div>
+    <h2>Stop parsing prose. <span class="grad">Constrain generation.</span></h2>
+    <p class="lead">A parser cleans up after the model. Structured output changes what the model is allowed to produce in the first place — the schema goes over as a tool definition, and you get back a validated object instead of a dict you hope has the right keys. Once you have seen both fail, you stop reaching for the parser.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧾 Four ways to get data out</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Same task — pull a lead's details out of a message. Step through the options, including the one that blows up on a Tuesday.</p>
+    <div class="chip-row" id="parser-tabs"></div>
+    <div id="parser-out"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>✅ How to actually do it</h3></div>
+      <pre class="code">from pydantic import BaseModel, Field
+from typing import Literal
+
+class Lead(BaseModel):
+    """A sales lead extracted from a message."""
+    name: str = Field(description="person's first name")
+    company: str
+    intent: Literal["pricing", "support", "other"]
+    urgency: int = Field(ge=1, le=5)
+
+chain = prompt | model.with_structured_output(Lead)
+
+lead = chain.invoke({"text": "..."})
+lead.urgency   # an int, validated, typed
+</pre>
+      <p class="panel-sub" style="margin-top:12px">The field descriptions and the class docstring are sent to the model. They are prompt engineering — a vague <span class="mono">urgency: int</span> gets you a vague number.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📋 Rules of thumb</h3></div>
+      <ul class="fact-list">
+        <li><b>Prefer <span class="mono">with_structured_output</span></b> whenever the model supports tool calling. That is nearly always.</li>
+        <li><b>Describe every field.</b> The description is the only hint the model gets about what you meant.</li>
+        <li><b>Use enums and ranges.</b> <span class="mono">Literal[...]</span> and <span class="mono">ge/le</span> turn a free-text guess into a constrained choice.</li>
+        <li><b>Keep schemas flat and small.</b> Deeply nested models measurably lower extraction accuracy — split into two calls instead.</li>
+        <li><b>Temperature 0</b> for anything whose output feeds code.</li>
+        <li><b>Validation failing often is data, not noise.</b> It usually means the schema does not match reality — add an <span class="mono">"other"</span> case rather than retrying harder.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 6. SPLITTERS                                                  -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="splitters" data-title="Loaders &amp; splitters" data-icon="6" data-group="Retrieval">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 6 · Retrieval</div>
+    <h2>Where RAG quality is <span class="grad">actually decided</span></h2>
+    <p class="lead">Everyone tunes the prompt. Almost nobody tunes the splitter — and chunking decides what can be retrieved at all. A fact cut in half across two chunks is a fact your system cannot answer about, no matter how good the model is.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>✂️ Splitter lab</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Drag the sliders and watch the chunk boundaries move. Highlighted text is the overlap carried over from the previous chunk. Set overlap to 0 and read the seams.</p>
+    <textarea id="split-text" class="ta" spellcheck="false"></textarea>
+    <div class="sampler-controls" style="margin-top:16px">
+      <div class="ctrl">
+        <label for="split-size">chunk_size <span class="mono" id="split-size-v">300</span></label>
+        <input type="range" id="split-size" min="80" max="700" step="20" value="300">
+      </div>
+      <div class="ctrl">
+        <label for="split-lap">chunk_overlap <span class="mono" id="split-lap-v">50</span></label>
+        <input type="range" id="split-lap" min="0" max="200" step="10" value="50">
+      </div>
+    </div>
+    <div id="split-out"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔪 Which splitter</h3></div>
+    <div class="three-up" id="split-kinds"></div>
+    <pre class="code" style="margin-top:6px">from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=800,
+    chunk_overlap=120,
+    separators=["\n\n", "\n", ". ", " ", ""],   # tried in order
+)
+chunks = splitter.split_documents(docs)   # Documents in, Documents out
+</pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Four things worth internalising</h3></div>
+    <div class="glossary" id="split-lessons"></div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 7. EMBEDDINGS + VECTOR STORE                                  -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="vectors" data-title="Embeddings &amp; vectors" data-icon="7" data-group="Retrieval">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 7 · Retrieval</div>
+    <h2>Search by <span class="grad">meaning</span>, not by keyword</h2>
+    <p class="lead">An embedding model turns text into a vector; similar meanings land near each other. A vector store indexes those vectors and answers "what are the k nearest to this one?" — which is how a question about "undoing a release" finds a document that says "rollback".</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔍 Similarity search, live</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Eight documents from a fictional engineering handbook. Type a question — or ask something the handbook says nothing about, and watch what still comes back.</p>
+    <div class="chip-row" id="vec-examples"></div>
+    <input type="search" id="vec-q" class="input-line" placeholder="ask something…" value="friday deploy rules">
+    <div id="vec-out"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🗄️ Store and retrieve</h3></div>
+      <pre class="code">from langchain_chroma import Chroma
+
+store = Chroma.from_documents(chunks, embeddings)
+
+retriever = store.as_retriever(
+    search_type="mmr",              # diversify results
+    search_kwargs={"k": 4, "fetch_k": 20},
+)
+
+retriever.invoke("Can I deploy on a Friday?")
+# -> [Document(...), Document(...), ...]</pre>
+      <p class="panel-sub" style="margin-top:12px">A retriever is just a Runnable that takes a string and returns Documents — which is why it drops straight into a chain with <span class="mono">|</span>.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📈 Making retrieval better</h3></div>
+      <ul class="fact-list">
+        <li><b>Hybrid search.</b> Vector similarity plus keyword (BM25) beats either alone, especially for names, error codes and IDs — which embeddings are genuinely bad at.</li>
+        <li><b>MMR</b> (maximal marginal relevance) stops all k results being near-copies of the same paragraph.</li>
+        <li><b>Metadata filters.</b> <span class="mono">{"team": "infra", "year": 2026}</span> narrows before you search. Cheap and effective.</li>
+        <li><b>Reranking.</b> Fetch 20, rerank with a cross-encoder, keep 4. The single biggest quality win in most RAG systems.</li>
+        <li><b>Tune k.</b> More chunks is not more knowledge — it dilutes the prompt and raises cost. 3–5 usually beats 10.</li>
+      </ul>
+      <div class="callout warn" style="margin-top:14px">
+        <div class="callout-ico">⚠️</div>
+        <div>A vector store <b>always</b> returns k results. There is no "nothing matched" — the bottom of your result list is noise with a score attached. Threshold it, rerank it, or grade it (Chapter 11).</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 8. RAG                                                        -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="rag" data-title="The RAG chain" data-icon="8" data-group="Retrieval">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 8 · Retrieval</div>
+    <h2>Put the <span class="grad">answer</span> in the prompt</h2>
+    <p class="lead">RAG is not a special model or a special API. It is a chain: embed the question, fetch the nearest chunks, paste them into the prompt, ask the model to answer only from them. Every part is something you have already met.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📚 The full pipeline</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Pick a question, then switch retrieval off and ask the same thing again. The second answer is the one that gets shipped by accident.</p>
+    <div class="chip-row" id="rag-questions"></div>
+    <div class="btn-row" style="margin-top:0;margin-bottom:16px">
+      <button class="btn" id="rag-toggle">🔌 Turn retrieval OFF</button>
+    </div>
+    <div class="rag-grid">
+      <div id="rag-pipe" class="rag-pipe"></div>
+      <div id="rag-out"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>💻 The whole thing in LCEL</h3></div>
+    <pre class="code" id="rag-code"></pre>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🩺 When RAG answers wrong</h3></div>
+      <p class="panel-sub">Debug in this order. Skipping to the last one is why people waste weeks.</p>
+      <ul class="fact-list">
+        <li><b>1. Did the right chunk come back?</b> Call the retriever alone. If not, nothing downstream matters.</li>
+        <li><b>2. Is the fact split across chunks?</b> Chapter 6. Raise overlap or split on structure.</li>
+        <li><b>3. Did the chunk reach the prompt?</b> Read the rendered prompt in the trace — truncation is silent.</li>
+        <li><b>4. Does the prompt forbid outside knowledge?</b> Without an explicit instruction the model happily blends its priors with your context.</li>
+        <li><b>5. Only now,</b> consider the model.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📎 Citations for free</h3></div>
+      <p class="panel-sub">Because you already have the source documents, you can attach sources to the answer without asking the model to invent them:</p>
+      <pre class="code">chain = RunnableParallel(
+    context=retriever,
+    question=RunnablePassthrough(),
+).assign(
+    answer=(
+        RunnableLambda(lambda x: {
+            "context": format_docs(x["context"]),
+            "question": x["question"]})
+        | prompt | model | StrOutputParser()
+    )
+)
+
+out = chain.invoke("Can I deploy on a Friday?")
+out["answer"]                       # the text
+[d.metadata["source"] for d in out["context"]]</pre>
+      <p class="panel-sub" style="margin-top:12px"><span class="mono">.assign()</span> adds a key while keeping everything already in the dict — which is how the documents survive alongside the answer.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 9. HISTORY                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="history" data-title="Memory &amp; history" data-icon="9" data-group="Stateful">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 9 · Stateful</div>
+    <h2>The model remembers <span class="grad">nothing</span></h2>
+    <p class="lead">"Memory" in LangChain means: store the messages, load them by session id, splice them into the prompt before the next call. That is all. Understanding this makes both the privacy bug and the cost curve obvious in advance.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🗂️ Two users, one chain</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Step through six turns from two sessions. Watch turn 3 — Bob asks Alice's exact question and gets a different answer, because <span class="mono">session_id</span> is the only thing keeping them apart.</p>
+    <div class="mem-wrap">
+      <div class="agent-trace" id="hist-stream"></div>
+      <div class="mem-stores" id="hist-stores"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="hist-next">Next turn</button>
+      <button class="btn btn-ghost" id="hist-reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 Wiring it up</h3></div>
+      <pre class="code">from langchain_core.runnables.history import (
+    RunnableWithMessageHistory)
+from langchain_core.chat_history import (
+    InMemoryChatMessageHistory)
+
+store = {}
+def get_history(session_id: str):
+    if session_id not in store:
+        store[session_id] = InMemoryChatMessageHistory()
+    return store[session_id]
+
+chat = RunnableWithMessageHistory(
+    chain, get_history,
+    input_messages_key="question",
+    history_messages_key="history",
+)
+
+chat.invoke(
+    {"question": "And the week before?"},
+    config={"configurable": {"session_id": "alice"}},
+)</pre>
+      <p class="panel-sub" style="margin-top:12px"><span class="mono">InMemoryChatMessageHistory</span> is for demos. Swap in Redis, Postgres or a LangGraph checkpointer the moment there are two processes.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>✂️ Keeping it affordable</h3></div>
+      <pre class="code">from langchain_core.messages import trim_messages
+
+trimmer = trim_messages(
+    max_tokens=2000,
+    strategy="last",
+    token_counter=model,
+    include_system=True,      # keep the system message!
+    start_on="human",         # never start mid tool-call
+)
+
+chain = trimmer | prompt | model | StrOutputParser()</pre>
+      <div class="glossary" id="hist-notes" style="margin-top:14px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 10. TOOLS AND AGENTS                                          -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="agents" data-title="Tools &amp; agents" data-icon="10" data-group="Stateful">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 10 · Stateful</div>
+    <h2>A loop that decides <span class="grad">its own next step</span></h2>
+    <p class="lead">A chain runs the steps you wrote. An agent runs a loop: the model either asks for a tool or gives a final answer, and your executor keeps going until it stops asking. LangChain writes that loop; you write the tools and the caps.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔧 Three tools</h3></div>
+    <p class="panel-sub">The <span class="mono">@tool</span> decorator reads the function name, the type hints and the docstring. The docstring is what the model sees — write it for the model.</p>
+    <div class="tool-list" id="agent-tools"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🤖 Step the executor</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">A real trace: the model calls a tool, reads the result, and only decides to write a ticket once two observations agree.</p>
+    <div class="agent-trace" id="agent-trace"></div>
+    <div class="btn-row">
+      <button class="btn" id="agent-step">Next message</button>
+      <button class="btn btn-ghost" id="agent-auto">▶ Run to completion</button>
+      <button class="btn btn-ghost" id="agent-reset">↺ Reset</button>
+      <span class="ctrl-hint mono" id="agent-iter">not started</span>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 Defining tools and the executor</h3></div>
+      <pre class="code">from langchain_core.tools import tool
+
+@tool
+def get_p95(service: str, window: str) -> dict:
+    """Return p95 latency in ms for a service over a
+    window like "24h" or "7d_prior". Use this before
+    claiming anything is slow."""
+    return metrics.p95(service, window)
+
+tools = [get_p95, list_deploys, open_ticket]</pre>
+      <pre class="code" id="agent-code" style="margin-top:12px"></pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Four things that bite</h3></div>
+      <div class="glossary" id="agent-notes"></div>
+      <div class="callout warn" style="margin-top:14px">
+        <div class="callout-ico">🚦</div>
+        <div><span class="mono">open_ticket</span> writes. In production that call belongs behind an approval gate or a hard cap — which is precisely the case LangGraph's <span class="mono">interrupt_before</span> exists for.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 11. LANGGRAPH                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="graph" data-title="LangGraph" data-icon="11" data-group="Stateful">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 11 · Stateful</div>
+    <h2>When a chain needs to <span class="grad">go backwards</span></h2>
+    <p class="lead">LCEL builds a DAG: data flows forward and never loops. But "retrieve, check whether it was any good, and try a different query if not" is a cycle. LangGraph gives you explicit state, real cycles, checkpoints you can resume from, and interrupts for human approval.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🕸️ Step a self-correcting RAG graph</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The first retrieval deliberately misses. Watch the conditional edge route back to <span class="mono">rewrite_query</span> — and watch <span class="mono">attempts</span> tick up in the state, which is what stops it looping forever.</p>
+    <div class="graph-wrap">
+      <svg id="graph-svg" viewBox="0 0 100 100" class="topo-svg"></svg>
+      <div>
+        <div id="graph-state"></div>
+        <div id="graph-log" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="graph-next">Next node</button>
+      <button class="btn btn-ghost" id="graph-reset">↺ Reset</button>
+      <span class="ctrl-hint mono" id="graph-count">not started</span>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧩 The nodes</h3></div>
+      <div class="glossary" id="graph-nodes"></div>
+      <p class="panel-sub" style="margin-top:12px">Each one is an ordinary function: takes the state dict, returns a dict of updates. No base class, no decorator, and testable with a plain assert.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>💻 The graph</h3></div>
+      <pre class="code" id="graph-code"></pre>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Why bother</h3></div>
+    <div class="glossary" id="graph-why"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🖐️</div>
+    <div><b>Human in the loop, concretely.</b> Compile with <span class="mono">interrupt_before=["execute"]</span> and a checkpointer. The graph runs up to that node, stops, and hands you the full state. Approve it, edit a value, or reject — then call <span class="mono">app.invoke(None, config)</span> to resume from exactly where it paused. Building that yourself over an LCEL chain is not a small job.</div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">📚</div>
+    <div><b>This chapter is the tour.</b> Reducers, super-steps, checkpointer internals, time travel, the five streaming modes, subgraph hand-offs and long-term memory each get a full chapter in the companion <a href="../langgraph/index.html"><b>LangGraph Flow</b></a> course.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 12. SHIP IT                                                   -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="ship" data-title="Ship it" data-icon="12" data-group="Shipping">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 12 · Shipping</div>
+    <h2>Tracing, cost, and the <span class="grad">debugging order</span></h2>
+    <p class="lead">LangChain is a library, not a runtime — you deploy it inside whatever you already have. What changes in production is that you can no longer see what the chain did, which is why tracing is the first thing to turn on, not the last.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏛️ The pieces</h3></div>
+    <div class="arch" id="arch"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🔍 Turning on tracing</h3></div>
+      <pre class="code">export LANGSMITH_TRACING=true
+export LANGSMITH_API_KEY=...
+export LANGSMITH_PROJECT=northwind-support</pre>
+      <p class="panel-sub" style="margin-top:12px">That is the whole integration — every runnable already emits callback events, so every step of every run shows up with its inputs, outputs, token counts, latency and errors. Name your steps so the trace is readable:</p>
+      <pre class="code">chain = (
+    retriever.with_config(run_name="retrieve")
+    | format_docs
+    | prompt
+    | model.with_config(run_name="answer")
+    | StrOutputParser()
+)</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🩺 Debug in this order</h3></div>
+      <div class="ladder" id="debug-steps"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>💰 What a RAG request costs</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Defaults are roughly a mid-tier model at $3/$15 per million tokens. Change the retrieved-context size and watch which line dominates.</p>
+    <div class="calc" id="calc"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📦 The packages</h3></div>
+    <div class="glossary" id="ecosystem"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>✅ Pre-launch checklist</h3><span class="panel-tag">saves</span></div>
+    <div class="checklist" id="checklist"></div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 13. QUIZ                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Shipping">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 13 · Finish line</div>
+    <h2>Prove it to <span class="grad">yourself</span></h2>
+    <p class="lead">Twelve questions across everything above. No time limit, instant explanations, retake it as often as you like.</p>
+  </header>
+
+  <div class="panel">
+    <div id="quiz" class="quiz"></div>
+  </div>
+
+  <div class="panel glossary-panel">
+    <div class="panel-head"><h3>📖 Glossary</h3></div>
+    <input type="search" id="gloss-search" class="input-line" placeholder="filter terms…">
+    <div class="glossary" id="glossary"></div>
+  </div>
+</section>
+
+</div><!-- /stage -->
+
+<div class="pager" id="pager">
+  <button class="btn btn-ghost" data-goto="prev">&larr; Back</button>
+  <div class="pager-dots" id="pager-dots"></div>
+  <button class="btn" data-goto="next">Next &rarr;</button>
+</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/content.js"></script>
+<script src="js/demos.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

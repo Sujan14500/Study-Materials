@@ -1,0 +1,1240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Datanyx Agent Field Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🗄️</text></svg>">
+<style>*,*::before,*::after{box-sizing:border-box}img,svg{max-width:100%}</style>
+</head>
+<body>
+<style>
+  :root {
+    --ground: #EDF0F3;
+    --surface: #FFFFFF;
+    --surface-2: #E3E8ED;
+    --ink: #0F161D;
+    --ink-2: #46535F;
+    --ink-3: #6E7C89;
+    --rule: #C8D1D9;
+    --rule-soft: #DCE3E9;
+    --accent: #B03E17;
+    --accent-soft: #F3E2DB;
+    --signal: #14615F;
+    --signal-soft: #DDEBEA;
+    --code-bg: #E7ECF0;
+    --shadow: 0 1px 2px rgba(15,22,29,.06), 0 8px 24px rgba(15,22,29,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0B1116;
+      --surface: #121B22;
+      --surface-2: #182430;
+      --ink: #E2E9EF;
+      --ink-2: #A3B1BD;
+      --ink-3: #7C8A97;
+      --rule: #2A3944;
+      --rule-soft: #1E2B35;
+      --accent: #E4703F;
+      --accent-soft: #2E1B12;
+      --signal: #46B3AE;
+      --signal-soft: #102C2C;
+      --code-bg: #172129;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0B1116;
+    --surface: #121B22;
+    --surface-2: #182430;
+    --ink: #E2E9EF;
+    --ink-2: #A3B1BD;
+    --ink-3: #7C8A97;
+    --rule: #2A3944;
+    --rule-soft: #1E2B35;
+    --accent: #E4703F;
+    --accent-soft: #2E1B12;
+    --signal: #46B3AE;
+    --signal-soft: #102C2C;
+    --code-bg: #172129;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.28);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono, code, kbd, .eyebrow, .stat-k, th, .qnum, .tag {
+    font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    gap: 48px;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 28px 120px;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--rule);
+    padding: 56px 0 30px;
+    margin-bottom: 40px;
+  }
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: clamp(30px, 4.6vw, 46px);
+    line-height: 1.08;
+    letter-spacing: -.025em;
+    font-weight: 600;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+  .deck {
+    max-width: 62ch;
+    font-size: 19px;
+    color: var(--ink-2);
+    margin: 0 0 32px;
+  }
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border-top: 1px solid var(--rule-soft);
+    padding-top: 20px;
+  }
+  .stat {
+    flex: 1 1 116px;
+    padding-right: 20px;
+  }
+  .stat + .stat { border-left: 1px solid var(--rule-soft); padding-left: 20px; }
+  .stat-k {
+    display: block;
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-l {
+    display: block;
+    font-size: 12px;
+    color: var(--ink-3);
+    letter-spacing: .02em;
+  }
+
+  /* ---------- rail ---------- */
+  nav.rail {
+    position: sticky;
+    top: 24px;
+    align-self: start;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  nav.rail h2 {
+    font-size: 10.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  nav.rail ul { list-style: none; margin: 0 0 26px; padding: 0; }
+  nav.rail li { margin-bottom: 3px; }
+  nav.rail a {
+    color: var(--ink-2);
+    text-decoration: none;
+    display: block;
+    padding: 3px 0 3px 10px;
+    border-left: 2px solid var(--rule-soft);
+  }
+  nav.rail a:hover, nav.rail a:focus-visible {
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+
+  /* ---------- content ---------- */
+  main { min-width: 0; }
+
+  section { margin-bottom: 68px; scroll-margin-top: 24px; }
+
+  h2.sec {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink);
+    font-weight: 600;
+    margin: 0 0 6px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--ink);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+  }
+  h2.sec span { color: var(--accent); font-size: 11px; letter-spacing: .1em; }
+
+  h3 {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 18px;
+    letter-spacing: -.01em;
+    font-weight: 600;
+    margin: 38px 0 12px;
+    text-wrap: balance;
+  }
+  h4 {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 26px 0 8px;
+    color: var(--ink-2);
+  }
+
+  p { margin: 0 0 16px; max-width: 68ch; }
+  ul.body, ol.body { max-width: 68ch; margin: 0 0 18px; padding-left: 22px; }
+  ul.body li, ol.body li { margin-bottom: 7px; }
+
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+
+  code {
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: .84em;
+    word-break: break-word;
+  }
+
+  a.inline { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .scroller { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--rule-soft); border-radius: 4px; background: var(--surface); }
+
+  pre {
+    margin: 0;
+    padding: 18px 20px;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    white-space: pre;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 14.5px;
+    background: var(--surface);
+  }
+  th {
+    text-align: left;
+    font-size: 10.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  tr:last-child td { border-bottom: 0; }
+  td:first-child { font-weight: 600; }
+
+  .note {
+    background: var(--surface);
+    border-left: 3px solid var(--signal);
+    padding: 16px 20px;
+    margin: 0 0 22px;
+    max-width: 68ch;
+    box-shadow: var(--shadow);
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .tag {
+    display: block;
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--signal);
+    margin-bottom: 8px;
+  }
+
+  /* ---------- stage list (real sequence) ---------- */
+  ol.stages { list-style: none; counter-reset: st; margin: 0 0 24px; padding: 0; max-width: 72ch; }
+  ol.stages li {
+    counter-increment: st;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  ol.stages li::before {
+    content: counter(st, decimal-leading-zero);
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    color: var(--accent);
+    padding-top: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+  ol.stages b { font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+
+  /* ---------- Q&A ---------- */
+  .qgroup { margin-bottom: 34px; }
+  .qgroup > h3 { margin-top: 0; }
+  details.q {
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow);
+  }
+  details.q[open] { border-color: var(--rule); }
+  details.q summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 14px 18px 14px 16px;
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 12px;
+    align-items: baseline;
+    font-weight: 600;
+    font-size: 16.5px;
+  }
+  details.q summary::-webkit-details-marker { display: none; }
+  details.q summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .qnum {
+    font-size: 11.5px;
+    color: var(--accent);
+    letter-spacing: .04em;
+    font-variant-numeric: tabular-nums;
+  }
+  details.q .ans {
+    padding: 0 18px 16px 68px;
+    border-top: 1px solid var(--rule-soft);
+    padding-top: 16px;
+    margin-top: 2px;
+  }
+  details.q .ans > *:last-child { margin-bottom: 0; }
+  .short {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13.5px;
+    line-height: 1.55;
+    background: var(--accent-soft);
+    color: var(--ink);
+    padding: 10px 14px;
+    border-radius: 3px;
+    margin: 0 0 16px;
+    max-width: 68ch;
+  }
+  .short b { color: var(--accent); letter-spacing: .06em; font-size: 10.5px; text-transform: uppercase; display: block; margin-bottom: 4px; }
+
+  .qtools {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 18px;
+  }
+  .qtools button {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    background: var(--surface);
+    color: var(--ink-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 7px 13px;
+    cursor: pointer;
+  }
+  .qtools button:hover { border-color: var(--accent); color: var(--accent); }
+  .qtools button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  ul.bullets { list-style: none; padding: 0; margin: 0 0 18px; max-width: 68ch; }
+  ul.bullets li {
+    padding-left: 18px;
+    position: relative;
+    margin-bottom: 8px;
+  }
+  ul.bullets li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+  }
+
+  footer {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--rule);
+    padding-top: 22px;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; gap: 0; padding: 0 20px 80px; }
+    nav.rail { position: static; max-height: none; margin-bottom: 44px; padding-bottom: 24px; border-bottom: 1px solid var(--rule-soft); }
+    nav.rail ul { columns: 2; column-gap: 20px; margin-bottom: 18px; }
+    details.q summary { grid-template-columns: 34px 1fr; font-size: 15.5px; }
+    details.q .ans { padding-left: 18px; }
+    body { font-size: 16.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <p class="eyebrow">Conversational BI · Azure OpenAI · pgvector · Flask</p>
+    <h1>Datanyx Agent Field Guide</h1>
+    <p class="deck">A GenAI backend that takes read-only credentials to an unfamiliar customer database, onboards itself onto the schema, builds its own semantic layer, and then answers business questions in English — with governed, executable analytics instead of guessed SQL.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-k">75k</span><span class="stat-l">lines, agentService</span></div>
+      <div class="stat"><span class="stat-k">253</span><span class="stat-l">Python modules</span></div>
+      <div class="stat"><span class="stat-k">67</span><span class="stat-l">REST endpoints</span></div>
+      <div class="stat"><span class="stat-k">94</span><span class="stat-l">pytest files</span></div>
+      <div class="stat"><span class="stat-k">6</span><span class="stat-l">source DB engines</span></div>
+      <div class="stat"><span class="stat-k">11</span><span class="stat-l">onboarding stages</span></div>
+    </div>
+  </header>
+
+  <nav class="rail">
+    <h2>The system</h2>
+    <ul>
+      <li><a href="#problem">What it solves</a></li>
+      <li><a href="#context">System context</a></li>
+      <li><a href="#stack">Tech stack</a></li>
+      <li><a href="#catalog">Semantic catalog</a></li>
+      <li><a href="#onboard">Onboarding pipeline</a></li>
+      <li><a href="#ask">The /ask pipeline</a></li>
+      <li><a href="#retrieval">Retrieval algorithm</a></li>
+      <li><a href="#subagents">Sub-agents</a></li>
+      <li><a href="#patterns">GenAI patterns</a></li>
+      <li><a href="#safety">Safety &amp; governance</a></li>
+      <li><a href="#perf">Performance</a></li>
+      <li><a href="#reliability">Reliability</a></li>
+      <li><a href="#tradeoffs">Trade-offs</a></li>
+      <li><a href="#bullets">Resume bullets</a></li>
+    </ul>
+    <h2>50 questions</h2>
+    <ul>
+      <li><a href="#qa-a">A · Project story</a></li>
+      <li><a href="#qa-b">B · Architecture</a></li>
+      <li><a href="#qa-c">C · RAG &amp; retrieval</a></li>
+      <li><a href="#qa-d">D · Prompting</a></li>
+      <li><a href="#qa-e">E · Agents</a></li>
+      <li><a href="#qa-f">F · Safety</a></li>
+      <li><a href="#qa-g">G · Performance</a></li>
+      <li><a href="#qa-h">H · Reliability</a></li>
+      <li><a href="#cheat">Cheat sheet</a></li>
+    </ul>
+  </nav>
+
+  <main>
+
+    <!-- ============ PART ONE ============ -->
+    <section id="problem">
+      <h2 class="sec">What it solves <span>Part one · the system</span></h2>
+      <p>Text-to-SQL demos work on a toy schema pasted into a prompt. Real enterprise databases break that in five ways, and each one has a specific answer in this codebase.</p>
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Real-world problem</th><th>What the service does</th></tr></thead>
+          <tbody>
+            <tr><td>Schemas don't fit in a prompt</td><td>Vector schema retrieval — embed every table, retrieve top-12 per question</td></tr>
+            <tr><td>Cryptic columns, undeclared foreign keys</td><td>Profiling, FK inference with live value-overlap verification, LLM role/domain classification</td></tr>
+            <tr><td>Business language ≠ schema language</td><td>A mined, human-editable business glossary retrieved and injected per question</td></tr>
+            <tr><td>LLMs hallucinate columns and emit destructive SQL</td><td>sqlglot AST safety gate, catalog-validated structured specs, bounded self-repair</td></tr>
+            <tr><td>Multi-tenant SaaS needs RLS and PII control</td><td>Execution delegated to the BI platform's RLS engine; PII blocked from raw projection; 4-tuple connection identity</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="context">
+      <h2 class="sec">System context <span>Two datastores, neither is the source DB</span></h2>
+      <div class="scroller">
+<pre>┌──────────────────────┐        ┌───────────────────────────────────────────┐
+│  Angular BI frontend │        │        Datanyx AI Service (this repo)      │
+│  chat · dashboards   │        │  api.py — Flask, port 5000                │
+│  report wizard       │        │   ├── sqlService routes  /ask /mongoquery │
+└──────────┬───────────┘        │   └── agentService blueprint  /agent/*    │
+           │                    │                                           │
+           ▼                    │  schema_agent  glossary_agent  kpi_agent  │
+┌──────────────────────┐  HTTP  │  qa_agent  report_agent  viz_agent        │
+│  Node/Java BI backend│◄──────►│  doc_agent  questionnaire  observability  │
+│  RLS/CLS executor    │        └────────────┬─────────────────┬────────────┘
+│  credential vault    │                     │                 │
+└──────────┬───────────┘                     ▼                 ▼
+           │                    ┌────────────────────┐  ┌──────────────────┐
+           ▼                    │ Catalog DB         │  │ Azure OpenAI     │
+┌──────────────────────┐        │ Postgres+pgvector  │  │ gpt-4.1  chat    │
+│  Customer source DBs │◄───────│ schema · profiles  │  │ text-embedding-  │
+│  MySQL PG MSSQL      │ read-  │ glossary · KPIs    │  │ 3-small · 1536d  │
+│  Oracle Databricks   │ only   │ reports · vectors  │  └──────────────────┘
+│  ClickHouse          │        └────────────────────┘
+└──────────────────────┘                 + AWS S3 — uploaded docs, AI call logs</pre>
+      </div>
+      <p><strong>Two execution paths from one endpoint.</strong> When the caller supplies <code>datasourceDetails</code>, the agent connects to the source database itself and returns rows plus a chart. When it doesn't, the agent returns only the SQL/spec and the BI app executes it — which preserves row- and column-level security, and is also the graceful fallback when the agent cannot reach the source DB.</p>
+      <div class="note">
+        <span class="tag">Why one Flask app hosts two services</span>
+        <p>The Angular frontend already targeted one host and port. <code>api.py</code> at the repo root is a composition root: it boots <code>sqlService</code> routes inline and mounts <code>agentService</code> as a Blueprint at <code>/agent/*</code> on port 5000. It configures logging once with <code>force=True</code> (several imported modules call <code>basicConfig</code> themselves), and <code>chdir</code>s into <code>sqlService/</code> because that service reads config relative to cwd while agentService resolves its own by absolute path. The same Blueprint object serves the standalone port-5001 app, so the two modes cannot drift.</p>
+      </div>
+    </section>
+
+    <section id="stack">
+      <h2 class="sec">Tech stack</h2>
+      <div class="scroller">
+        <table>
+          <tbody>
+            <tr><td>Runtime</td><td>Python 3.11, Flask 3 + Blueprints, SSE for long requests</td></tr>
+            <tr><td>LLM</td><td>Azure OpenAI <code>gpt-4.1</code> at temperature 0.0; <code>text-embedding-3-small</code>, 1536 dims. Pluggable: Databricks serving endpoints and customer OpenAI keys</td></tr>
+            <tr><td>Vector store</td><td>pgvector inside the catalog Postgres — native <code>&lt;=&gt;</code> cosine distance over an HNSW index, so ranking and top-k run in the database</td></tr>
+            <tr><td>Data access</td><td>SQLAlchemy 2.0, declarative models, <code>session_scope()</code></td></tr>
+            <tr><td>SQL analysis</td><td>sqlglot 25.x — AST safety gate, dialect transpilation, LIMIT injection</td></tr>
+            <tr><td>Source drivers</td><td>pymysql, psycopg2, pyodbc, oracledb (aliased as <code>cx_Oracle</code>), databricks-sql-connector, clickhouse-connect</td></tr>
+            <tr><td>Background work</td><td>ThreadPoolExecutor job pool + APScheduler; stale-job sweeps at startup</td></tr>
+            <tr><td>Documents</td><td>pypdf, PyMuPDF (rasterizes scanned PDFs for the vision model), python-docx, openpyxl, boto3 → S3</td></tr>
+            <tr><td>Optional scale</td><td>PySpark profiler backend for Databricks or tables above 100M rows</td></tr>
+            <tr><td>Legacy engine</td><td>LangChain 0.3 <code>SQLDatabaseChain</code> in sqlService only</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="catalog">
+      <h2 class="sec">The semantic catalog <span>The agent's memory</span></h2>
+      <p>Everything the agent learns lands in a Postgres catalog DB with pgvector — never the customer's database. Schema is auto-created on first request; the <code>vector</code> extension and the database itself are created automatically when the PG user has <code>CREATEDB</code>.</p>
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Table</th><th>Holds</th></tr></thead>
+          <tbody>
+            <tr><td>agent_connection</td><td>One registered datasource. Identity is the tuple <code>(tenant_id, user_id, data_source_id, env_name)</code> — status, onboarding checkpoint, live profile progress, industry</td></tr>
+            <tr><td>agent_datasource_table</td><td>Every profiled table: row count, role (fact/dimension/…), business domain, <code>embedding_vector vector(1536)</code></td></tr>
+            <tr><td>agent_column</td><td>Null ratio, distinct count, min/max/mean/stddev, top-k values, samples, sensitivity (none/pii/financial/health)</td></tr>
+            <tr><td>agent_datasource_relationship</td><td>FK edges tagged <code>declared</code> or <code>inferred</code>, with confidence</td></tr>
+            <tr><td>agent_business_term</td><td>The glossary: term, aliases, definition, type, column refs, filter/formula SQL, structured recipe, <code>depends_on</code>, versions, embedding, status, source</td></tr>
+            <tr><td>agent_kpi</td><td>KPI definition, last value, and structured metadata (base table, measure, aggregation, date column, row-scope filter)</td></tr>
+            <tr><td>agent_dashboard + widget_mapping</td><td>Instant dashboards. Widgets store a dims/measures <em>spec</em>, never raw SQL — data is fetched through the BI app at open time</td></tr>
+            <tr><td>agent_report_topic / plan_snapshot</td><td>AI-generated report topics with blueprints; pre-computed window-independent report plans, version-gated</td></tr>
+            <tr><td>agent_document / chunk</td><td>Uploaded files (S3 key + SHA-256 dedupe) and their embedded, citable chunks</td></tr>
+            <tr><td>agent_conversation / message</td><td>Chat threads. <strong>No raw result rows</strong> — only question, answer text, SQL, and the chart/dim-measure spec; rows re-materialize on reload</td></tr>
+            <tr><td>questionnaire tables</td><td>Per-source answers, org-level shared answers, and generated Tier-3 schema questions</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>Three modelling decisions worth naming</h4>
+      <ul class="bullets">
+        <li><strong>Soft deletes everywhere.</strong> A re-detected category, topic or dashboard keeps its original id, so saved artifacts keep resolving.</li>
+        <li><strong>Python attributes decoupled from physical columns</strong> via <code>Column("db_name", …)</code> — the DB could be renamed without touching application code.</li>
+        <li><strong>Embeddings written twice during migration.</strong> The legacy JSON-float TEXT column is still written for back-compat but no longer read; retrieval runs natively over pgvector.</li>
+      </ul>
+    </section>
+
+    <section id="onboard">
+      <h2 class="sec">Onboarding pipeline <span>11 stages · checkpointed · resumable</span></h2>
+      <p>Triggered by <code>POST /agent/connect</code>, run on a background thread pool. Status flows <code>pending → introspecting → ready</code>; <code>/ask</code> returns HTTP 409 until ready.</p>
+      <ol class="stages">
+        <li><b>connect</b> Read-only SQLAlchemy connection to the source DB.</li>
+        <li><b>introspect</b> Tables, views, columns, types, PKs, declared FKs, constraints, row-count estimates.</li>
+        <li><b>profile</b> Per-column stats and PII/financial/health tagging. Parallelized, and publishes live intra-stage progress <code>{done, total}</code> so the progress bar moves <em>within</em> the stage while hundreds of tables are profiled.</li>
+        <li><b>fk_inference</b> Infers undeclared foreign keys from four signal families.</li>
+        <li><b>role_classify</b> Batched LLM labels each table's role and business domain, with heuristic fallback; a separate classifier assigns the connection's industry.</li>
+        <li><b>vector_embed</b> Builds a natural-language summary per table and embeds it.</li>
+        <li><b>glossary_bootstrap</b> Tool-calling agent mines business terms from schema and real data.</li>
+        <li><b>category_generate</b> AI invents dashboard categories and up to three templates each.</li>
+        <li><b>dashboard_build</b> Agentic KPI proposer builds the starter dashboard.</li>
+        <li><b>report_topics</b> AI generates narrative-report topics with structural blueprints.</li>
+        <li><b>plan_snapshot_build</b> Pre-computes window-independent report plans so report generation later skips retrieval and planning LLM calls.</li>
+      </ol>
+      <p><strong>Resumability.</strong> Each stage writes <code>last_completed_stage</code>; a re-entered run skips everything at or before it, and unknown stage names are defensively treated as not-done. <code>POST /refresh</code> clears the checkpoint. A startup sweep bounces rows stuck in <code>INTROSPECTING</code> for over 30 minutes — a dead worker, a container OOM — back to <code>PENDING</code>; the same pattern covers stale dashboards and document ingestions.</p>
+      <div class="note">
+        <span class="tag">Foreign-key inference — LLM proposes, code disposes</span>
+        <p>Four signals merge: a name heuristic (<code>&lt;thing&gt;_id</code> → table resembling <code>&lt;thing&gt;</code> above 0.6 similarity), shared normalized key names with an orientation decision, value-shape agreement, and optional LLM proposals for pairs the textual heuristic misses — the classic <code>purchaser_id → customers.id</code>.</p>
+        <p>LLM proposals are never trusted alone. They pass a deterministic <strong>value-overlap gate</strong> that samples both columns from the live database and requires real overlap before the edge is persisted. Every stored edge carries its source, origin tag and confidence.</p>
+      </div>
+    </section>
+
+    <section id="ask">
+      <h2 class="sec">The /agent/ask pipeline</h2>
+      <div class="scroller">
+<pre>question
+  │
+  ├─ 1. ROUTER  one LLM call, JSON mode
+  │      • follow-up? → rewrite into a standalone question
+  │      • intent: data | metadata | report | metric_correction |
+  │                conversational | unsupported | out_of_scope | refine | clarify
+  │      • FAIL-OPEN: any error → data path, original question
+  │
+  ├─ 2. INTENT DISPATCH — non-data intents short-circuit
+  │      metadata → answered from the catalog, no source-DB hit
+  │      report   → narrative/topic report builder
+  │      refine   → re-chart the previous result, no re-query
+  │      metric_correction → NL correction parsed into an old→new diff dialog
+  │
+  └─ 3. DATA PATH  qa_agent/fast_pipeline.py
+         a. RETRIEVE  pgvector top-k + 1-hop FK neighbours
+                      + near-duplicate suppression
+                      + glossary terms + relationships block        [no LLM]
+         b. SYNTH     ONE call → structured spec {dimensions, measures,
+                      joins, filters, having, sort, customColumns}
+                      validated against the catalog, own repair loop
+         c. EXECUTE   POST spec to the Node BI generator (RLS/CLS preserved)
+         d. REPAIR    on error or 0 rows, feed the failure back and re-synth
+                      bounded by QA_FAST_MAX_EXEC_REPAIRS = 2
+         e. TAIL      chart plan (1 call: chart + alternatives + caption),
+                      confidence score, assumptions, audit, envelope</pre>
+      </div>
+
+      <h3>Why a structured spec instead of raw SQL</h3>
+      <p>The shipped path does <strong>not</strong> have the LLM write final SQL. It emits a validated JSON spec that the Node BI report generator compiles and executes. Three reasons:</p>
+      <ul class="bullets">
+        <li><strong>Security.</strong> SQL is generated by deterministic, already-audited BI code, and execution runs the same path dashboards use — so row- and column-level security are preserved without being reimplemented.</li>
+        <li><strong>Correctness.</strong> A spec is checkable field-by-field against the catalog before anything executes: does this column exist on this table, is this aggregation legal, is this join reachable.</li>
+        <li><strong>Capability honesty.</strong> When a question needs something the generator cannot express, the synth raises <code>UnsupportedQuestionError</code> instead of silently producing something wrong.</li>
+      </ul>
+
+      <h3>The response envelope</h3>
+      <p>Every answer — success or failure, on every path — is built from one skeleton, so a key is never missing. Builders only overwrite blocks, never delete them, which makes totality structural rather than a per-call discipline. <code>schemaVersion</code> is currently <strong>3</strong>; v3 is when charts moved from base64 PNG to live React components.</p>
+      <div class="scroller">
+<pre>{
+  "schemaVersion": 3,
+  "status": "success",
+  "kind": "answer",          // answer | metadata | report | needs_clarification |
+                             // irrelevant | unsupported | correction_proposed | error
+  "response": "SELECT …",    // SQL, kept top-level for legacy consumers
+  "queryId", "traceId", "durationMs", "message", "question",
+  "flags":        { isInsight, isIrrelevant, limitInjected, inlineData },
+  "followup":     { isFollowup, rewrittenQuestion },
+  "transparency": { tablesUsed, assumptions, ambiguities, clarificationsOffered },
+  "links":        { feedbackUrl, inspectHtmlUrl, clarifyEndpoint },
+  "payload":      { intent, result, chart }
+}</pre>
+      </div>
+      <p><code>transparency</code> is the trust surface. A text-to-SQL system's worst failure is not being wrong — it is being wrong <em>invisibly</em>. If the agent assumed "revenue" meant <code>net_amount</code>, that assumption ships next to the number.</p>
+    </section>
+
+    <section id="retrieval">
+      <h2 class="sec">The retrieval algorithm <span>Vector search was 60% of it</span></h2>
+      <p><strong>What gets embedded is not DDL.</strong> Each table gets a natural-language summary — name, LLM-assigned role, business domain, description, column names with types and representative samples — and <em>that</em> is embedded. User questions are in business language, so a summary reading "sales fact table, domain commerce, columns include order_date, net_amount, customer_id" sits far closer to "how much did we sell last month" than <code>CREATE TABLE sls_hdr</code> does.</p>
+      <ol class="body">
+        <li>Embed the question (cached) and run pgvector top-k, <code>DEFAULT_TOP_K_TABLES = 12</code>.</li>
+        <li><strong>Near-duplicate suppression.</strong> Two tables whose column-name sets overlap ≥ 0.70 collapse to the higher-ranked one. Denominator is <code>max(len(a), len(b))</code>, so a small lookup dim inside a wide fact is not flagged. Shown both, the LLM joins them and selects duplicate columns — which fails at execution with <code>ER_DUP_FIELDNAME</code> under MySQL's case-insensitive matching.</li>
+        <li><strong>Deprecated-twin tiebreak.</strong> When the duplicate pair differs only by <code>_old</code> / <code>_bak</code> / <code>_archive</code>, the canonical name wins regardless of rank — a 0.004 cosine gap must not strand every column the LLM will reference.</li>
+        <li><strong>FK-graph expansion.</strong> Vector similarity is blind to the FK graph, so 1-hop neighbours of the seed tables are pulled in (capped) — otherwise the fact table arrives without its dimensions and a fully-supported join becomes impossible.</li>
+        <li><strong>Relevance floor at 0.30 cosine.</strong> Vector search essentially never returns zero rows, so an off-topic prompt still retrieved something and got a confident fabricated answer. Observed: real topics ~0.4+, noise ~0.11–0.19.</li>
+        <li><strong>Metric-source augmentation.</strong> Tables a bound glossary metric depends on are force-added even when vector search missed them.</li>
+      </ol>
+
+      <h3>Glossary retrieval is exact-match-first, not cosine-first</h3>
+      <p>If a user literally names a metric — "show me GMV" — that definition <em>must</em> be injected; leaving it to cosine risks the right term ranking ninth and being dropped. So the order is: exact term or alias match, then fuzzy name match (trigram similarity plus Damerau–Levenshtein for typos), then cosine for concepts the user described rather than named, then dependency closure via <code>depends_on</code> so a ratio's numerator and denominator come along. The cap is a <strong>token budget</strong> of 4000 rather than a fixed top-k, with 1500 reserved for cosine hits so exact matches cannot starve them. Human-confirmed terms get a +0.10 rank boost, human-authored +0.05, so curated entries outrank equally-similar LLM drafts.</p>
+    </section>
+
+    <section id="subagents">
+      <h2 class="sec">Sub-agents and capabilities</h2>
+
+      <h3>Glossary agent — the semantic layer</h3>
+      <p>A tool-calling agent with <code>list_tables</code>, <code>describe_table</code>, <code>get_distinct_values</code>, <code>sample_rows</code> and <code>finalize_term</code> — so it can look at real data before naming a concept. It proposes seven term types: acronym, filter, metric, dimension, entity, synonym, and join_path. Every SQL-bearing fragment passes a deny-token check; every term is stored as <code>proposed</code> with a confidence score until a human confirms it.</p>
+      <p><strong>Conversational editing</strong> is the part users feel. Someone says "active customer should only count people who ordered in the last 90 days"; the service translates that into a structured recipe change, shows an old→new diff, and applies it only on confirm. Terms are versioned and revertible. There are also ad-hoc terms scoped to "this chat only". The pipeline deliberately does <em>not</em> cache the agent's catalog bindings across turns, precisely so an edit takes effect on the very next question.</p>
+
+      <h3>KPI / dashboard agent</h3>
+      <p>The agent explores the live database through tools and emits finalized KPI SQL with real names. The runner then re-executes every KPI itself <strong>under a row cap and statement timeout</strong> so a model-written query cannot wedge the service, asks the chart picker for a Vega-Lite spec derived from the actual result shape, and persists KPI, value and chart. There is deliberately <strong>no template fallback</strong> — "if the LLM is down, no dashboard" — because a generic template dashboard looks authoritative while being disconnected from the customer's schema.</p>
+
+      <h3>Narrative report agent</h3>
+      <p>The largest sub-package, around 10k lines. It produces multi-section HTML/React reports honouring topic, time period, comparison window and section choices. The mechanics that matter: the selected window is translated into the BI app's <code>filterObj</code> and threaded through <em>every</em> query, so totals reflect the window rather than cached all-time KPI values; "compare against" re-runs the same queries over the prior window for period-over-period deltas; KPIs carrying structured metadata are <strong>re-measured</strong> under the window with their own row-scope filter, so a subset KPI can never come out larger than its parent total. Quality gates include a coverage critic, a prose guard, evidence and ranking passes, and an audience inference that is cached alongside the plan snapshot. Everything is best-effort — a failing sub-question is logged and skipped so the report still composes.</p>
+
+      <h3>Visualization agent</h3>
+      <p>One LLM call returns the best chart, ranked alternatives for the UI dropdown, <em>and</em> the caption. It never raises — any failure falls back to a table plan. A high-cardinality guard downgrades a bar chart over 500 categories. Charts render as data-driven React/Recharts components; the legacy deterministic Vega-Lite path still serves dashboard tiles.</p>
+
+      <h3>Document agent — RAG over uploaded files</h3>
+      <p>Read → understand → embed → route, mirroring onboarding: one background job per document, resumable via a checkpoint, per-document failure isolation, SHA-256 dedupe per connection. Bytes live in S3 — the BI app uploads and hands over the key, the agent only reads. Scanned, text-empty PDFs are rasterized with PyMuPDF and read by the vision model, chosen over pdf2image specifically because it needs no poppler binary. Chunks carry a source locator (<code>{"page": 3}</code>) so answers can cite them. An FK asserted by an ER diagram still has to pass live probe verification, or it parks in <code>pending_proposals</code> for human confirmation.</p>
+
+      <h3>Questionnaire — "AI Setup"</h3>
+      <p>Three tiers capturing what the AI genuinely cannot infer. <strong>Common</strong> questions (fiscal year start, week start, timezone) live in global YAML. <strong>Domain</strong> banks are selected by function and industry. <strong>Schema</strong> questions are generated per connection from the catalog, LLM-phrased, cached, and regenerated only when a catalog hash drifts — never per page open, because the phrasing pass is the expensive part. Only answers are stored per connection; answers emit real artifacts and the row points at what it emitted, so an edit rewrites that artifact rather than creating a second one. Org-common answers are shared across a tenant, with precedence per-source &gt; org-common &gt; standard default.</p>
+    </section>
+
+    <section id="patterns">
+      <h2 class="sec">GenAI engineering patterns <span>Each one is a shipped decision</span></h2>
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Pattern</th><th>Where it lives</th></tr></thead>
+          <tbody>
+            <tr><td>RAG over schema metadata</td><td><code>catalog/vector_index.py</code>, <code>qa_agent/schema_retriever.py</code></td></tr>
+            <tr><td>Hybrid retrieval — exact → fuzzy → cosine</td><td><code>glossary_agent/retriever.py</code></td></tr>
+            <tr><td>Structured output over free-form text</td><td><code>qa_agent/structured_synth.py</code></td></tr>
+            <tr><td>Tool-calling agents at onboarding time</td><td>glossary proposer, KPI proposer, FK proposer, hybrid QA loop</td></tr>
+            <tr><td>LLM proposes, deterministic code disposes</td><td>FK value-overlap gate, catalog validation, SQL deny-lists</td></tr>
+            <tr><td>Bounded self-repair on real errors</td><td><code>fast_pipeline._execute_with_repair</code></td></tr>
+            <tr><td>Error messages engineered for the model</td><td><code>safety_gate.validate</code> — all failures at once, plus <code>did you mean</code></td></tr>
+            <tr><td>Single-call multi-task prompting</td><td>router (rewrite + classify), chart picker (chart + alts + caption)</td></tr>
+            <tr><td>Fail-open routing</td><td><code>router.classify</code> — never a 500 from an enrichment step</td></tr>
+            <tr><td>Refuse rather than fabricate</td><td>relevance floor + three typed refusal exceptions</td></tr>
+            <tr><td>Clarify instead of guess</td><td>schema-aware synth raises, answer persists as a glossary term</td></tr>
+            <tr><td>Memory as rewrite, not context stuffing</td><td><code>router.py</code>, <code>qa_agent/followup.py</code></td></tr>
+            <tr><td>Pre-computed, version-gated plan snapshots</td><td><code>report_agent/plan_snapshot.py</code></td></tr>
+            <tr><td>Deterministic embedding cache, pre-warmed</td><td><code>vector_index._embed_cache</code></td></tr>
+            <tr><td>Confidence scoring from three real signals</td><td><code>qa_agent/confidence.py</code></td></tr>
+            <tr><td>Per-request token accounting</td><td>thread-local tally in <code>qa_agent/llm.py</code></td></tr>
+            <tr><td>Full LLM call-trace + per-query inspect viewer</td><td><code>debug_trace.py</code>, <code>observability/ai_log_store.py</code></td></tr>
+            <tr><td>Model-compatibility shim</td><td><code>llm_compat.py</code> — new GPT versions drop in as config</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="safety">
+      <h2 class="sec">Safety &amp; governance</h2>
+      <h3>The sqlglot safety gate, in order</h3>
+      <ol class="body">
+        <li>Reject empty SQL.</li>
+        <li>Forbidden-substring scan: <code>into outfile</code>, <code>load_file(</code>, <code>xp_cmdshell</code>, <code>sp_executesql</code>, <code>pg_sleep(</code>, <code>benchmark(</code>, <code>sleep(</code>.</li>
+        <li>Parse with sqlglot at the target dialect.</li>
+        <li>Top-level node must be <code>Select</code>, <code>With</code>, or a set operation.</li>
+        <li>Walk the whole tree rejecting <code>Insert</code>/<code>Update</code>/<code>Delete</code>/<code>Create</code>/<code>Drop</code>/<code>Alter</code>/<code>Truncate</code>/<code>Merge</code>/raw <code>Command</code> nodes anywhere, including nested.</li>
+        <li>Table allow-list drawn from the retrieved slice.</li>
+        <li>Column-existence check with alias and CTE-alias resolution; unqualified columns must exist on at least one FROM/JOIN table, not merely somewhere in the slice.</li>
+        <li>PII-in-projection check.</li>
+        <li>Inject a dialect-correct row cap (1000) when no LIMIT is present — including T-SQL <code>TOP</code> wrapping for set operations.</li>
+      </ol>
+      <p><strong>Why bother when the role is read-only?</strong> Read-only is a deployment claim you cannot verify at runtime, and it stops neither exfiltration primitives (<code>INTO OUTFILE</code>, <code>load_file()</code>) nor resource exhaustion (<code>SELECT *</code> with no LIMIT, <code>benchmark()</code> as a DoS).</p>
+
+      <div class="note">
+        <span class="tag">The parse-failure trade-off, stated explicitly</span>
+        <p>sqlglot is an incomplete parser for some dialects — ClickHouse especially, where function-arity validation trips on valid nested duration math. Hard-rejecting there killed <em>valid</em> queries after the entire repair budget was spent, and the model cannot "fix" SQL that was never wrong. So a parse failure falls back to AST-free checks: no chained statements, must begin SELECT/WITH, append a row cap — and lets the source DB, the real authority on its own dialect, validate the rest.</p>
+        <p><strong>The exception is the point:</strong> it <em>fails closed</em> when the schema has PII columns, because PII safety cannot be proven without an AST. Degrade availability for unparseable SQL; never degrade confidentiality.</p>
+      </div>
+
+      <h3>PII, tenancy, and what is deliberately not stored</h3>
+      <ul class="bullets">
+        <li>Columns tagged <code>pii</code>/<code>financial</code>/<code>health</code> may appear in WHERE, JOIN and GROUP BY — those filter rows — but never raw in the SELECT projection unless wrapped in an aggregate. Alias resolution means <code>u.email</code> is recognized as <code>users.email</code>.</li>
+        <li>Tenancy has three layers: the 4-tuple identity with unique constraints and ambiguity rejection; explicit tenant + user authorization returning 403; and execution through the BI app with user/client headers so its own RLS applies. RLS is routed to, never reimplemented.</li>
+        <li>Chat history stores no raw result rows — only question, answer text, SQL and the spec. Reopening replays the spec through the RLS path, so a user who lost access to rows since the original answer does not see them on reload.</li>
+        <li>Secrets may be committed encrypted with a <code>~</code> marker and are decrypted at read; sensitive datasource fields are redacted in logs.</li>
+      </ul>
+    </section>
+
+    <section id="perf">
+      <h2 class="sec">Performance engineering</h2>
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Technique</th><th>Detail</th></tr></thead>
+          <tbody>
+            <tr><td>Search in the DB</td><td>pgvector <code>&lt;=&gt;</code> over HNSW — ordering and top-k in Postgres, no per-question Python scan</td></tr>
+            <tr><td>Embedding cache</td><td>512-entry LRU keyed by <code>(sha256(text), deployment)</code>. Deterministic, so a hit is byte-identical to recomputing. Pre-warmed at boot</td></tr>
+            <tr><td>Question cache</td><td>question → schema slice, 300s TTL, 256 entries, lazily expired on read, invalidated by <code>/refresh</code></td></tr>
+            <tr><td>Plan snapshots</td><td>Report retrieval + planning + extraction pre-computed at onboarding, version-gated so a logic change self-invalidates</td></tr>
+            <tr><td>Merged LLM calls</td><td>Router does rewrite + classify; chart picker does chart + alternatives + caption</td></tr>
+            <tr><td>Zero-LLM retrieval</td><td>The whole retrieve stage is vector + SQL</td></tr>
+            <tr><td>Boot warm-up</td><td>Catalog engine + schema warmed off-thread so the first <code>/ask</code> pays no one-time init</td></tr>
+            <tr><td>Prompt budgets</td><td>Glossary 4000, few-shot 2400, tool results row-capped (8 QA / 20 KPI), metadata char-capped — guarded by tests</td></tr>
+            <tr><td>Context compaction</td><td>Only the last 3 tool results kept in full; older ones stubbed</td></tr>
+            <tr><td>SSE transport</td><td>15s heartbeats so a gateway never 504s a long question at ~60s</td></tr>
+            <tr><td>Spark profiler</td><td>Auto-selected for Databricks or tables above 100M rows</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="reliability">
+      <h2 class="sec">Reliability engineering</h2>
+      <ul class="bullets">
+        <li><strong>Checkpoint and resume</strong> on both onboarding and document ingestion; unknown checkpoint values re-run defensively.</li>
+        <li><strong>Startup sweeps</strong> for stuck introspections (30 min), stale building dashboards, and stale document jobs.</li>
+        <li><strong>Fail-open where it is safe:</strong> router errors → data path; glossary errors → empty enrichment; audit store unreachable → non-fatal, because it must never block API serving.</li>
+        <li><strong>Graceful degradation of execution:</strong> unreachable source DB → return spec only and let the BI app run it.</li>
+        <li><strong>0 rows is a soft signal.</strong> Retry once, then return the 0-row result as a legitimate answer rather than an error.</li>
+        <li><strong>The Werkzeug reloader is off by default</strong> — the watchdog would kill long-lived onboarding threads and a double import would create two thread pools.</li>
+        <li><strong>Layered config with provenance logging</strong> — four layers, later wins, and boot logs show which file won each key.</li>
+      </ul>
+    </section>
+
+    <section id="tradeoffs">
+      <h2 class="sec">Key trade-offs, stated honestly</h2>
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Decision</th><th>Why</th><th>Cost accepted</th></tr></thead>
+          <tbody>
+            <tr><td>Structured spec, not LLM SQL</td><td>RLS preserved; spec is validatable</td><td>Some constructs unexpressible → explicit refusal</td></tr>
+            <tr><td>pgvector in the catalog DB</td><td>One datastore, transactional consistency with the metadata it describes</td><td>Vector search shares Postgres' availability envelope</td></tr>
+            <tr><td>Thread pool, not Celery</td><td>No extra infrastructure until load demands it; <code>submit()</code> is the single swap point</td><td>Jobs die with the process — mitigated by checkpoints and sweeps</td></tr>
+            <tr><td>In-memory caches</td><td>Deterministic keys make correctness trivial</td><td>Lost on restart, not shared across instances</td></tr>
+            <tr><td>No dashboard template fallback</td><td>A plausible-but-wrong dashboard costs more trust than an empty state</td><td>LLM outage means no dashboard</td></tr>
+            <tr><td>Lenient gate on parse failure</td><td>Hard-rejecting valid ClickHouse burns the repair budget unrecoverably</td><td>Weaker static guarantees — mitigated by failing closed on PII</td></tr>
+            <tr><td>Relevance floor at 0.30</td><td>Vector search never returns empty, so silence needs a floor</td><td>Empirically tuned; may refuse a niche legitimate question</td></tr>
+            <tr><td>Credentials cached per process</td><td>Avoids a backend round trip on every request</td><td>Restart required after rotation — documented</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>Known gaps worth naming before an interviewer finds them</h4>
+      <p>The audit/query log is currently a documented no-op since the ClickHouse store was removed, which means few-shot example selection and glossary mining have no history to draw on. <code>sqlService</code> has no automated tests. Caches are per-process, so multi-instance deployment lowers hit rate. The EXPLAIN dry-run helper is built but deliberately not wired into <code>/ask</code> pending a latency-versus-value call. There are token budgets but no per-tenant spend ceiling yet.</p>
+    </section>
+
+    <section id="bullets">
+      <h2 class="sec">Resume bullets <span>Pick three to five</span></h2>
+      <ul class="bullets">
+        <li>Built a production <strong>GenAI conversational-BI backend</strong> (Python/Flask, Azure OpenAI, pgvector) that autonomously onboards an unfamiliar customer database — introspection, column profiling, foreign-key inference, LLM domain classification, glossary mining and vector indexing — across an 11-stage resumable pipeline.</li>
+        <li>Designed a <strong>RAG text-to-analytics pipeline</strong> over a 1536-dimension pgvector index with hybrid retrieval, FK-graph slice expansion, near-duplicate table suppression, and a cosine relevance floor that makes the agent refuse off-topic questions instead of fabricating answers.</li>
+        <li>Replaced free-form LLM SQL generation with a <strong>validated structured analytics spec</strong> executed through the BI platform's RLS-preserving engine, removing a class of injection and data-leak risk while keeping row/column security intact.</li>
+        <li>Implemented a <strong>sqlglot AST safety gate</strong> — read-only enforcement, table/column allow-lists with <code>did-you-mean</code> repair hints, PII-in-projection blocking, automatic row caps — plus a bounded self-repair loop fed by real execution errors.</li>
+        <li>Built <strong>tool-calling LLM agents</strong> for glossary mining and KPI generation whose every proposal is gated by deterministic verification: live value-overlap probes, catalog validation, SQL deny-lists.</li>
+        <li>Cut latency with a deterministic embedding cache, a TTL question cache and pre-computed report plan snapshots; eliminated gateway timeouts by moving long questions to an <strong>SSE streaming endpoint</strong> with heartbeats.</li>
+        <li>Shipped a <strong>conversational semantic layer</strong>: users correct metric definitions in plain English, review an old→new diff, and the change is versioned, revertible and live on the next question.</li>
+        <li>Delivered <strong>67 REST endpoints</strong> and <strong>94 pytest suites</strong> with fully stubbed LLM and database dependencies, plus per-request token accounting and a full LLM call-trace viewer.</li>
+      </ul>
+    </section>
+
+    <!-- ============ PART TWO ============ -->
+    <section id="qa-a">
+      <h2 class="sec">A · Project story <span>Part two · 50 questions</span></h2>
+      <p>Each question is collapsed so you can quiz yourself. The <span class="mono" style="color:var(--accent)">SAY</span> line is what you answer out loud; the rest is for the follow-up that always comes.</p>
+      <div class="qtools">
+        <button type="button" data-all="open">Expand all</button>
+        <button type="button" data-all="close">Collapse all</button>
+      </div>
+
+      <details class="q"><summary><span class="qnum">Q01</span><span>Tell me about this project in two minutes.</span></summary>
+        <div class="ans">
+          <p class="short"><b>Say</b>A GenAI backend that turns any customer database into a conversational BI system.</p>
+          <p>Two halves. The legacy half, <code>sqlService</code>, is a LangChain text-to-SQL engine. The half I'll focus on, <code>agentService</code>, is an autonomous database-analysis agent: give it read-only credentials and it onboards itself — introspects the schema, profiles every column, infers foreign keys that were never declared, uses an LLM to classify each table's role and business domain, mines a business glossary, embeds everything into a pgvector index, and generates a starter KPI dashboard and report topics.</p>
+          <p>After that, users ask questions in English. The agent retrieves the relevant schema slice by vector search, synthesizes a validated structured analytics spec, executes it through the BI platform's row-level-security engine, picks a chart, writes a caption, and returns a versioned response envelope. About 75,000 lines across 253 modules, 67 endpoints, 94 test files.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q02</span><span>What was the hardest problem you solved?</span></summary>
+        <div class="ans">
+          <p class="short"><b>Say</b>Making an LLM behave correctly on schemas far too large to fit in a prompt, without letting it hallucinate.</p>
+          <p>Three sub-problems, each with a concrete fix. <strong>Schema size</strong> — solved with RAG: every table gets an LLM-readable summary, embedded to 1536 dims, retrieved top-12 by pgvector cosine. <strong>Retrieval alone isn't enough</strong> — vector search is blind to the FK graph, so the fact table arrived without its dimensions and a supported join became impossible; fixed by expanding the slice with 1-hop FK neighbours. <strong>Silent fabrication</strong> — vector search essentially never returns zero rows, so an off-topic question still retrieved something and got a confident answer; fixed with an empirical relevance floor at 0.30 cosine. Real topics score ~0.4+, noise ~0.11–0.19.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q03</span><span>What would you do differently if you rebuilt it?</span></summary>
+        <div class="ans">
+          <p>Four things. Move background jobs off an in-process thread pool onto a real queue earlier — checkpoints and sweeps work, but they are compensating controls. Make the caches shared rather than per-process, because horizontal scaling silently drops the hit rate. Add per-tenant cost ceilings from day one; we have per-prompt token budgets but no spend ceiling. And build the evaluation harness before the features — 94 contract and unit test files prove the pipeline holds its shape, but a golden-question set scored on answer correctness would catch prompt regressions faster.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q04</span><span>What's the single most important architectural decision?</span></summary>
+        <div class="ans">
+          <p class="short"><b>Say</b>The LLM does not write the final SQL on the main path.</p>
+          <p>It emits a structured JSON spec — dimensions, measures, joins, filters, having, sort, custom columns — validated field-by-field against the catalog and POSTed to the BI platform's report generator, which compiles and executes it. Three payoffs: row/column security is enforced by existing audited code instead of reimplemented; the spec is machine-checkable in a way free SQL isn't; and when a question needs something the generator can't express, we raise <code>UnsupportedQuestionError</code> and say so instead of shipping plausible-but-wrong SQL.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q05</span><span>Who are the users and what does success look like?</span></summary>
+        <div class="ans">
+          <p>Business users inside a customer's organisation — people who know the business but not SQL. Success is: the agent onboards a new datasource unattended; a first question gets a correct, charted answer with nobody writing SQL; and when the agent is unsure it <em>says so</em> — clarification, transparency block, confidence label — rather than guessing. That last part is why so much of the code is refusal and transparency logic rather than generation.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q06</span><span>How is this different from calling ChatGPT with a schema?</span></summary>
+        <div class="ans">
+          <p>Five differences, all load-bearing in production. Schemas don't fit in context — hence RAG. Real column names carry no business meaning — hence the glossary and profiling. FKs are often undeclared — hence inference with value-overlap verification. Multi-tenant SaaS needs RLS and PII controls — hence spec execution through the BI engine and the AST PII guard. And an LLM answering confidently on a schema it misread is worse than no answer — hence the relevance floor, confidence scoring, and the clarification path.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="qa-b">
+      <h2 class="sec">B · Architecture</h2>
+
+      <details class="q"><summary><span class="qnum">Q07</span><span>Walk me through the request flow of one question.</span></summary>
+        <div class="ans">
+          <ol class="body">
+            <li><code>POST /agent/ask</code> or <code>/ask/stream</code>. Validation decodes base64 <code>datasourceDetails</code>, resolves <code>dataSourceId</code> to the internal connection via the identity tuple, and enforces tenant + user ownership.</li>
+            <li><strong>Router</strong> — one JSON-mode LLM call decides follow-up-and-rewrite plus intent across nine buckets.</li>
+            <li><strong>Intent dispatch</strong> — metadata, report, refine, correction, conversational, unsupported, out-of-scope and clarify all short-circuit here.</li>
+            <li><strong>Data path</strong> — retrieve slice + glossary + relationships with no LLM, one structured-synth call, execute via Node, bounded repair on error or 0 rows.</li>
+            <li><strong>Tail</strong> — one chart call producing chart + alternatives + caption, confidence score, assumptions and ambiguities, audit record, response envelope.</li>
+          </ol>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q08</span><span>Why is connection identity a 4-tuple instead of just dataSourceId?</span></summary>
+        <div class="ans">
+          <p>Because the numeric datasource id is not unique across the system — the same id exists in different environments and can belong to different tenants and users. Keying on it alone would let one tenant's question resolve to another tenant's catalog row. Identity is <code>(tenant_id, user_id, data_source_id, env_name)</code>, enforced by two unique constraints, and endpoints reject an ambiguous lookup rather than picking one. <code>/ask</code> returns 403 on ownership mismatch.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q09</span><span>Why two datastores, and why is neither the source database?</span></summary>
+        <div class="ans">
+          <p>The catalog DB (Postgres + pgvector) is the agent's own memory: connections, tables, columns, profiles, FKs, glossary, KPIs, dashboards, reports, conversations, embeddings. It must be separate from the customer's database because we only have read-only access there and must not write to it. The second store was ClickHouse for the audit/query log — deliberately separate because a high-volume append-only log has different characteristics from transactional catalog data, and because an unreachable log must never block API serving. That store has since been removed, so the audit module is a documented no-op that still mints query ids so every downstream artifact keeps working.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q10</span><span>Why did you mount two services in one Flask app?</span></summary>
+        <div class="ans">
+          <p>Product constraint — the Angular frontend already hit one host and port. <code>api.py</code> is a composition root that boots sqlService routes inline and agentService as a Blueprint at <code>/agent/*</code> on port 5000. It configures logging once with <code>force=True</code> because several imported modules call <code>basicConfig</code> themselves, puts both service directories on <code>sys.path</code>, and <code>chdir</code>s into <code>sqlService/</code> since that service reads config relative to cwd while agentService resolves its own by absolute path. The same Blueprint object serves the standalone port-5001 app, so the two deployment modes can't drift.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q11</span><span>How does the agent talk to six different database engines?</span></summary>
+        <div class="ans">
+          <p>SQLAlchemy with per-engine dialects across MySQL, PostgreSQL, SQL Server, Oracle, Databricks and ClickHouse. Two documented hacks: <code>oracledb</code> is aliased into <code>sys.modules</code> as <code>cx_Oracle</code> (cx_Oracle doesn't build on modern setuptools and SQLAlchemy imports it lazily), and the ClickHouse dialect is patched for SQLAlchemy 2.0. Dialect-specific generation goes through sqlglot, and the exact server version captured at onboarding is named in the synth prompt so the model avoids features the engine lacks — CTEs on MySQL 5.x, <code>FETCH FIRST</code> on Oracle 11g.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q12</span><span>Why a fixed response envelope with a schema version?</span></summary>
+        <div class="ans">
+          <p>Because the original code hand-assembled eight different dict literals across the orchestrator, and fields the frontend treated as always-present were silently missing on error paths — the same <code>kind: "answer"</code> even shipped results two different ways. Now every response starts from one skeleton and builders only overwrite blocks, never delete keys, so totality is structural rather than a per-call discipline. <code>schemaVersion</code>, currently 3, lets the frontend detect a breaking change and warn instead of crashing; v3 is when charts went from base64 PNG to live React components.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q13</span><span>What is the transparency block and why does it exist?</span></summary>
+        <div class="ans">
+          <p>It carries <code>tablesUsed</code>, <code>assumptions</code>, <code>ambiguities</code> and <code>clarificationsOffered</code> on every answer. It exists because a text-to-SQL system's biggest failure isn't being wrong — it's being wrong <em>invisibly</em>. If the agent assumed "revenue" meant <code>net_amount</code> rather than <code>gross_amount</code>, the user needs that assumption next to the number. It's also how the glossary grows: an ambiguity surfaced here becomes a clarification, and a confirmed clarification becomes a persisted term.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q14</span><span>Where does state live in a conversation?</span></summary>
+        <div class="ans">
+          <p>Two places only. Durable state in <code>agent_conversation</code>/<code>agent_message</code>: question, answer text, generated SQL, and the chart and dim-measure <em>specs</em> — but not raw result rows, for PHI safety. On reload, the render endpoint replays the spec through the RLS-preserving path to regenerate rows. Ephemeral state is a per-conversation in-memory store for "use this definition for this chat only" terms. Everything else is stateless, because the router rewrites follow-ups into standalone questions.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="qa-c">
+      <h2 class="sec">C · RAG, embeddings, retrieval</h2>
+
+      <details class="q"><summary><span class="qnum">Q15</span><span>What exactly do you embed?</span></summary>
+        <div class="ans">
+          <p>Not raw DDL. For each table a summariser builds a natural-language description combining the table name, its LLM-assigned role and business domain, its description, and its column names with types and representative sample values. That summary gets embedded. Glossary terms and document chunks are embedded separately with the same model.</p>
+          <p><strong>Why summaries beat DDL:</strong> user questions are in business language. "Sales fact table, domain commerce, columns include order_date, net_amount, customer_id" is semantically far closer to "how much did we sell last month" than <code>CREATE TABLE sls_hdr (...)</code> is.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q16</span><span>Why pgvector instead of Pinecone, Weaviate or FAISS?</span></summary>
+        <div class="ans">
+          <p>Operational simplicity plus consistency. The embeddings describe metadata that already lives in Postgres, so keeping the vector in the same row as the table it describes means one datastore, one backup, one transaction, and no sync job that can drift. Search uses the native <code>&lt;=&gt;</code> operator through SQLAlchemy's <code>Vector.cosine_distance</code> backed by HNSW, so ranking and top-k happen inside Postgres — no per-question Python scan. The trade-off is sharing Postgres' availability and scaling envelope, which is fine at our catalog sizes.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q17</span><span>Walk me through retrieval, including the parts that aren't vector search.</span></summary>
+        <div class="ans">
+          <ol class="body">
+            <li>Embed the question (cached) and run pgvector top-12.</li>
+            <li><strong>Near-duplicate suppression</strong> at ≥0.70 column-name overlap, denominator <code>max(len(a), len(b))</code> so a small lookup dim inside a wide fact isn't flagged. Showing both makes the LLM join them and emit duplicate columns — <code>ER_DUP_FIELDNAME</code> under MySQL's case-insensitive matching.</li>
+            <li><strong>Deprecated-twin tiebreak</strong> — <code>_old</code>/<code>_bak</code>/<code>_archive</code> loses to the canonical name regardless of rank, because a 0.004 cosine gap would strand every column the LLM references.</li>
+            <li><strong>FK-graph expansion</strong> — pull in capped 1-hop neighbours so the relationships block has in-slice edges.</li>
+            <li><strong>Relevance floor</strong> at 0.30 — refuse rather than answer.</li>
+            <li><strong>Metric-source augmentation</strong> — force-add tables a bound glossary metric depends on.</li>
+          </ol>
+          <p>The point worth landing: <strong>pure vector search was about 60% of the solution; the deterministic post-processing around it made it production-usable.</strong></p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q18</span><span>You cache embeddings — isn't caching risky for correctness?</span></summary>
+        <div class="ans">
+          <p>Not for query embeddings, which is exactly why only those are cached. An embedding is a deterministic pure function of <code>(text, deployment)</code> — the same text always yields the same vector, like a hash. A cache hit is byte-identical to recomputing, so it can never introduce a wrong result. It's a 512-entry LRU keyed by <code>(sha256(text), deployment)</code>, so a model change auto-misses, and only successful non-empty vectors are stored. It's pre-warmed at startup with recurring report topics so the first report after a restart doesn't pay a rate-limited round trip.</p>
+          <p>The <em>question</em> cache is different — question to schema slice isn't provably deterministic across schema changes, so it gets a 300-second TTL, a 256-entry bound, and explicit invalidation on refresh.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q19</span><span>How does glossary retrieval differ from schema retrieval?</span></summary>
+        <div class="ans">
+          <p>Schema retrieval is cosine-first; glossary retrieval is exact-match-first, because the failure modes differ. If a user literally names a metric, that definition must be injected — leaving it to cosine risks the right term ranking ninth and being dropped. Order: exact term/alias match, fuzzy name match (trigram + Damerau–Levenshtein for typos), cosine for described concepts, then dependency closure via <code>depends_on</code> so a ratio's numerator and denominator come along. The cap is a 4000-token budget rather than a fixed top-k, with 1500 reserved for cosine hits so exact matches can't starve them. Human-confirmed terms get +0.10 rank boost, human-authored +0.05.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q20</span><span>How do you keep the prompt from exploding?</span></summary>
+        <div class="ans">
+          <p>Named budgets everywhere, and tests that guard them. Glossary 4000 tokens; few-shot 2400 with k=3 from a pool of 100; metadata answers capped at 200 tables, 60 columns per table, 3 samples and 60,000 serialized characters; tool results row-capped at 8 for QA and 20 for KPI. In the agentic loop only the last three tool results are kept in full — earlier ones become short stubs. <code>test_prompt_size.py</code> and <code>test_token_budgets.py</code> fail the build if a change blows a budget.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q21</span><span>How does the document-upload RAG feature work?</span></summary>
+        <div class="ans">
+          <p>Read → understand → embed → route, mirroring onboarding: one background job per document, resumable via a checkpoint, per-document failure isolation so one bad file doesn't fail a batch. Bytes live in S3 — the BI app uploads and hands over the key, the agent only reads. SHA-256 dedupes re-uploads per connection. Scanned, text-empty PDFs are rasterized with PyMuPDF and read by the vision model, chosen over pdf2image specifically because it needs no poppler binary. Chunks carry a source locator like <code>{"page": 3}</code> so answers cite them. In the route stage, an FK asserted by an ER diagram must still pass live probe verification or it parks in <code>pending_proposals</code> for human confirmation.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q22</span><span>Why do document chunks use JSON embeddings while tables use pgvector?</span></summary>
+        <div class="ans">
+          <p>It's a migration in progress, and the code says so. Tables and glossary terms moved to native pgvector columns with an HNSW index; document chunks still use the older JSON-float-in-TEXT representation with cosine computed in Python. The legacy JSON column is still written for tables for backward compatibility but is no longer read by retrieval. Chunk volume per connection is small enough that the Python scan isn't the bottleneck yet — but it's the obvious next migration.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="qa-d">
+      <h2 class="sec">D · Prompting &amp; LLM engineering</h2>
+
+      <details class="q"><summary><span class="qnum">Q23</span><span>Why does the router do two jobs in one LLM call?</span></summary>
+        <div class="ans">
+          <p>Latency and consistency. Follow-up rewriting and intent classification need the same inputs — history plus the latest message — so splitting them meant two round-trips over nearly identical context. One JSON-mode call halves that latency and removes a class of inconsistency where the rewrite and the classification disagree about what the user meant. Same pattern in the chart picker: one call returns the best chart, the ranked alternatives for the dropdown, and the caption.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q24</span><span>What happens if the router's LLM call fails?</span></summary>
+        <div class="ans">
+          <p class="short"><b>Say</b>It fails open — the user still gets an answer, never a 500.</p>
+          <p>Any failure — no LLM, malformed JSON, an intent outside the taxonomy, a routed intent missing required params — degrades to intent <code>data</code>, not-a-follow-up, original question. That's the general principle here: an <em>enrichment</em> step that fails should silently reduce quality, never break the request. Glossary retrieval, the relationships block and the audit write follow the same rule.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q25</span><span>How do you handle follow-up questions?</span></summary>
+        <div class="ans">
+          <p class="short"><b>Say</b>By rewriting, not by context-stuffing.</p>
+          <p>The router turns "now just the top 5" into a standalone question carrying over only the subject, filter, time range and grouping the reference actually needs. Everything downstream — retrieval, glossary, few-shot, cache, synth — then works on a self-contained question with zero conversation awareness. The pipeline stays stateless and cacheable, and the retriever embeds a complete question rather than a fragment.</p>
+          <p>The prompt is explicit that <strong>sharing a topic is not a follow-up</strong> — the test is an <em>unresolved reference</em>: a pronoun, an ellipsis, or a request to modify the previous result. It's told never to carry over a filter the latest message didn't state, because that answers a different question than the user asked.</p>
+          <p>Related subtlety: the UI's "Select tables" scope is sticky across turns, so when a turn is <em>not</em> a follow-up we drop the inherited allow-list — otherwise a fresh unrelated question gets refused as irrelevant against the previous question's tables.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q26</span><span>How does the system know it can't answer something?</span></summary>
+        <div class="ans">
+          <p>Three typed exceptions with three different user outcomes. <code>IrrelevantQuestionError</code> — the schema genuinely can't answer this. <code>UnsupportedQuestionError</code> — the question needs a construct the report generator can't express, such as some window functions, CTEs, UNION or self-joins. <code>NeedsClarificationError</code> — a named business term can't be grounded without guessing, so we ask a <em>grounded</em> question and the answer can be persisted as a real glossary term. Plus the router's terminal intents: conversational, unsupported (write/export/email/schedule — we're read-only), and out-of-scope general knowledge, which is never free-answered.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q27</span><span>Why is the clarification decision made in synth, not in the router?</span></summary>
+        <div class="ans">
+          <p>Because the router has no schema visibility — it would be guessing. If a user names a term the dataset doesn't define, the router still routes to the data path; the schema-aware structured synth, which can see the actual columns and the retrieved glossary, decides whether the term can be grounded, and asks only when it genuinely can't. Router-level <code>clarify</code> is reserved for genuinely vague <em>wording</em>.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q28</span><span>Describe the self-repair loop.</span></summary>
+        <div class="ans">
+          <p>Two nested loops, both bounded. <strong>Inner (catalog validation):</strong> the synth validates the spec against the catalog — column existence, legal aggregations, joinable tables, resolvable custom-column references, duplicate output names — and re-prompts with the specific problems. <strong>Outer (execution):</strong> the spec goes to Node; on an execution error or 0 rows the real failure text is appended and the spec re-synthesized, bounded at two attempts.</p>
+          <p>A 0-row result is a <em>soft</em> signal, usually a wrong filter value: retry once, but if the budget runs out return the 0-row result as a legitimate answer rather than failing. The re-synth threads the error through the existing "previous turn" free-text channel instead of forking the prompt builder — one less prompt to keep in sync.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q29</span><span>You said error messages are "engineered for the model". Explain.</span></summary>
+        <div class="ans">
+          <p>Two concrete changes in the safety gate. <strong>Collect all failures in one pass.</strong> The original code rejected on the first unknown column; a wide report references ~40 columns across a dozen tables, so each repair fixed one column and the next attempt surfaced another — the repair budget was exhausted before the query was clean. Now every bad column is reported together with an instruction to fix them all in a single corrected query. <strong>Add "did you mean".</strong> Unknown names are matched against real catalog names with <code>difflib.get_close_matches</code> (n=3, cutoff 0.6) and echoed in the catalog's exact casing, since ClickHouse identifiers can be case-sensitive. Without it the model re-emits the same invented name.</p>
+          <p class="short"><b>The lesson</b>A rejection message is a prompt. Optimize it like one.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q30</span><span>What temperature do you use and why?</span></summary>
+        <div class="ans">
+          <p>0.0 almost everywhere — spec synthesis, chart picking, intent routing, role classification. These have correct answers, not creative ones, and determinism makes debugging and caching tractable. The one deliberate exception is the narrator at 0.2, which writes the one-sentence caption where variation reads better and there's no correctness risk. Max-token budgets are per task: 8000 for SQL synth, 700 for the router, 600 for the chart planner, 120 for the narrator.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q31</span><span>How do you handle different LLM model families?</span></summary>
+        <div class="ans">
+          <p>Through a compatibility shim that rewrites <code>temperature</code> and <code>max_tokens</code> for families that reject them — newer reasoning models refuse a non-default temperature and renamed the token parameter. Wrapping that in one place made supporting a new GPT version a config change rather than an edit at every call site. On the sqlService side there are pluggable providers — Datanyx-default Azure OpenAI, a customer's Databricks serving endpoint, or a customer's own OpenAI key — with <strong>no silent fallback</strong> when a provider's credentials are missing, so traffic never quietly lands on the wrong model or the wrong bill.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="qa-e">
+      <h2 class="sec">E · Agents &amp; tool calling</h2>
+
+      <details class="q"><summary><span class="qnum">Q32</span><span>Which parts are true agents versus a fixed pipeline, and why?</span></summary>
+        <div class="ans">
+          <p>Three genuine tool-calling agents — glossary proposer, KPI proposer, FK proposer — all running at <strong>onboarding time</strong>, where a 30–60 iteration exploration loop is acceptable because it happens once. The main <code>/ask</code> path is a <strong>fixed pipeline</strong> with a single synth call plus bounded repairs, because the user is waiting and the earlier agentic version's variable iteration count made latency unpredictable. A true tool-calling QA loop still exists as a hybrid path.</p>
+          <p class="short"><b>The rule</b>Agentic where exploration is genuinely needed and latency is amortized; deterministic where the user is blocked.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q33</span><span>What tools does the glossary agent get, and what stops it inventing terms?</span></summary>
+        <div class="ans">
+          <p>Tools: <code>list_tables</code> with role/domain/row count, <code>describe_table</code>, <code>get_distinct_values</code> for low-cardinality categoricals, <code>sample_rows</code> for up to five real rows, and <code>finalize_term</code>. So it can look at the data before naming a concept — it discovers <code>status</code> holds A/I/X and proposes an "active customer" filter grounded in the real value.</p>
+          <p>Guards: every SQL-bearing fragment passes a deny-token check, while term types carrying no SQL skip it as a no-op. Every term is stored as <code>proposed</code>, source <code>llm</code>, with a confidence score — visibly a draft until a human confirms — and confirmed terms get a retrieval rank boost so they outrank equally-similar drafts.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q34</span><span>How does FK inference work, and how do you avoid bad edges?</span></summary>
+        <div class="ans">
+          <p>Four signal families: a name heuristic (<code>&lt;thing&gt;_id</code> → table resembling <code>&lt;thing&gt;</code>, similarity above 0.6), shared normalized key names with an orientation decision, value-shape agreement (UUID, numeric, prefixed code), and optional LLM proposals for semantically likely pairs the textual heuristic misses — <code>purchaser_id → customers.id</code>, where nothing about the strings suggests a relationship.</p>
+          <p>The critical part: LLM proposals pass through a filter that samples both columns from the live database and requires genuine value overlap before persisting. Every stored edge carries source (declared vs inferred), origin (heuristic vs llm) and confidence, so consumers can weight them.</p>
+          <p class="short"><b>Name the pattern</b>LLM proposes, deterministic code disposes — in FK inference, in spec validation, and in the document agent's FK proposals.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q35</span><span>How do you bound an agent loop so it can't run forever?</span></summary>
+        <div class="ans">
+          <p>Three separate limits per loop, all named constants: a max-iteration count (QA 20, KPI 50, glossary 60), a <strong>safety ceiling</strong> on total tool calls independent of iterations (QA 6, KPI 30, glossary 80), and a per-call max-token budget. Tool results fed back are row-capped at 8 for QA and 20 for KPI. And only the last three tool results are retained in full — older ones are stubbed — so context doesn't grow unbounded across iterations.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q36</span><span>How does the KPI agent work, and why is there no fallback?</span></summary>
+        <div class="ans">
+          <p>The agent explores the live database through tools and emits finalized KPI SQL with real table and column names. The runner re-executes every KPI itself under a row cap and statement timeout so a model-written query can't wedge the service, asks the chart picker for a Vega-Lite spec derived from the <em>actual</em> result shape, and persists KPI, value and chart.</p>
+          <p>No template fallback is deliberate: a generic template dashboard looks authoritative but is disconnected from the customer's real schema. A plausible-but-wrong dashboard damages trust more than an empty state does.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q37</span><span>What is the conversational glossary and why does it matter?</span></summary>
+        <div class="ans">
+          <p>It's how users correct the agent in English instead of filing a ticket. Someone says "active customer should only count people who ordered in the last 90 days"; the edit endpoint translates that into a structured recipe change and returns an old→new diff; it applies only on confirm. Terms are versioned and revertible, and there's a lighter "this chat only" ad-hoc option scoped to a conversation in memory.</p>
+          <p>Why it matters: it moves the semantic layer from something a data engineer maintains to something the business owner maintains, and closes the loop from a bad answer to a permanent fix in one conversation. Notably the pipeline deliberately does <em>not</em> cache catalog bindings across turns, precisely so an edit takes effect on the very next question.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="qa-f">
+      <h2 class="sec">F · Safety, security, governance</h2>
+
+      <details class="q"><summary><span class="qnum">Q38</span><span>The DB role is read-only. Why still need a SQL safety gate?</span></summary>
+        <div class="ans">
+          <p>Defence in depth plus three failure modes read-only doesn't cover. "Read-only" is a deployment claim you can't verify at runtime — a misconfigured customer credential is exactly the case you need protection for. It doesn't stop <strong>exfiltration primitives</strong> like <code>INTO OUTFILE</code>, <code>load_file()</code> or <code>xp_cmdshell</code>. And it doesn't stop <strong>resource exhaustion</strong> — an unbounded <code>SELECT *</code>, or <code>benchmark()</code>/<code>pg_sleep()</code> as a DoS. The gate blocks all three and injects a row cap when the model forgets one.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q39</span><span>Walk through the safety gate's checks in order.</span></summary>
+        <div class="ans">
+          <ol class="body">
+            <li>Reject empty SQL.</li>
+            <li>Case-insensitive forbidden-substring scan.</li>
+            <li>Parse with sqlglot at the target dialect.</li>
+            <li>Top-level node must be Select, With, or a set operation.</li>
+            <li>Walk the entire tree rejecting Insert/Update/Delete/Create/Drop/Alter/Truncate/Merge/raw Command nodes anywhere, including nested.</li>
+            <li>Table allow-list from the retrieved slice.</li>
+            <li>Column-existence check with alias and CTE-alias resolution; unqualified columns must exist on at least one FROM/JOIN table, not merely somewhere in the slice.</li>
+            <li>PII-in-projection check.</li>
+            <li>Inject a dialect-correct row cap if no LIMIT is present.</li>
+          </ol>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q40</span><span>What's the PII rule exactly, and why projection-only?</span></summary>
+        <div class="ans">
+          <p>Columns tagged pii, financial or health may appear in WHERE, JOIN and GROUP BY — those <em>filter</em> rows and don't return sensitive values — but not raw in the SELECT projection unless wrapped in an aggregate. So <code>SELECT COUNT(DISTINCT email) FROM users WHERE email LIKE '%@acme.com'</code> is allowed; <code>SELECT email FROM users</code> is rejected with a message telling the model to aggregate instead. The check resolves table aliases so <code>u.email</code> is recognized as <code>users.email</code>, and unqualified columns are matched against every PII column in scope.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q41</span><span>What happens when sqlglot can't parse the SQL?</span></summary>
+        <div class="ans">
+          <p>This was a real production problem. sqlglot is incomplete for some dialects — ClickHouse especially, where function-arity validation trips on valid nested duration math. Hard-rejecting killed <em>valid</em> queries after the whole repair budget was spent, and the model can't "fix" SQL that was never wrong; it regenerates the same valid ClickHouse and gets rejected again.</p>
+          <p>So a parse failure falls back to AST-free checks — no chained statements, must begin SELECT/WITH/parenthesised select, append a row cap — and lets the source DB validate the rest through the execute-and-repair loop.</p>
+          <p class="short"><b>The important bit</b>It fails closed when the schema has PII columns. Without an AST we can't prove PII isn't in the projection, so we refuse. Degrade availability, never confidentiality.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q42</span><span>How is multi-tenancy enforced?</span></summary>
+        <div class="ans">
+          <p>Three layers. <strong>Identity</strong> — the 4-tuple key with unique constraints and endpoints that reject ambiguity instead of picking one. <strong>Authorization</strong> — ownership-sensitive endpoints check tenant and user against the catalog row and return 403; background scripts use an explicit system-user sentinel rather than a null that could match anything. <strong>Execution</strong> — the spec goes to the BI app with user and client headers, so the BI backend resolves the user profile and applies its own row- and column-level security. We don't reimplement RLS; we route through the system that already has it.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q43</span><span>What data do you deliberately not store, and why?</span></summary>
+        <div class="ans">
+          <p>Raw result rows are not persisted in chat history — only question, answer text, generated SQL and the chart/dim-measure spec. Reopening replays the spec through the RLS path, which means a user who has lost access to some rows since the original answer doesn't see them on reload. The one exception is catalog-derived metadata answers (table lists, dimension values), stored inline because they aren't source PHI and their SQL is synthetic and non-executable. Config secrets are stored encrypted with a <code>~</code> marker and decrypted at read; sensitive datasource fields are redacted in logs.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="qa-g">
+      <h2 class="sec">G · Performance &amp; scale</h2>
+
+      <details class="q"><summary><span class="qnum">Q44</span><span>Where does the latency go, and what did you do about it?</span></summary>
+        <div class="ans">
+          <p>Per question: one router call, one synth call plus up to two repairs, one chart call, one embedding call, plus actual query execution. Optimizations roughly by impact — merged LLM calls (router does rewrite+classify, chart picker does chart+alternatives+caption); retrieval with no LLM at all; the deterministic embedding cache and the TTL question cache; plan snapshots that remove the report planner's LLM calls entirely; background catalog warm-up at boot; SSE with heartbeats so gateways don't 504 a long question; and progress beats published to a polling endpoint so the UI shows real steps instead of a spinner.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q45</span><span>How do you handle a database with thousands of tables?</span></summary>
+        <div class="ans">
+          <p>Retrieval makes prompt size independent of schema size — that's the whole point. What <em>is</em> O(tables) is onboarding: introspection and profiling run on a thread pool with live intra-stage progress published so the bar interpolates <em>within</em> the profile stage instead of freezing while hundreds of tables are profiled. For genuinely large data there's an optional Spark profiler backend, auto-selected for Databricks or tables above 100M rows. And the pipeline is checkpointed, so a 30-minute onboarding that dies at stage 7 resumes at stage 7.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q46</span><span>How do you control LLM cost?</span></summary>
+        <div class="ans">
+          <p>Named token budgets per prompt component, tests that fail the build when a budget is exceeded, per-request thread-local token accounting folded into the audit plan so every request's real cost is measurable, and caches that remove whole LLM calls rather than shortening them — plan snapshots remove the report planner entirely, the embedding cache removes embed calls. The honest gap: no per-tenant spend ceiling yet.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q47</span><span>Your caches are in-memory. What breaks at multiple instances?</span></summary>
+        <div class="ans">
+          <p>Correctness doesn't break — every cache is either provably deterministic (embeddings) or TTL-bounded with explicit invalidation. What breaks is <strong>hit rate</strong>: each instance warms its own cache, so N instances mean roughly 1/N effective hit rate, and a refresh that invalidates on one instance doesn't invalidate on the others — which is why the TTLs are deliberately short. The documented upgrade path is Redis, and the modules are written so swapping the backing store is a local change, the same way the job <code>submit()</code> call is the single swap point for moving to a real queue.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="qa-h">
+      <h2 class="sec">H · Reliability, testing, reflection</h2>
+
+      <details class="q"><summary><span class="qnum">Q48</span><span>How does a long multi-stage onboarding survive crashes?</span></summary>
+        <div class="ans">
+          <p>Four mechanisms. <strong>Checkpointing</strong> — each stage writes <code>last_completed_stage</code>; a re-entered run skips everything at or before it, and unknown stage names are defensively treated as not-done. <strong>Startup sweeps</strong> — rows stuck in INTROSPECTING over 30 minutes are bounced back to PENDING, with the same pattern for stale dashboards and document jobs. <strong>Status as the contract</strong> — the BI app polls connection status, and <code>/ask</code> returns 409 until ready, so a half-onboarded source can't be queried. <strong>Reloader disabled by default</strong> — Werkzeug's watchdog would kill long-lived onboarding threads and a double import would create two thread pools.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q49</span><span>How do you test an LLM-dependent system?</span></summary>
+        <div class="ans">
+          <p>Four layers, all offline. <strong>Stubbed LLMs</strong> — a scripted client returns canned completions so a test asserts on <em>our</em> logic. <strong>Contract tests</strong> — response envelope, narrative API, renderer output — which is what makes the "every key always present" guarantee real rather than aspirational. <strong>Budget tests</strong> that fail if a prompt change blows a token budget. <strong>Named regression tests</strong> — files encoding specific production bugs so a fix can't silently regress.</p>
+          <p>What's missing, and I'd say so: an end-to-end evaluation set scoring <em>answer correctness</em> over a golden question bank. Contract tests prove the pipeline holds its shape; they don't prove the answer is right.</p>
+        </div>
+      </details>
+
+      <details class="q"><summary><span class="qnum">Q50</span><span>What did you learn from this project?</span></summary>
+        <div class="ans">
+          <p><strong>One: the LLM is the smallest part of the system.</strong> The router, synth and chart calls are maybe 200 lines of prompt. The other 75,000 lines are retrieval, validation, caching, refusal logic, resumability and transparency — the machinery that makes a probabilistic component safe to put in front of a customer's database.</p>
+          <p><strong>Two: constrain the output, not the model.</strong> Every quality jump came from narrowing what the model was allowed to emit — free SQL to validated spec, free chart choice to a constrained enum, free answers to explicit refusal exceptions. A model that can only emit valid shapes doesn't need to be trusted as much.</p>
+          <p><strong>Three: an error message is a prompt.</strong> Rewriting rejections to collect all failures at once and include "did you mean" suggestions fixed more real failures than any tweak to the main synth prompt. The model is a consumer of your error strings — write them for that reader.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="cheat">
+      <h2 class="sec">Cheat sheet <span>Numbers to have ready</span></h2>
+      <div class="scroller">
+        <table>
+          <tbody>
+            <tr><td>Chat model</td><td>Azure OpenAI <code>gpt-4.1</code>, temperature 0.0</td></tr>
+            <tr><td>Embedding model</td><td><code>text-embedding-3-small</code>, 1536 dims</td></tr>
+            <tr><td>Vector store</td><td>pgvector in the catalog Postgres, HNSW, <code>&lt;=&gt;</code> cosine</td></tr>
+            <tr><td>Top-k tables</td><td>12</td></tr>
+            <tr><td>Relevance floor</td><td>0.30 cosine</td></tr>
+            <tr><td>Near-duplicate threshold</td><td>0.70 column-name overlap</td></tr>
+            <tr><td>Execution repair budget</td><td>2</td></tr>
+            <tr><td>Default row cap injected</td><td>1000</td></tr>
+            <tr><td>Onboarding stages</td><td>11, checkpointed and resumable</td></tr>
+            <tr><td>Stale-introspection sweep</td><td>30 minutes</td></tr>
+            <tr><td>Question cache</td><td>300s TTL, 256 entries</td></tr>
+            <tr><td>Embedding cache</td><td>512-entry LRU, deterministic, pre-warmed</td></tr>
+            <tr><td>Glossary token budget</td><td>4000, with 1500 reserved for cosine hits</td></tr>
+            <tr><td>Agent loop caps</td><td>QA 20 iters / 6 tool calls · KPI 50/30 · glossary 60/80</td></tr>
+            <tr><td>Response envelope</td><td>schemaVersion 3</td></tr>
+            <tr><td>Endpoints · tests</td><td>67 on <code>/agent</code> · 94 pytest files, ~16,600 lines</td></tr>
+            <tr><td>Source engines</td><td>MySQL, PostgreSQL, SQL Server, Oracle, Databricks, ClickHouse</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    Datanyx AI Service · field guide for interview prep · source of truth lives in PROJECT_DOCUMENTATION.md and INTERVIEW_QA.md in the repo
+  </footer>
+</div>
+
+<script>
+  document.querySelectorAll('.qtools button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var open = btn.dataset.all === 'open';
+      document.querySelectorAll('details.q').forEach(function (d) { d.open = open; });
+    });
+  });
+</script>
+</body>
+</html>

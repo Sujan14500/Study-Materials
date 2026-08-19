@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LangGraph Flow — State, Cycles, Checkpoints, Interrupts</title>
+<meta name="description" content="An interactive course on LangGraph: state and reducers, nodes and edges, cycles, checkpointers, interrupts, time travel, streaming, subgraphs and long-term memory.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕸️</text></svg>">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<canvas id="bg-particles" class="bg-particles" aria-hidden="true"></canvas>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark"><span>⬡</span></div>
+    <div>
+      <div class="brand-name">LangGraph Flow</div>
+      <div class="brand-sub">state · cycles · checkpoints</div>
+    </div>
+  </div>
+
+  <div class="progress-block">
+    <div class="progress-top">
+      <span>Progress</span><span id="progress-label">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="xp-row">
+      <span class="xp-badge" id="xp-badge">0 XP</span>
+      <button class="reset-btn" id="reset-btn" title="Clear saved progress">reset</button>
+    </div>
+  </div>
+
+  <nav class="chapter-nav" id="chapter-nav" aria-label="Chapters"></nav>
+
+  <div class="sidebar-foot">
+    <kbd>&larr;</kbd><kbd>&rarr;</kbd> to navigate
+  </div>
+</aside>
+
+<button class="menu-toggle" id="menu-toggle" aria-label="Toggle chapters">&#9776;</button>
+
+<!-- ============ MAIN ============ -->
+<main class="main" id="main">
+<div class="stage" id="stage">
+
+<!-- ============================================================= -->
+<!-- 0. WELCOME                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="welcome" data-title="Welcome" data-icon="&#10022;" data-group="Start here">
+  <div class="hero">
+    <div class="hero-tag">interactive course · no signup · no server</div>
+    <h1 class="hero-title">Graphs that <span class="grad">remember</span><br>where they were</h1>
+    <p class="hero-sub">
+      LangGraph is two ideas with a lot of consequences: <b>explicit state</b> that every node
+      reads and writes, and a <b>checkpoint</b> written after every step. From those two you get
+      cycles, resume-after-crash, pause-for-a-human, and rewinding a run to change one value and
+      try again. Fourteen chapters, every idea attached to something you can step and break.
+    </p>
+
+    <div class="hero-anim">
+      <svg viewBox="0 0 640 180" class="flow-svg" id="hero-flow">
+        <defs>
+          <linearGradient id="gradFlow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#818cf8"/><stop offset="50%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#e879f9"/>
+          </linearGradient>
+        </defs>
+        <path id="flow-path" d="M40,90 C170,20 250,160 380,90 S560,40 600,90" fill="none" stroke="url(#gradFlow)" stroke-width="2" stroke-dasharray="6 6" opacity=".45"/>
+        <g id="hero-nodes"></g>
+        <circle r="6" fill="#fff"><animateMotion dur="4s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#e879f9"><animateMotion dur="4s" begin="1.3s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#818cf8"><animateMotion dur="4s" begin="2.6s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+      </svg>
+      <div class="hero-flow-labels">
+        <span>start</span><span>node</span><span>loop back</span><span>pause</span><span>end</span>
+      </div>
+    </div>
+
+    <div class="hero-cards">
+      <div class="hcard"><div class="hcard-ico">↺</div><h4>Watch it loop</h4><p>Step a cycle backwards through a node, then drop the recursion limit and watch it abort.</p></div>
+      <div class="hcard"><div class="hcard-ico">⏸</div><h4>Pause it</h4><p>Hit an interrupt, then approve, edit or reject — and see where each one lands.</p></div>
+      <div class="hcard"><div class="hcard-ico">⏪</div><h4>Rewind it</h4><p>Pick a checkpoint from the middle of a finished run and fork a different future.</p></div>
+    </div>
+
+    <button class="btn btn-lg" data-goto="next">Start the course <span class="arr">&rarr;</span></button>
+    <p class="hero-note">Progress saves in your browser. Code is Python.<br>
+      New to the framework? Do <b>LangChain Flow</b> first — this course assumes you know what a Runnable and an LCEL chain are.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 1. CHAIN OR GRAPH                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="why" data-title="Chain or graph?" data-icon="1" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 1 · Foundations</div>
+    <h2>Two questions, and only <span class="grad">two</span></h2>
+    <p class="lead">Does control flow ever need to go <b>backwards</b>? Does a run need to <b>survive the process</b> it started in? If both answers are no, an LCEL chain is smaller, faster and has nothing to configure. If either is yes, no amount of chain cleverness gets you there — you need a graph.</p>
+  </header>
+
+  <div class="two-up">
+    <div class="pcard reveal">
+      <div class="pcard-badge">⛓️ LCEL</div>
+      <h3>A chain is a DAG</h3>
+      <p class="pcard-desc">Data flows forward. Every step runs once. The run lives and dies inside one call.</p>
+      <pre class="code">chain = prompt | model | parser
+chain.invoke(x)</pre>
+      <div class="pcard-foot"><span class="pill good">Tiny, fast, obvious</span><span class="pill bad">No loops, no pause</span></div>
+    </div>
+    <div class="pcard reveal hot">
+      <div class="pcard-badge">🕸️ LangGraph</div>
+      <h3>A graph is a state machine</h3>
+      <p class="pcard-desc">Nodes read and write one shared state. Edges can point anywhere, including backwards. State is checkpointed after every step.</p>
+      <pre class="code">builder.add_edge("rewrite", "retrieve")
+graph = builder.compile(checkpointer=saver)
+graph.invoke(x, {"configurable":
+    {"thread_id": "t1"}})</pre>
+      <div class="pcard-foot"><span class="pill good">Cycles, resume, interrupts</span><span class="pill bad">More to configure</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Try it: chain or graph?</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Six real tasks. Apply the two questions — backwards, or beyond the process — before you answer. "It feels complicated" is not one of the tests.</p>
+    <div id="shape"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎁 What the graph buys you</h3></div>
+    <div class="glossary" id="graph-gives"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">💡</div>
+    <div><b>They compose.</b> A node can be an LCEL chain, and a compiled graph can sit inside a chain. This is not a choice of team — use chains for the straight bits and a graph for the part that loops or pauses. Most good LangGraph code has plenty of <span class="mono">|</span> in it.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 2. STATE AND REDUCERS                                         -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="state" data-title="State &amp; reducers" data-icon="2" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 2 · Foundations</div>
+    <h2>One typed dict, and the rules for <span class="grad">merging</span> it</h2>
+    <p class="lead">A node does not mutate state — it returns a dict of updates, and LangGraph merges them in. <b>How</b> each key merges is decided by its reducer: overwrite by default, append if you say so. Getting one annotation wrong is the most common LangGraph bug, and it fails silently.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>♻️ Reducer lab</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Four nodes run in sequence, each returning one new step. Switch the reducer on <span class="mono">steps</span> and replay — the difference between "appended" and "silently lost" is one annotation.</p>
+    <div class="chip-row" id="state-reducers"></div>
+    <div id="state-out"></div>
+    <div class="btn-row">
+      <button class="btn" id="state-next">Run next node</button>
+      <button class="btn btn-ghost" id="state-reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 Declaring state</h3></div>
+      <pre class="code">from typing import Annotated, TypedDict
+from operator import add
+from langgraph.graph.message import add_messages
+
+class State(TypedDict):
+    question: str                             # overwrite
+    steps: Annotated[list[str], add]          # append
+    attempts: Annotated[int, add]             # sum
+    messages: Annotated[list, add_messages]   # append, replace by id
+
+# or start from the prebuilt one:
+from langgraph.graph import MessagesState
+
+class State(MessagesState):        # already has `messages`
+    question: str
+    attempts: Annotated[int, add]</pre>
+      <p class="panel-sub" style="margin-top:12px">A reducer is any <span class="mono">f(existing, update) -> merged</span>. <span class="mono">Annotated[str, keep_longest]</span> with your own function works exactly the same way.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five rules</h3></div>
+      <div class="glossary" id="state-rules"></div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">⚠️</div>
+    <div><b>Two nodes, one super-step, one un-reduced key</b> raises <span class="mono">InvalidUpdateError</span>. That is deliberate: with no reducer there is no rule for merging concurrent writes, so LangGraph refuses to guess rather than losing one silently. When you see it, you are being told to annotate the key — not to serialise the nodes.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 3. NODES AND EDGES                                            -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="nodes" data-title="Nodes &amp; edges" data-icon="3" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 3 · Foundations</div>
+    <h2>A node is just a <span class="grad">function</span></h2>
+    <p class="lead">Takes the state, returns a dict of updates. No base class, no decorator, nothing to inherit — which is why every node in this course is testable with a plain <span class="mono">assert</span> and no model in sight.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧱 Graph builder</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Add and remove nodes; the wiring, the diagram and the code all follow. This builds a straight line — Chapter 4 adds the branching and Chapter 5 the loop.</p>
+    <div class="chip-row" id="build-bank"></div>
+    <div class="build-wrap">
+      <svg id="build-svg" viewBox="0 0 100 100" class="graph-svg"></svg>
+      <div>
+        <div class="lchain" id="build-chain"></div>
+      </div>
+    </div>
+    <div id="build-out" style="margin-top:18px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Six things about wiring</h3></div>
+    <div class="glossary" id="edge-rules"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>⚡ Parallel is the default</h3></div>
+      <p class="panel-sub">Two edges out of one node means both branches run in the <b>same super-step</b>, concurrently. Fan-in waits automatically:</p>
+      <pre class="code">builder.add_edge("plan", "search_web")
+builder.add_edge("plan", "search_docs")   # both run together
+builder.add_edge("search_web", "merge")
+builder.add_edge("search_docs", "merge")  # merge waits for both</pre>
+      <p class="panel-sub" style="margin-top:12px">Both branches write <span class="mono">results</span>, so that key needs a reducer — otherwise this is exactly the <span class="mono">InvalidUpdateError</span> from Chapter 2.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📤 Dynamic fan-out with Send</h3></div>
+      <p class="panel-sub">When you do not know the number of branches until run time — one per retrieved document, say — return <span class="mono">Send</span> objects:</p>
+      <pre class="code">from langgraph.types import Send
+
+def fan_out(state: State):
+    return [Send("summarise", {"doc": d})
+            for d in state["docs"]]
+
+builder.add_conditional_edges("retrieve", fan_out)</pre>
+      <p class="panel-sub" style="margin-top:12px">Each <span class="mono">Send</span> runs <span class="mono">summarise</span> with its own private input, all in one super-step. This is map-reduce, and the reduce half is just a reducer on the key they all write.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 4. CONDITIONAL EDGES                                          -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="routing" data-title="Conditional edges" data-icon="4" data-group="Control flow">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 4 · Control flow</div>
+    <h2>A function that picks an <span class="grad">edge</span></h2>
+    <p class="lead">A conditional edge is a plain function taking the state and returning the <b>name of the next node</b>. Not data, not a boolean — a node name. Once that lands, routing, branching, looping and finishing are all the same mechanism.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔀 Router lab</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Four incoming questions, one router. Watch which branch lights up — and note that the action request is routed to a human review node rather than straight to execution.</p>
+    <div class="chip-row" id="router-cases"></div>
+    <div id="router-out"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 The router</h3></div>
+      <pre class="code" id="router-code"></pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five things worth knowing</h3></div>
+      <div class="glossary" id="router-notes"></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🧭</div>
+    <div><b>Router or Command?</b> Use a conditional edge when the decision is a small pure function of state — cheap, testable, visible in the drawn graph. Use <span class="mono">Command(goto=…, update=…)</span> when the node that <i>did the work</i> is the one that knows where to go next, which is nearly always true for agent hand-offs. Chapter 11 uses the second.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 5. CYCLES                                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="cycles" data-title="Cycles &amp; limits" data-icon="5" data-group="Control flow">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 5 · Control flow</div>
+    <h2>The edge that points <span class="grad">backwards</span></h2>
+    <p class="lead">This is the feature. <span class="mono">add_edge("rewrite", "retrieve")</span> is one line and it is the entire reason LangGraph exists — a chain has no way to express it. What it costs you is that you now own the stopping condition.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>↺ Step a self-correcting loop</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The first retrieval deliberately misses. Watch the run go back around, and watch <span class="mono">attempts</span> climb. Then drag the recursion limit down to 3 and step again — that is what an unguarded loop looks like from the outside.</p>
+    <div class="ctrl" style="max-width:320px;margin-bottom:18px">
+      <label for="cycle-limit">recursion_limit <span class="mono" id="cycle-limit-v">25</span></label>
+      <input type="range" id="cycle-limit" min="2" max="25" value="25">
+    </div>
+    <div class="graph-wrap">
+      <svg id="cycle-svg" viewBox="0 0 100 100" class="graph-svg"></svg>
+      <div>
+        <div id="cycle-state"></div>
+        <div id="cycle-log" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="cycle-next">Next super-step</button>
+      <button class="btn btn-ghost" id="cycle-reset">↺ Reset</button>
+      <span class="ctrl-hint mono" id="cycle-count">not started</span>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 The loop</h3></div>
+      <pre class="code" id="cycle-code"></pre>
+      <p class="panel-sub" style="margin-top:12px">Two lines make the cycle; the <span class="mono">attempts &gt;= 2</span> clause makes it terminate. Delete that clause and the graph is technically still valid — it just runs until the recursion limit kills it.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🛑 Four ways to stop a loop</h3></div>
+      <div class="ladder" id="cycle-guards"></div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">⚠️</div>
+    <div><b><span class="mono">recursion_limit</span> is not a stopping condition.</b> It is a circuit breaker that fires when your design has already failed. Alert on <span class="mono">GraphRecursionError</span> and treat every occurrence as a bug in the routing function — raising the limit just makes the failure more expensive.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 6. PREBUILT AGENT                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="react" data-title="create_react_agent" data-icon="6" data-group="Control flow">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 6 · Control flow</div>
+    <h2>The graph you would have <span class="grad">written anyway</span></h2>
+    <p class="lead">A tool-calling agent is two nodes and one conditional edge. <span class="mono">create_react_agent</span> gives you that in one call — and because it returns an ordinary compiled graph, checkpointers, interrupts, streaming and the store all still work on it.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🤖 Step the agent loop</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Two nodes light up in turn. Every message is appended to <span class="mono">state["messages"]</span> by the <span class="mono">add_messages</span> reducer — the loop exits when the model returns no tool calls.</p>
+    <div class="ra-wrap">
+      <div class="ra-graph">
+        <div class="ra-node" data-n="agent"><span>🧠</span><b>agent</b></div>
+        <div class="ra-arrow">⇅</div>
+        <div class="ra-node" data-n="tools"><span>🔧</span><b>tools</b></div>
+        <div class="ra-cond">conditional edge:<br>tool_calls? → <b>tools</b><br>else → <b>END</b></div>
+      </div>
+      <div class="agent-trace" id="react-trace"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="react-step">Next message</button>
+      <button class="btn btn-ghost" id="react-auto">▶ Run to completion</button>
+      <button class="btn btn-ghost" id="react-reset">↺ Reset</button>
+      <span class="ctrl-hint mono" id="react-count">messages in state: 0</span>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 The whole thing</h3></div>
+      <pre class="code" id="react-code"></pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🔬 What is under it</h3></div>
+      <div class="glossary" id="react-anatomy"></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🎓</div>
+    <div><b>Use it, then outgrow it.</b> The prebuilt agent is the right starting point and a bad ceiling. The day you need a node before the model, a second branch, or a stopping rule of your own, write the graph yourself — it is about thirty lines, and every one of them is something you already met in Chapters 2–5.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 7. PERSISTENCE                                                -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="persist" data-title="Checkpointers" data-icon="7" data-group="Durability">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 7 · Durability</div>
+    <h2>Save the state after <span class="grad">every step</span></h2>
+    <p class="lead">A checkpointer writes the full state after every super-step, keyed by <span class="mono">thread_id</span>. That one mechanism is where memory, resume-after-crash, interrupts and time travel all come from — the next three chapters are just consequences of this one.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧵 Two threads, one graph</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Step through six turns. Watch turn 3, where Bob asks Alice's exact question and gets a different answer. Then kill the process and bring it back.</p>
+    <div class="mem-wrap">
+      <div class="agent-trace" id="thread-stream"></div>
+      <div class="mem-stores" id="thread-stores"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="thread-next">Next turn</button>
+      <button class="btn btn-ghost" id="thread-crash">💥 Kill / restart the process</button>
+      <button class="btn btn-ghost" id="thread-reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>💾 Which checkpointer</h3></div>
+    <div class="three-up" id="savers"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 Wiring it up</h3></div>
+      <pre class="code" id="persist-code"></pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five things about threads</h3></div>
+      <div class="glossary" id="persist-notes"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 8. INTERRUPTS                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="hitl" data-title="Interrupts &amp; HITL" data-icon="8" data-group="Durability">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 8 · Durability</div>
+    <h2>Stop, ask a human, <span class="grad">carry on tomorrow</span></h2>
+    <p class="lead">Because the state is checkpointed, a graph can stop in the middle of a node and wait — not for a second, but for as long as it takes. The process can exit. The server can redeploy. When the answer arrives, the run continues from exactly where it paused.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⏸ Run it, then decide</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">A refund email. The graph drafts it, then stops at the review node — nothing irreversible has happened yet. Approve, edit, or reject with a reason, and watch where each one lands.</p>
+    <div class="btn-row" style="margin-top:0;margin-bottom:16px">
+      <button class="btn" id="hitl-run">▶ Run the graph</button>
+      <button class="btn btn-ghost" id="hitl-reset">↺ Reset</button>
+    </div>
+    <div id="hitl-out"></div>
+    <div class="btn-row" id="hitl-choices" style="display:none"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 interrupt and resume</h3></div>
+      <pre class="code" id="hitl-code"></pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five things that bite</h3></div>
+      <div class="glossary" id="hitl-notes"></div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">🔁</div>
+    <div><b>The node re-runs from the top.</b> On resume, everything before <span class="mono">interrupt()</span> in that node executes a second time. If you sent an email above the interrupt line, you have now sent two. Keep side effects strictly after the interrupt, or in a node of their own.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 9. TIME TRAVEL                                                -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="timetravel" data-title="Time travel" data-icon="9" data-group="Durability">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 9 · Durability</div>
+    <h2>Every past moment is <span class="grad">addressable</span></h2>
+    <p class="lead">Checkpoints are not just for resume. Each one has an id, so you can jump to the middle of a finished run, change a value, and run a different future from there — with the original branch left intact beside it.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⏪ Rewind and fork</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">A finished run: someone asked for EU Q2 revenue. Pick the checkpoint after <span class="mono">plan</span>, change the region to APAC, and fork — without re-running anything before that point.</p>
+    <div class="tt-wrap">
+      <div id="tt-history"></div>
+      <div id="tt-out"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="tt-fork">🍴 Edit region → APAC and fork</button>
+      <button class="btn btn-ghost" id="tt-reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 The API</h3></div>
+      <pre class="code" id="tt-code"></pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🧰 What it is actually for</h3></div>
+      <div class="glossary" id="tt-uses"></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🔬</div>
+    <div><b>This is the debugging superpower.</b> A run failed at step 11? Load the checkpoint from step 10, fix the input by hand, and re-run just that node. No re-paying for the ten steps that were fine, and no guessing about the state they left behind — you can read it.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 10. STREAMING                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="streaming" data-title="Streaming" data-icon="10" data-group="Working with it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 10 · Working with it</div>
+    <h2>Five different things called <span class="grad">"streaming"</span></h2>
+    <p class="lead">A graph run emits state, per-node updates, model tokens, your own progress events, and execution traces. They are different streams, and <span class="mono">stream_mode</span> chooses which ones you get. Picking the wrong one is why "streaming does not work" is such a common complaint.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📡 Same run, five views</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">One retrieval-and-answer run. Switch modes and read what actually arrives — the shapes are genuinely different, not just more or less verbose.</p>
+    <div class="chip-row" id="stream-tabs"></div>
+    <div id="stream-out"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 Streaming API</h3></div>
+      <pre class="code" id="stream-code"></pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🎛️ Choosing in practice</h3></div>
+      <ul class="fact-list">
+        <li><b>Chat UI</b> → <span class="mono">["updates", "messages"]</span>. Updates drive the "thinking / searching" status line; messages drive the text appearing.</li>
+        <li><b>Filter by node.</b> The metadata on each message chunk carries <span class="mono">langgraph_node</span> — stream tokens from <span class="mono">generate</span> and drop the ones from a grader the user should never see.</li>
+        <li><b>Long non-LLM work</b> → <span class="mono">"custom"</span>. Nothing else can see inside a node that is embedding 200 documents.</li>
+        <li><b>Nested graphs</b> → add <span class="mono">subgraphs=True</span>, or a subgraph looks like one silent node.</li>
+        <li><b>Async</b> → <span class="mono">astream</span>, same modes. <span class="mono">astream_events</span> exists for very fine-grained hooks, and is more than most UIs need.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 11. SUBGRAPHS AND MULTI-AGENT                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="multi" data-title="Subgraphs &amp; handoffs" data-icon="11" data-group="Working with it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 11 · Working with it</div>
+    <h2>A graph inside a <span class="grad">graph</span></h2>
+    <p class="lead">A compiled graph is a callable that takes state and returns updates — which is exactly the definition of a node. So graphs nest, with no special API. Multi-agent systems are just that, plus <span class="mono">Command</span> to route and update in one move.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🤝 Step the hand-offs</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">A supervisor delegating to two specialists. Each step is one node returning a <span class="mono">Command</span> — control goes back through the supervisor every time, because it is the only node holding the plan.</p>
+    <div class="graph-wrap">
+      <svg id="multi-svg" viewBox="0 0 100 100" class="graph-svg"></svg>
+      <div id="multi-log"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="multi-next">Next handoff</button>
+      <button class="btn btn-ghost" id="multi-reset">↺ Reset</button>
+      <span class="ctrl-hint mono" id="multi-count">not started</span>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 Supervisor with Command</h3></div>
+      <pre class="code" id="multi-code"></pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five things about nesting</h3></div>
+      <div class="glossary" id="subgraph-notes"></div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">🎯</div>
+    <div><b>Nesting is a readability tool, not an intelligence one.</b> Splitting one agent into five adds hand-off cost, lost context and five traces to correlate. Split when a subgraph is genuinely a separate concern with a separate tool set — or when one state schema has grown incoherent. Not because it looks more sophisticated on a diagram.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 12. MEMORY                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="memory" data-title="Long-term memory" data-icon="12" data-group="Working with it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 12 · Working with it</div>
+    <h2>The checkpointer is not <span class="grad">memory</span></h2>
+    <p class="lead">A checkpointer remembers <i>this thread</i>. When a user opens a new chat, that is a new thread and it knows nothing about them. Facts that should outlive a conversation go in the <b>store</b> — a separate thing, scoped by namespace rather than by thread.</p>
+  </header>
+
+  <div class="mem-grid" id="mem-scopes"></div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🗄️ Store lab</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Step through five operations. Note that Alice and Bob both use the key <span class="mono">pref-1</span> without colliding, and that a search never leaves its namespace.</p>
+    <div class="mem-wrap">
+      <div class="agent-trace" id="mem-ops"></div>
+      <div id="mem-store"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="mem-next">Next operation</button>
+      <button class="btn btn-ghost" id="mem-reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💻 Both at once</h3></div>
+      <pre class="code" id="mem-code"></pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five rules</h3></div>
+      <div class="glossary" id="mem-notes"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 13. SHIP IT                                                   -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="ship" data-title="Ship it" data-icon="13" data-group="Shipping">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 13 · Shipping</div>
+    <h2>What breaks in <span class="grad">production</span></h2>
+    <p class="lead">Nearly every LangGraph production problem is one of four things: state that grew too big, a loop with no guard, a node that is not safe to re-run, or a node rename that broke resume for every in-flight thread. All four are cheap to prevent and expensive to discover.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏛️ The pieces</h3></div>
+    <div class="arch" id="arch"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>💾 What checkpointing actually costs</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">A checkpoint per super-step, per run. Change the state size and watch what "just put it in state" turns into at scale.</p>
+    <div class="calc" id="calc"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔧 Six production concerns</h3></div>
+    <div class="glossary" id="prod-concerns"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🚀 Running it somewhere</h3></div>
+      <div class="glossary" id="deploy-notes"></div>
+      <pre class="code" style="margin-top:14px">// langgraph.json
+{
+  "dependencies": ["."],
+  "graphs": { "agent": "./app.py:graph" },
+  "env": ".env"
+}</pre>
+      <pre class="code" style="margin-top:10px">pip install "langgraph-cli[inmem]"
+langgraph dev        # local server + Studio UI</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>✅ Pre-launch checklist</h3><span class="panel-tag">saves</span></div>
+      <div class="checklist" id="checklist"></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">📌</div>
+    <div><b>A note on versions.</b> LangGraph's core ideas — state, reducers, super-steps, checkpoints, interrupts — have been stable for a long time. The surface around them still moves: names get aliased, keyword arguments get added, prebuilts get better. When something here does not match your installed version, trust the docs for the exact call and this course for what the call is <i>for</i>.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 14. QUIZ                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Shipping">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 14 · Finish line</div>
+    <h2>Prove it to <span class="grad">yourself</span></h2>
+    <p class="lead">Twelve questions across everything above. No time limit, instant explanations, retake it as often as you like.</p>
+  </header>
+
+  <div class="panel">
+    <div id="quiz" class="quiz"></div>
+  </div>
+
+  <div class="panel glossary-panel">
+    <div class="panel-head"><h3>📖 Glossary</h3></div>
+    <input type="search" id="gloss-search" class="input-line" placeholder="filter terms…">
+    <div class="glossary" id="glossary"></div>
+  </div>
+</section>
+
+</div><!-- /stage -->
+
+<div class="pager" id="pager">
+  <button class="btn btn-ghost" data-goto="prev">&larr; Back</button>
+  <div class="pager-dots" id="pager-dots"></div>
+  <button class="btn" data-goto="next">Next &rarr;</button>
+</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/content.js"></script>
+<script src="js/demos.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

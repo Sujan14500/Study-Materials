@@ -1,0 +1,69 @@
+/* Smallest check that fails if the course data rots.
+   Run: node test.js                                        */
+const assert = require('assert');
+const fs = require('fs');
+const vm = require('vm');
+
+const ctx = {};
+ctx.window = ctx;          // content.js writes window.C, which is a global in the browser
+vm.createContext(ctx);
+vm.runInContext(fs.readFileSync('js/content.js', 'utf8'), ctx);
+const C = ctx.window.C;
+
+// quiz answers must index a real option
+C.quiz.forEach((q, i) => assert(q.o[q.a] !== undefined, `quiz ${i} has a bad answer index`));
+
+// every ch1 task must be sortable into a bucket the UI actually renders
+C.agencyTasks.forEach(t => assert(C.agencyLabels[t.a], `agencyTasks: unknown bucket "${t.a}"`));
+
+// every loop step must use a kind the legend + trace styling know about,
+// and every task must terminate — a loop demo with no exit teaches the wrong lesson
+C.loopTasks.forEach(t => {
+  t.steps.forEach(s => assert(C.loopKinds[s.k], `loopTasks: unknown step kind "${s.k}"`));
+  assert(t.steps[t.steps.length - 1].k === 'final', `loopTask "${t.label}" never reaches a final answer`);
+});
+
+// tool queries must point at a tool that exists (or explicitly at none)
+C.toolQueries.forEach(q => {
+  if (q.pick === null) return;
+  assert(C.tools.some(t => t.id === q.pick), `toolQueries: unknown tool "${q.pick}"`);
+});
+
+// plan dependencies must be backward-pointing, or the wave layout loops forever
+C.planGoals.forEach(g => g.plan.forEach((s, i) =>
+  s.dep.forEach(d => assert(d < i, `plan "${g.goal}" step ${i} depends on later step ${d}`))));
+
+// memory routing must name real stores
+const memKeys = new Set(C.memKinds.map(m => m.k));
+C.memConvo.forEach(m => m.store.forEach(s => assert(memKeys.has(s), `memConvo: unknown store "${s}"`)));
+C.memQuestions.forEach(q => assert(memKeys.has(q.a), `memQuestions: unknown store "${q.a}"`));
+
+// reflection must actually improve, and flatten out — that is the lesson of the chapter
+for (let i = 1; i < C.reflectRounds.length; i++) {
+  assert(C.reflectRounds[i].score > C.reflectRounds[i - 1].score, `reflect round ${i} did not improve`);
+}
+const first = C.reflectRounds[1].score - C.reflectRounds[0].score;
+const last = C.reflectRounds[C.reflectRounds.length - 1].score - C.reflectRounds[C.reflectRounds.length - 2].score;
+assert(last < first, 'reflection gains must show diminishing returns');
+
+// topology edges must reference declared nodes
+C.topologies.forEach(t => {
+  const ids = new Set(t.nodes.map(n => n.id));
+  (t.edges || []).forEach(e => e.forEach(id => assert(ids.has(id), `topology "${t.k}": edge to unknown node "${id}"`)));
+});
+
+// guardrail verdicts must be one of the three the drill offers
+C.guardActions.forEach(a => assert(['auto', 'ask', 'block'].includes(a.verdict),
+  `guardActions: unknown verdict "${a.verdict}"`));
+// anything irreversible must never be auto-approved — that is the whole chapter
+C.guardActions.forEach(a => assert(a.reversible || a.verdict !== 'auto',
+  `guardActions: irreversible action "${a.t}" is marked auto`));
+
+// the compounding maths the chapter claims must hold
+assert(Math.abs(Math.pow(0.95, 20) - 0.3585) < 0.01, '0.95^20 is not ~36% — the quiz answer is wrong');
+
+// eval runs must exercise all four outcome/trajectory combinations
+const combos = new Set(C.evalRuns.map(r => r.outcome + '/' + r.trajectory));
+assert(combos.size === 4, `evalRuns should cover all 4 pass/fail combinations, got ${combos.size}`);
+
+console.log('ok — content data is consistent');

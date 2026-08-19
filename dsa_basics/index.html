@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DSA Basics — Data Structures &amp; Algorithms, Visually</title>
+<meta name="description" content="An interactive, theory-first course on data structures and algorithms: complexity, arrays, strings, nodes and linked lists, stacks, queues, hash tables, trees, heaps, graphs, sorting, searching, recursion and dynamic programming.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧮</text></svg>">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<canvas id="bg-particles" class="bg-particles" aria-hidden="true"></canvas>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark"><span>⬢</span></div>
+    <div>
+      <div class="brand-name">DSA Basics</div>
+      <div class="brand-sub">concepts, not exercises</div>
+    </div>
+  </div>
+
+  <div class="progress-block">
+    <div class="progress-top">
+      <span>Progress</span><span id="progress-label">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="xp-row">
+      <span class="xp-badge" id="xp-badge">0 XP</span>
+      <button class="reset-btn" id="reset-btn" title="Clear saved progress">reset</button>
+    </div>
+  </div>
+
+  <nav class="chapter-nav" id="chapter-nav" aria-label="Chapters"></nav>
+
+  <div class="sidebar-foot">
+    <kbd>&larr;</kbd><kbd>&rarr;</kbd> to navigate
+  </div>
+</aside>
+
+<button class="menu-toggle" id="menu-toggle" aria-label="Toggle chapters">&#9776;</button>
+
+<!-- ============ MAIN ============ -->
+<main class="main" id="main">
+<div class="stage" id="stage">
+
+<!-- ============================================================= -->
+<!-- 0. WELCOME                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="welcome" data-title="Welcome" data-icon="&#10022;" data-group="Start here">
+  <div class="hero">
+    <div class="hero-tag">interactive course · theory only · no signup</div>
+    <h1 class="hero-title">Every structure is<br>a <span class="grad">trade</span>, never a winner</h1>
+    <p class="hero-sub">
+      An array makes reading by position free and inserting in the middle expensive.
+      A linked list swaps exactly those two. A hash table gives you instant lookup and takes
+      away all ordering. Once you can say what each structure makes cheap and what it makes
+      expensive, the names stop mattering. Fourteen chapters, every idea attached to something
+      you can push, step and watch.
+    </p>
+
+    <div class="hero-anim">
+      <svg viewBox="0 0 640 180" class="flow-svg" id="hero-flow">
+        <defs>
+          <linearGradient id="gradFlow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#c084fc"/><stop offset="50%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#a3e635"/>
+          </linearGradient>
+        </defs>
+        <path id="flow-path" d="M40,90 C170,20 250,160 380,90 S560,40 600,90" fill="none" stroke="url(#gradFlow)" stroke-width="2" stroke-dasharray="6 6" opacity=".45"/>
+        <g id="hero-nodes"></g>
+        <circle r="6" fill="#fff"><animateMotion dur="4s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#a3e635"><animateMotion dur="4s" begin="1.3s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#c084fc"><animateMotion dur="4s" begin="2.6s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+      </svg>
+      <div class="hero-flow-labels">
+        <span>arrays</span><span>lists</span><span>trees</span><span>graphs</span><span>DP</span>
+      </div>
+    </div>
+
+    <div class="hero-cards">
+      <div class="hcard"><div class="hcard-ico">👀</div><h4>Watch it happen</h4><p>Sorting animates, BFS steps, the call stack piles up and unwinds, a BST degenerates in front of you.</p></div>
+      <div class="hcard"><div class="hcard-ico">📖</div><h4>Definitions that stick</h4><p>Every term defined plainly, then immediately shown. No problem sets, no LeetCode.</p></div>
+      <div class="hcard"><div class="hcard-ico">⚖️</div><h4>Costs, not vibes</h4><p>What each operation actually costs, and the reason — usually one sentence about memory.</p></div>
+    </div>
+
+    <button class="btn btn-lg" data-goto="next">Start the course <span class="arr">&rarr;</span></button>
+    <p class="hero-note">Progress saves in your browser. This is a <b>theory</b> course — concepts, definitions and intuition. There are no coding problems to solve here.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 1. COMPLEXITY                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="complexity" data-title="Big-O &amp; complexity" data-icon="1" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 1 · Foundations</div>
+    <h2>How the work grows when the <span class="grad">input grows</span></h2>
+    <p class="lead">Big-O is not a measure of speed. It answers one question: if the input gets ten times bigger, what happens to the work? That question decides which structures and algorithms are even candidates — so it comes first, and everything else in this course refers back to it.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📈 Watch the classes diverge</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Drag n. At small sizes they all look similar — that is why the difference is so easy to miss until it is a production incident.</p>
+    <div class="ctrl" style="max-width:360px;margin-bottom:18px">
+      <label for="growth-n">input size <span class="mono" id="growth-n-v">n = 16</span></label>
+      <input type="range" id="growth-n" min="2" max="40" value="16">
+    </div>
+    <div id="growth-out"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Name the complexity</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Six operations described in plain English. No code — just decide how the work grows.</p>
+    <div id="bigo-cases"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Five rules</h3></div>
+    <div class="glossary" id="bigo-rules"></div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 2. ARRAYS                                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="arrays" data-title="Arrays" data-icon="2" data-group="Linear structures">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 2 · Linear structures</div>
+    <h2>One block of memory, and everything <span class="grad">follows from that</span></h2>
+    <p class="lead" id="array-def"></p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧠 Why array[i] is free</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Click any cell. The computer does not search for it — it calculates where it is.</p>
+    <div class="cellrow" id="memviz"></div>
+    <div id="mem-out" style="margin-top:14px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>↔️ …and why inserting is not</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The same contiguity that makes access instant is what forces everything to shift.</p>
+    <div class="chip-row" id="shift-tabs"></div>
+    <div id="shiftviz"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📦 Dynamic arrays: where "amortised" comes from</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Python lists, Java ArrayList, JavaScript arrays — all of these. Push items and watch the capacity double.</p>
+    <div id="growarr"></div>
+    <div class="btn-row">
+      <button class="btn" id="grow-push">push an item</button>
+      <button class="btn btn-ghost" id="grow-reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💰 What each operation costs</h3></div>
+      <div id="array-ops"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five things worth knowing</h3></div>
+      <div class="glossary" id="array-facts"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 3. STRINGS                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="strings" data-title="Strings" data-icon="3" data-group="Linear structures">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 3 · Linear structures</div>
+    <h2>An array of characters, with <span class="grad">two catches</span></h2>
+    <p class="lead" id="string-def"></p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔤 Characters, code units, bytes</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Type something — then try the samples. The three counts agree only for plain ASCII, and every string bug in internationalised software lives in that gap.</p>
+    <div class="chip-row" id="str-samples">
+      <button class="chip" data-s="hello">hello</button>
+      <button class="chip" data-s="café">café</button>
+      <button class="chip" data-s="naïve résumé">naïve résumé</button>
+      <button class="chip" data-s="日本語テキスト">日本語テキスト</button>
+      <button class="chip" data-s="hi 👋🏽 there">hi 👋🏽 there</button>
+    </div>
+    <input type="text" id="str-input" class="input-line" value="hello" spellcheck="false">
+    <div id="str-out"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>➕ Why building a string in a loop is quadratic</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The most common accidental O(n²) in everyday code, and it looks completely innocent.</p>
+    <div class="ctrl" style="max-width:360px;margin-bottom:18px">
+      <label for="concat-n">pieces to join <span class="mono" id="concat-n-v">200 pieces</span></label>
+      <input type="range" id="concat-n" min="10" max="2000" step="10" value="200">
+    </div>
+    <div id="concat-out"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>💰 What each operation costs</h3></div>
+      <div id="str-ops"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five things worth knowing</h3></div>
+      <div class="glossary" id="string-facts"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 4. NODES AND LINKED LISTS                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="lists" data-title="Nodes &amp; linked lists" data-icon="4" data-group="Linear structures">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 4 · Linear structures</div>
+    <h2>The <span class="grad">node</span> — and everything built from it</h2>
+    <p class="lead" id="node-def"></p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">🧩</div>
+    <div><b>Learn the node once and you have learned four chapters.</b> A linked list is a node with one pointer. A binary tree is a node with two. A graph is a node with a list of them. A trie is a node with one per character. The wiring changes; the atom does not.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⛓️ Linked list</h3></div>
+    <p class="panel-sub" id="list-def"></p>
+    <div id="listviz" style="margin-top:16px"></div>
+    <div class="btn-row">
+      <button class="btn" id="l-head">insert at head</button>
+      <button class="btn btn-ghost" id="l-tail">insert at tail</button>
+      <button class="btn btn-ghost" id="l-del">delete head</button>
+      <button class="btn btn-ghost" id="l-walk">walk to index 3</button>
+      <button class="btn btn-ghost" id="l-reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔗 Three wirings</h3></div>
+    <div class="three-up" id="list-kinds"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⚖️ Array vs linked list</h3></div>
+    <p class="panel-sub">The two structures are near mirror images. Neither wins — they are different points on the same trade.</p>
+    <div class="cmptabwrap"><div id="list-vs-array"></div></div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">🧊</div>
+    <div><b>The Big-O undersells the array.</b> Linked lists look better on paper for insertion, but their nodes are scattered across memory while an array's elements are neighbours. The CPU fetches memory in chunks, so walking an array pulls the next elements in for free. In practice an array often wins even where the notation says it should lose — which is a useful reminder that Big-O is about growth, not speed.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 5. STACKS AND QUEUES                                          -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="stackqueue" data-title="Stacks &amp; queues" data-icon="5" data-group="Linear structures">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 5 · Linear structures</div>
+    <h2>Same items in. <span class="grad">Different items out.</span></h2>
+    <p class="lead">Both are collections you add to and take from. The only difference is which end you take from — and that single choice is the whole reason both exist. The restriction is the feature: because only one position is reachable, every operation is O(1) and the semantics are impossible to misuse.</p>
+  </header>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>⬓ Stack</h3></div>
+      <p class="panel-sub" id="stack-def"></p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>⇥ Queue</h3></div>
+      <p class="panel-sub" id="queue-def"></p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎬 Feed both the same items</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Add a few, then remove from both at once. Watch the answers diverge.</p>
+    <div class="sqwrap">
+      <div id="sq-stack"></div>
+      <div id="sq-queue"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="sq-add">add to both</button>
+      <button class="btn btn-ghost" id="sq-take">remove from both</button>
+      <button class="btn btn-ghost" id="sq-reset">↺ Reset</button>
+    </div>
+    <div id="sq-log" style="margin-top:16px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Which one does this need?</h3><span class="panel-tag">interactive</span></div>
+    <div id="sq-cases"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔀 Four variants worth knowing</h3></div>
+    <div class="glossary" id="sq-variants"></div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 6. HASH TABLES                                                -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="hash" data-title="Hash tables" data-icon="6" data-group="Lookup structures">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 6 · Lookup structures</div>
+    <h2>Don't search for it. <span class="grad">Calculate where it is.</span></h2>
+    <p class="lead" id="hash-def"></p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>#️⃣ Insert keys and watch them collide</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Add keys, then shrink the table with the slider. Collisions are not a bug in the hash function — they are arithmetic, and every hash table is really defined by how it handles them.</p>
+    <div class="chip-row" id="hash-keys"></div>
+    <div class="ctrl" style="max-width:360px;margin-bottom:18px">
+      <label for="hash-buckets">table size <span class="mono" id="hash-buckets-v">8 buckets</span></label>
+      <input type="range" id="hash-buckets" min="2" max="12" value="8">
+    </div>
+    <div id="hash-view"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="hash-reset">↺ Empty the table</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Six things worth knowing</h3></div>
+    <div class="glossary" id="hash-facts"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🚫</div>
+    <div><b>What a hash table cannot do.</b> "Give me the smallest key." "Give me everything between 10 and 50." "Iterate in order." A hash table has no ordering to offer — the position of a key is a function of its hash, which is deliberately unrelated to its value. If you need any of those, you want a tree. That is the next chapter, and it is not a coincidence.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 7. TREES                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="trees" data-title="Trees" data-icon="7" data-group="Hierarchical structures">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 7 · Hierarchical structures</div>
+    <h2>One root, no cycles, <span class="grad">one path</span> between any two nodes</h2>
+    <p class="lead" id="tree-def"></p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🌳 A binary search tree, and how to walk it</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Pick a traversal and watch the visit order build. Then press the shape button and insert the same values <b>already sorted</b> — the BST rule is never broken, and the tree collapses anyway.</p>
+    <div class="chip-row" id="tree-traversals"></div>
+    <div class="treewrap">
+      <svg id="tree-svg" viewBox="0 0 100 100" class="viz-svg"></svg>
+      <div>
+        <div class="stat-row" id="tree-stats"></div>
+        <div id="tree-order" style="margin-top:14px"></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="tree-shape">🌳 Now insert them sorted instead</button>
+    </div>
+    <div class="tnote" id="tree-note" style="margin-top:14px"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📖 The vocabulary</h3></div>
+      <div class="glossary" id="tree-terms"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🌲 Trees you will actually meet</h3></div>
+      <div class="glossary" id="tree-kinds"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 8. HEAPS                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="heaps" data-title="Heaps" data-icon="8" data-group="Hierarchical structures">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 8 · Hierarchical structures</div>
+    <h2>A tree that promises <span class="grad">almost nothing</span> — on purpose</h2>
+    <p class="lead" id="heap-def"></p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⛰️ Insert and extract</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Insert values one at a time and watch each one sift up. Then extract the minimum and watch the replacement sift down. Look at the array on the right — there are no pointers anywhere in a heap.</p>
+    <div class="treewrap">
+      <svg id="heap-svg" viewBox="0 0 100 100" class="viz-svg"></svg>
+      <div id="heap-array"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="heap-insert">insert next value</button>
+      <button class="btn btn-ghost" id="heap-extract">extract the minimum</button>
+      <button class="btn btn-ghost" id="heap-reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Six things worth knowing</h3></div>
+    <div class="glossary" id="heap-facts"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🎯</div>
+    <div><b>Heap versus sorted list, in one line.</b> A sorted list answers "what is the whole order?" and pays for it on every insert. A heap answers only "what is next?" and stays cheap. Priority queues never need the full order — so paying for it is pure waste, and the heap is the structure that declines to.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 9. GRAPHS                                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="graphs" data-title="Graphs" data-icon="9" data-group="Hierarchical structures">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 9 · Hierarchical structures</div>
+    <h2>Drop the hierarchy, allow <span class="grad">cycles</span></h2>
+    <p class="lead" id="graph-def"></p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🕸️ BFS and DFS, step by step</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Same graph, same starting point, one difference: BFS takes from the <b>front</b> of its collection and DFS takes from the <b>back</b>. That is genuinely the only difference in the code, and it changes everything about the result.</p>
+    <div class="chip-row" id="graph-algo"></div>
+    <div class="treewrap">
+      <svg id="graph-svg" viewBox="0 0 100 100" class="viz-svg"></svg>
+      <div id="graph-log"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="graph-step">Step</button>
+      <button class="btn btn-ghost" id="graph-auto">▶ Run it</button>
+      <button class="btn btn-ghost" id="graph-reset">↺ Reset</button>
+      <span class="ctrl-hint mono" id="graph-count">not started</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🗂️ Two ways to store the same graph</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Both hold exactly the graph above. Notice how much of the matrix is zeros — that ratio is the whole argument.</p>
+    <div class="chip-row" id="graph-rep"></div>
+    <div id="graph-rep-out"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📖 The vocabulary</h3></div>
+      <div class="glossary" id="graph-terms"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🧭 The algorithms worth knowing by name</h3></div>
+      <div class="glossary" id="graph-algos"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 10. SORTING AND SEARCHING                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="sorting" data-title="Sorting &amp; searching" data-icon="10" data-group="Algorithms">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 10 · Algorithms</div>
+    <h2>Six ways to do the <span class="grad">same thing</span></h2>
+    <p class="lead">You will almost never write a sort — every language ships a good one. You learn them because they are the clearest demonstrations of the ideas that appear everywhere else: divide and conquer, in-place versus extra memory, worst case versus average, and stability.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📊 Watch them sort</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Same twelve numbers each time. Watch the comparison counter — that is where the complexity class shows up.</p>
+    <div class="chip-row" id="sort-tabs"></div>
+    <div class="sortbox" id="sort-bars"></div>
+    <div class="stat-row" id="sort-stats" style="margin-top:14px"></div>
+    <div class="btn-row">
+      <button class="btn" id="sort-play">▶ Run</button>
+      <button class="btn btn-ghost" id="sort-step">Step</button>
+      <button class="btn btn-ghost" id="sort-reset">↺ Reset</button>
+      <span class="ctrl-hint mono" id="sort-note"></span>
+    </div>
+    <div id="sort-info"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📋 The comparison table</h3></div>
+    <div class="cmptabwrap"><div id="sort-table"></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Five things worth knowing</h3></div>
+    <div class="glossary" id="sort-facts"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔍 Linear vs binary search</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">A sorted array of ten. Pick a target — and try 50, which is not in the array at all.</p>
+    <div class="chip-row" id="search-targets"></div>
+    <div id="search-out"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Five things about searching</h3></div>
+    <div class="glossary" id="search-facts"></div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 11. RECURSION                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="recursion" data-title="Recursion" data-icon="11" data-group="Algorithms">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 11 · Algorithms</div>
+    <h2>A function that calls <span class="grad">itself</span></h2>
+    <p class="lead" id="rec-def"></p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🥞 Watch the call stack</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Step through and watch frames pile up until the base case, then unwind. Then switch to naive Fibonacci and count the calls — that is the setup for the next chapter.</p>
+    <div class="chip-row" id="rec-tabs"></div>
+    <div id="rec-out"></div>
+    <div class="btn-row">
+      <button class="btn" id="rec-step">Step</button>
+      <button class="btn btn-ghost" id="rec-play">▶ Run</button>
+      <button class="btn btn-ghost" id="rec-reset">↺ Reset</button>
+      <span class="ctrl-hint mono" id="rec-count">not started</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧱 The five parts</h3></div>
+    <div class="ladder" id="rec-parts"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⚖️ Recursion vs iteration</h3></div>
+    <div class="glossary" id="rec-vs-iter"></div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">💥</div>
+    <div><b>Stack overflow, plainly.</b> Every call in progress occupies a frame holding its arguments and locals, and that memory is finite — typically a few thousand to a few tens of thousands of frames. Recurse down a million-element linked list and you will hit it. The fix is either an explicit stack of your own, or a loop.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 12. DYNAMIC PROGRAMMING                                       -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="dp" data-title="Dynamic programming" data-icon="12" data-group="Algorithms">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 12 · Algorithms</div>
+    <h2>Solve it once. <span class="grad">Write it down.</span></h2>
+    <p class="lead" id="dp-def"></p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔁 The duplication, counted</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Every call the naive Fibonacci recursion makes, grouped by which subproblem it was solving. Push n up and watch the repeats explode while the number of <i>distinct</i> subproblems barely moves.</p>
+    <div class="ctrl" style="max-width:360px;margin-bottom:18px">
+      <label for="dp-n">compute <span class="mono" id="dp-n-v">fib(6)</span></label>
+      <input type="range" id="dp-n" min="3" max="22" value="6">
+    </div>
+    <div id="dp-out"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>✅ When does DP apply?</h3></div>
+    <p class="panel-sub">Two conditions. Both must hold, and the test takes thirty seconds on paper.</p>
+    <div class="ladder" id="dp-conditions"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔀 Two ways to write it</h3></div>
+    <div class="two-up" id="dp-styles"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Five things worth knowing</h3></div>
+    <div class="glossary" id="dp-facts"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">✏️</div>
+    <div><b>The whole test, in one habit:</b> draw the recursion tree for a small input. If the same node appears twice, dynamic programming applies and caching will collapse the tree. If every node is distinct, it does not — you have plain divide and conquer, and a cache would only add overhead.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 13. PARADIGMS                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="paradigms" data-title="Algorithm paradigms" data-icon="13" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 13 · Putting it together</div>
+    <h2>Five <span class="grad">shapes</span> a solution can take</h2>
+    <p class="lead">Almost every algorithm you meet is one of these five strategies applied to a particular problem. Recognising the shape is most of the work — once you know it is a DP problem, the rest is deciding what a subproblem is.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🗂️ The five</h3></div>
+    <div class="three-up" id="paradigm-cards"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Name the paradigm</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Six problems. Two of them are traps — a greedy answer that looks right and is not, and a divide-and-conquer that people reach for DP on.</p>
+    <div id="paradigm-cases"></div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">🍽️</div>
+    <div><b>Greedy needs a proof, not a hunch.</b> "Always take the biggest coin" gives the right answer for normal currency and the wrong one for denominations like {1, 3, 4} — greedy makes 6 as 4+1+1 while the answer is 3+3. Greedy algorithms are the fastest to write and the easiest to be quietly wrong with, which is why every real one comes with an exchange argument attached.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 14. CHOOSING                                                  -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="choosing" data-title="Choosing a structure" data-icon="14" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 14 · Putting it together</div>
+    <h2>Match the structure to the <span class="grad">operation you do most</span></h2>
+    <p class="lead">You do not pick a data structure because it is interesting. You pick it by asking which operation you will perform thousands of times, and choosing whatever makes that one O(1) — then checking you can live with what it made expensive.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Pick the structure</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Eight requirements, described the way a colleague would actually say them.</p>
+    <div id="chooser"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📋 The cheat sheet</h3></div>
+    <p class="panel-sub">Average-case costs. Green is cheap, red is the one that will bite you if you do it in a loop.</p>
+    <div class="cmptabwrap"><div id="cheatsheet"></div></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🧭</div>
+    <div><b>Four questions that settle it nearly every time.</b> Do I look things up by key, or by position? Do I need them in order? Do I add and remove constantly, or build once and read many times? Is it always the newest, the oldest, or the smallest that I want next? Answer those and the structure is usually already chosen — the names in this course are just labels for the answers.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 15. QUIZ                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 15 · Finish line</div>
+    <h2>Prove it to <span class="grad">yourself</span></h2>
+    <p class="lead">Twelve questions across everything above. No time limit, instant explanations, retake it as often as you like.</p>
+  </header>
+
+  <div class="panel">
+    <div id="quiz" class="quiz"></div>
+  </div>
+
+  <div class="panel glossary-panel">
+    <div class="panel-head"><h3>📖 Glossary</h3></div>
+    <input type="search" id="gloss-search" class="input-line" placeholder="filter terms…">
+    <div class="glossary" id="glossary"></div>
+  </div>
+</section>
+
+</div><!-- /stage -->
+
+<div class="pager" id="pager">
+  <button class="btn btn-ghost" data-goto="prev">&larr; Back</button>
+  <div class="pager-dots" id="pager-dots"></div>
+  <button class="btn" data-goto="next">Next &rarr;</button>
+</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/content.js"></script>
+<script src="js/demos.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
