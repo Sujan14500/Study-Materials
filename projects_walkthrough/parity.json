@@ -1,0 +1,817 @@
+{
+ "policy_constants": {
+  "AUTO_APPROVE_LIMIT_CENTS": 5000,
+  "RETURN_WINDOW_DAYS": 30,
+  "FRAUD_BLOCK_SCORE": 0.8,
+  "FRAUD_REVIEW_SCORE": 0.45,
+  "VALID_REASONS": [
+   "damaged",
+   "not_as_described",
+   "changed_mind",
+   "never_arrived",
+   "duplicate_charge"
+  ],
+  "NO_RESTOCK_REASONS": [
+   "damaged",
+   "never_arrived"
+  ]
+ },
+ "policy": [
+  {
+   "case": {
+    "total": 2400,
+    "refunded": 0,
+    "days": 4,
+    "fraud": 0.0,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": true,
+   "amount": 2400,
+   "requires": false,
+   "restock": false,
+   "reasons": [
+    "full_remaining_amount",
+    "auto_approved"
+   ]
+  },
+  {
+   "case": {
+    "total": 28000,
+    "refunded": 0,
+    "days": 6,
+    "fraud": 0.0,
+    "reason": "not_as_described",
+    "asked": null
+   },
+   "allowed": true,
+   "amount": 28000,
+   "requires": true,
+   "restock": true,
+   "reasons": [
+    "full_remaining_amount",
+    "over_auto_limit_5000"
+   ]
+  },
+  {
+   "case": {
+    "total": 3000,
+    "refunded": 0,
+    "days": 2,
+    "fraud": 0.0,
+    "reason": "damaged",
+    "asked": 5000000
+   },
+   "allowed": true,
+   "amount": 3000,
+   "requires": false,
+   "restock": false,
+   "reasons": [
+    "capped_to_remaining_3000",
+    "auto_approved"
+   ]
+  },
+  {
+   "case": {
+    "total": 10000,
+    "refunded": 7000,
+    "days": 5,
+    "fraud": 0.0,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": true,
+   "amount": 3000,
+   "requires": false,
+   "restock": false,
+   "reasons": [
+    "full_remaining_amount",
+    "auto_approved"
+   ]
+  },
+  {
+   "case": {
+    "total": 4000,
+    "refunded": 0,
+    "days": 90,
+    "fraud": 0.0,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": false,
+   "amount": 0,
+   "requires": false,
+   "restock": true,
+   "reasons": [
+    "outside_return_window_90d"
+   ]
+  },
+  {
+   "case": {
+    "total": 4000,
+    "refunded": 0,
+    "days": 90,
+    "fraud": 0.0,
+    "reason": "never_arrived",
+    "asked": null
+   },
+   "allowed": true,
+   "amount": 4000,
+   "requires": false,
+   "restock": false,
+   "reasons": [
+    "full_remaining_amount",
+    "auto_approved"
+   ]
+  },
+  {
+   "case": {
+    "total": 3000,
+    "refunded": 0,
+    "days": 3,
+    "fraud": 0.95,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": false,
+   "amount": 0,
+   "requires": false,
+   "restock": true,
+   "reasons": [
+    "full_remaining_amount",
+    "fraud_block_0.95"
+   ]
+  },
+  {
+   "case": {
+    "total": 1000,
+    "refunded": 0,
+    "days": 3,
+    "fraud": 0.6,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": true,
+   "amount": 1000,
+   "requires": true,
+   "restock": false,
+   "reasons": [
+    "full_remaining_amount",
+    "fraud_review_0.60"
+   ]
+  },
+  {
+   "case": {
+    "total": 2000,
+    "refunded": 0,
+    "days": 3,
+    "fraud": 0.0,
+    "reason": "<script>alert(1)</script>",
+    "asked": null
+   },
+   "allowed": true,
+   "amount": 2000,
+   "requires": false,
+   "restock": true,
+   "reasons": [
+    "unknown_reason_defaulted",
+    "full_remaining_amount",
+    "auto_approved"
+   ]
+  },
+  {
+   "case": {
+    "total": 5000,
+    "refunded": 0,
+    "days": 1,
+    "fraud": 0.0,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": true,
+   "amount": 5000,
+   "requires": false,
+   "restock": false,
+   "reasons": [
+    "full_remaining_amount",
+    "auto_approved"
+   ]
+  },
+  {
+   "case": {
+    "total": 5001,
+    "refunded": 0,
+    "days": 1,
+    "fraud": 0.0,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": true,
+   "amount": 5001,
+   "requires": true,
+   "restock": false,
+   "reasons": [
+    "full_remaining_amount",
+    "over_auto_limit_5000"
+   ]
+  },
+  {
+   "case": {
+    "total": 4000,
+    "refunded": 0,
+    "days": 30,
+    "fraud": 0.0,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": true,
+   "amount": 4000,
+   "requires": false,
+   "restock": false,
+   "reasons": [
+    "full_remaining_amount",
+    "auto_approved"
+   ]
+  },
+  {
+   "case": {
+    "total": 4000,
+    "refunded": 0,
+    "days": 31,
+    "fraud": 0.0,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": false,
+   "amount": 0,
+   "requires": false,
+   "restock": true,
+   "reasons": [
+    "outside_return_window_31d"
+   ]
+  },
+  {
+   "case": {
+    "total": 4000,
+    "refunded": 4000,
+    "days": 1,
+    "fraud": 0.0,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": false,
+   "amount": 0,
+   "requires": false,
+   "restock": true,
+   "reasons": [
+    "already_fully_refunded"
+   ]
+  },
+  {
+   "case": {
+    "total": 4000,
+    "refunded": 0,
+    "days": 1,
+    "fraud": 0.8,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": false,
+   "amount": 0,
+   "requires": false,
+   "restock": true,
+   "reasons": [
+    "full_remaining_amount",
+    "fraud_block_0.80"
+   ]
+  },
+  {
+   "case": {
+    "total": 4000,
+    "refunded": 0,
+    "days": 1,
+    "fraud": 0.45,
+    "reason": "damaged",
+    "asked": null
+   },
+   "allowed": true,
+   "amount": 4000,
+   "requires": true,
+   "restock": false,
+   "reasons": [
+    "full_remaining_amount",
+    "fraud_review_0.45"
+   ]
+  },
+  {
+   "case": {
+    "total": 4000,
+    "refunded": 0,
+    "days": 1,
+    "fraud": 0.0,
+    "reason": "changed_mind",
+    "asked": 0
+   },
+   "allowed": false,
+   "amount": 0,
+   "requires": false,
+   "restock": true,
+   "reasons": [
+    "zero_amount"
+   ]
+  },
+  {
+   "case": {
+    "total": 9000,
+    "refunded": 0,
+    "days": 1,
+    "fraud": 0.0,
+    "reason": "duplicate_charge",
+    "asked": 2500
+   },
+   "allowed": true,
+   "amount": 2500,
+   "requires": false,
+   "restock": true,
+   "reasons": [
+    "auto_approved"
+   ]
+  }
+ ],
+ "retrieval": [
+  {
+   "tenant": "acme",
+   "q": "how long do I have for a refund?",
+   "titles": [
+    "Refund policy",
+    "Refund policy",
+    "Refund policy"
+   ],
+   "top": 1.797997,
+   "conf": 0.265505
+  },
+  {
+   "tenant": "acme",
+   "q": "how do I create an API key?",
+   "titles": [
+    "API keys",
+    "API keys"
+   ],
+   "top": 5.789194,
+   "conf": 0.764795
+  },
+  {
+   "tenant": "acme",
+   "q": "what is the rate limit?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "acme",
+   "q": "can I move my appointment?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "acme",
+   "q": "where do I create an API key?",
+   "titles": [
+    "API keys",
+    "API keys"
+   ],
+   "top": 5.789194,
+   "conf": 0.764795
+  },
+  {
+   "tenant": "acme",
+   "q": "how long do I have to return something?",
+   "titles": [
+    "Refund policy"
+   ],
+   "top": 1.9935,
+   "conf": 0.274738
+  },
+  {
+   "tenant": "acme",
+   "q": "what is your VAT registration number?",
+   "titles": [
+    "Shipping"
+   ],
+   "top": 2.319874,
+   "conf": 0.322728
+  },
+  {
+   "tenant": "acme",
+   "q": "write me a poem about kubernetes",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "acme",
+   "q": "what does a 429 mean?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "bloom",
+   "q": "how long do I have for a refund?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "bloom",
+   "q": "how do I create an API key?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "bloom",
+   "q": "what is the rate limit?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "bloom",
+   "q": "can I move my appointment?",
+   "titles": [
+    "Booking changes"
+   ],
+   "top": 1.048214,
+   "conf": 0.184424
+  },
+  {
+   "tenant": "bloom",
+   "q": "where do I create an API key?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "bloom",
+   "q": "how long do I have to return something?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "bloom",
+   "q": "what is your VAT registration number?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "bloom",
+   "q": "write me a poem about kubernetes",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "bloom",
+   "q": "what does a 429 mean?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "zenith",
+   "q": "how long do I have for a refund?",
+   "titles": [
+    "Refund policy",
+    "Refund policy"
+   ],
+   "top": 1.328541,
+   "conf": 0.207247
+  },
+  {
+   "tenant": "zenith",
+   "q": "how do I create an API key?",
+   "titles": [
+    "API keys",
+    "API keys"
+   ],
+   "top": 4.409845,
+   "conf": 0.667947
+  },
+  {
+   "tenant": "zenith",
+   "q": "what is the rate limit?",
+   "titles": [
+    "Rate limits",
+    "Rate limits"
+   ],
+   "top": 2.801157,
+   "conf": 0.503558
+  },
+  {
+   "tenant": "zenith",
+   "q": "can I move my appointment?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "zenith",
+   "q": "where do I create an API key?",
+   "titles": [
+    "API keys",
+    "API keys"
+   ],
+   "top": 4.409845,
+   "conf": 0.667947
+  },
+  {
+   "tenant": "zenith",
+   "q": "how long do I have to return something?",
+   "titles": [
+    "Rate limits"
+   ],
+   "top": 1.767724,
+   "conf": 0.250044
+  },
+  {
+   "tenant": "zenith",
+   "q": "what is your VAT registration number?",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "zenith",
+   "q": "write me a poem about kubernetes",
+   "titles": [],
+   "top": 0.0,
+   "conf": 0.0
+  },
+  {
+   "tenant": "zenith",
+   "q": "what does a 429 mean?",
+   "titles": [
+    "Rate limits"
+   ],
+   "top": 1.767724,
+   "conf": 0.261951
+  }
+ ],
+ "evals": [
+  {
+   "tenant": "acme",
+   "name": "Acme Tools",
+   "n": 9,
+   "acc": 1.0,
+   "auto": 0.222222,
+   "bad_auto": 0,
+   "missed_ref": 0,
+   "failures": []
+  },
+  {
+   "tenant": "bloom",
+   "name": "Bloom Studio",
+   "n": 6,
+   "acc": 0.833333,
+   "auto": 0.0,
+   "bad_auto": 0,
+   "missed_ref": 0,
+   "failures": [
+    "'what happens if I cancel last minute?' cited nothing, expected 'Booking changes'"
+   ]
+  },
+  {
+   "tenant": "zenith",
+   "name": "Zenith Cloud",
+   "n": 7,
+   "acc": 1.0,
+   "auto": 0.428571,
+   "bad_auto": 0,
+   "missed_ref": 0,
+   "failures": []
+  }
+ ],
+ "sql": [
+  {
+   "sql": "SELECT category, COUNT(*) AS tickets FROM tickets GROUP BY category",
+   "allowed": true
+  },
+  {
+   "sql": "SELECT COUNT(*) AS n FROM tickets",
+   "allowed": true
+  },
+  {
+   "sql": "SELECT COUNT(*) AS n FROM tickets WHERE tenant_id = 'acme'",
+   "allowed": true
+  },
+  {
+   "sql": "SELECT * FROM memories",
+   "allowed": false,
+   "why": "generated SQL touches tables outside the analytics surface: ['memories']"
+  },
+  {
+   "sql": "SELECT * FROM tenants",
+   "allowed": false,
+   "why": "generated SQL touches tables outside the analytics surface: ['tenants']"
+  },
+  {
+   "sql": "DROP TABLE tickets",
+   "allowed": false,
+   "why": "generated SQL must be a single SELECT"
+  },
+  {
+   "sql": "SELECT 1; DROP TABLE tickets",
+   "allowed": false,
+   "why": "generated SQL must be a single statement"
+  },
+  {
+   "sql": "UPDATE tickets SET csat = 5",
+   "allowed": false,
+   "why": "generated SQL must be a single SELECT"
+  },
+  {
+   "sql": "SELECT * FROM tickets UNION SELECT * FROM tickets",
+   "allowed": false,
+   "why": "generated SQL contains a forbidden keyword"
+  },
+  {
+   "sql": "PRAGMA table_info(tickets)",
+   "allowed": false,
+   "why": "generated SQL must be a single SELECT"
+  },
+  {
+   "sql": "SELECT * FROM docs JOIN tickets ON 1=1",
+   "allowed": false,
+   "why": "generated SQL touches tables outside the analytics surface: ['docs']"
+  }
+ ],
+ "tenants": {
+  "acme": {
+   "docs": [
+    [
+     "Refund policy",
+     "Acme refunds any order within 30 days of delivery for a full refund.\n\nRefunds are returned to the original payment method and take 5 to 7 business days to appear on your statement.\n\nItems marked final sale cannot be refunded."
+    ],
+    [
+     "API keys",
+     "Acme API keys are created in Settings, then Developers, then Create key. A key is shown once and cannot be recovered afterwards.\n\nKeys can be rotated at any time. The old key stops working immediately when you rotate, so update your integrations first."
+    ],
+    [
+     "Shipping",
+     "Standard shipping is 3 to 5 business days within the country. Express shipping is next business day if ordered before 2pm.\n\nTracking numbers are emailed when the parcel leaves our warehouse."
+    ],
+    [
+     "Plans and billing",
+     "Acme has Starter, Pro and Business plans, billed monthly or annually. Annual billing saves two months.\n\nYou can change plan at any time; upgrades are prorated immediately and downgrades take effect at the end of the billing period."
+    ]
+   ],
+   "config": {
+    "auto_send_at": 0.62,
+    "refuse_below": 0.3,
+    "sla_accuracy": 0.8,
+    "budget_cents_per_period": 500.0,
+    "brand_voice": "friendly and concise"
+   },
+   "golden": [
+    {
+     "q": "how long do I have to return something?",
+     "must_cite": "Refund policy"
+    },
+    {
+     "q": "how long does a refund take to show up?",
+     "must_cite": "Refund policy"
+    },
+    {
+     "q": "where do I create an API key?",
+     "must_cite": "API keys"
+    },
+    {
+     "q": "what happens to my old key when I rotate it?",
+     "must_cite": "API keys"
+    },
+    {
+     "q": "when will my parcel arrive with express shipping?",
+     "must_cite": "Shipping"
+    },
+    {
+     "q": "does annual billing save money?",
+     "must_cite": "Plans and billing"
+    },
+    {
+     "q": "what happens if I downgrade my plan?",
+     "must_cite": "Plans and billing"
+    },
+    {
+     "q": "what is the CEO's home address?",
+     "must_refuse": true
+    },
+    {
+     "q": "can you write me a poem about kubernetes?",
+     "must_refuse": true
+    }
+   ]
+  },
+  "bloom": {
+   "docs": [
+    [
+     "Booking changes",
+     "Bloom appointments can be rescheduled free of charge up to 24 hours before the slot.\n\nInside 24 hours a 50% fee applies, and no-shows are charged in full."
+    ],
+    [
+     "Gift cards",
+     "Bloom gift cards are valid for 12 months from purchase and can be used against any service. They cannot be exchanged for cash."
+    ]
+   ],
+   "config": {
+    "auto_send_at": 0.8,
+    "refuse_below": 0.42,
+    "sla_accuracy": 0.7,
+    "budget_cents_per_period": 120.0,
+    "brand_voice": "warm and personal"
+   },
+   "golden": [
+    {
+     "q": "can I move my appointment to next week?",
+     "must_cite": "Booking changes"
+    },
+    {
+     "q": "what happens if I cancel last minute?",
+     "must_cite": "Booking changes"
+    },
+    {
+     "q": "how long is a gift card good for?",
+     "must_cite": "Gift cards"
+    },
+    {
+     "q": "can I get cash for my gift card?",
+     "must_cite": "Gift cards"
+    },
+    {
+     "q": "do you offer a corporate discount?",
+     "must_refuse": true
+    },
+    {
+     "q": "what is your VAT number?",
+     "must_refuse": true
+    }
+   ]
+  },
+  "zenith": {
+   "docs": [
+    [
+     "Refund policy",
+     "Zenith refunds unused annual subscriptions within 14 days of purchase. Monthly subscriptions are non-refundable once the period has started.\n\nUsage-based charges are never refundable."
+    ],
+    [
+     "API keys",
+     "Zenith API keys are scoped per project and are created with the zen CLI: run zen keys create --project PROJECT.\n\nKeys expire after 90 days by default and must be rotated before expiry."
+    ],
+    [
+     "Rate limits",
+     "The free tier allows 60 requests per minute. Paid tiers start at 600 requests per minute and can be raised on request.\n\nExceeding the limit returns HTTP 429 with a Retry-After header."
+    ]
+   ],
+   "config": {
+    "auto_send_at": 0.62,
+    "refuse_below": 0.3,
+    "sla_accuracy": 0.8,
+    "budget_cents_per_period": 900.0,
+    "brand_voice": "precise and technical"
+   },
+   "golden": [
+    {
+     "q": "can I get a refund on my annual subscription?",
+     "must_cite": "Refund policy"
+    },
+    {
+     "q": "are monthly plans refundable?",
+     "must_cite": "Refund policy"
+    },
+    {
+     "q": "how do I create an API key?",
+     "must_cite": "API keys"
+    },
+    {
+     "q": "when do API keys expire?",
+     "must_cite": "API keys"
+    },
+    {
+     "q": "what is the rate limit on the free tier?",
+     "must_cite": "Rate limits"
+    },
+    {
+     "q": "what does a 429 mean?",
+     "must_cite": "Rate limits"
+    },
+    {
+     "q": "who are your biggest customers?",
+     "must_refuse": true
+    }
+   ]
+  }
+ }
+}

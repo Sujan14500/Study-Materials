@@ -22,7 +22,9 @@ from pathlib import Path
 
 # Windows consoles default to cp1252; the report uses box characters.
 if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    # sys.stdout is typed TextIO, which does not declare reconfigure; the
+    # hasattr guard above is the real check.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
 
 from refund_agent import Backend, FaultPlan, Ledger, RefundAgent
 from refund_agent.llm import StubLLM, get_llm

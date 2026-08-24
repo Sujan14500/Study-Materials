@@ -16,7 +16,9 @@ import tempfile
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    # sys.stdout is typed TextIO, which does not declare reconfigure; the
+    # hasattr guard above is the real check.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
 
 from support import Platform, SupportAgent
 from support.evals import report, run_tenant
