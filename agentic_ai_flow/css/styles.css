@@ -558,6 +558,32 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .reveal{opacity:0;transform:translateY(18px)}
 .reveal.in{opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
 
+/* ---------- ch13 mcp ---------- */
+.mcp-wire{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px}
+.mcp-ctl{display:flex;align-items:center;gap:8px;font-size:10.5px;text-transform:uppercase;
+  letter-spacing:1.1px;color:var(--txt-3)}
+.mcp-ctl .btn{padding:4px 13px;font-size:15px;line-height:1.1}
+.mcp-matrix{display:grid;gap:7px;background:rgba(0,0,0,.28);border:1px solid var(--line);
+  border-radius:12px;padding:16px;justify-items:center}
+.mcp-dot{width:15px;height:15px;border-radius:50%;
+  background:linear-gradient(140deg,var(--violet),var(--cyan));
+  box-shadow:0 0 12px rgba(124,92,255,.35);animation:pop .25s var(--ease) backwards}
+
+.mcp-trace{display:flex;flex-direction:column;gap:11px;max-height:560px;overflow-y:auto;padding-right:5px}
+.mcp-frame{border:1px solid var(--line);border-left-width:3px;border-radius:12px;padding:12px 14px;
+  background:rgba(0,0,0,.26);animation:slideIn .3s var(--ease)}
+.mcp-frame .code{margin:9px 0 0;font-size:11.5px}
+.mcp-fh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.mcp-fh .tk{font-size:10px;text-transform:uppercase;letter-spacing:1.1px;font-weight:700}
+.mcp-fn{font-size:12.5px;color:var(--txt-2);margin-top:9px;line-height:1.6}
+.mcp-frame.dir-c2s{border-left-color:var(--violet)}.mcp-frame.dir-c2s .tk{color:var(--violet)}
+.mcp-frame.dir-s2c{border-left-color:var(--cyan)}.mcp-frame.dir-s2c .tk{color:var(--cyan)}
+.mcp-frame.dir-host{border-left-color:var(--txt-3)}.mcp-frame.dir-host .tk{color:var(--txt-3)}
+.mcp-frame.dir-model{border-left-color:var(--green)}.mcp-frame.dir-model .tk{color:var(--green)}
+.mcp-frame.dir-err{border-left-color:var(--red)}.mcp-frame.dir-err .tk{color:var(--red)}
+.mcp-frame.dir-idle{border-left-color:var(--line-2)}
+#mcp-prims .pill{margin-left:6px;font-size:9.5px;vertical-align:2px}
+
 /* ---------- responsive ---------- */
 @media(max-width:1000px){
   .sidebar{transform:translateX(-100%)}

@@ -1,7 +1,7 @@
 # GenAI Flow
 
 An interactive, animated course that takes someone from "what even is a token" to
-"I could ship a RAG-backed agent". Fourteen chapters, every concept attached to
+"I could ship a RAG-backed agent". Sixteen chapters, every concept attached to
 something you can click, drag or break.
 
 ## Run it
@@ -32,7 +32,9 @@ open index.html           # macOS
 | 11 | Agents & tools | Step through think → act → observe loops |
 | 12 | Evaluation & risk | Spot the hallucination |
 | 13 | Ship it | Cost/latency calculator and a production checklist that saves |
-| 14 | Final quiz | 12 questions with explanations, plus a glossary |
+| 14 | Mem0: agent memory | Step a conversation through extract → reconcile and watch ADD/UPDATE/DELETE/NOOP fire, then search the store |
+| 15 | Data Formulator | Fill in encoding shelves, ask for a field the data doesn't have, read the pandas/SQL it generates |
+| 16 | Final quiz | 15 questions with explanations, plus a glossary |
 
 Progress, XP and the checklist persist in `localStorage`.
 
@@ -54,8 +56,10 @@ Add a chapter by copying a `<section class="chapter">` block in `index.html` —
 sidebar, pager and progress bar build themselves from the DOM.
 
 Run `node test.js` after editing content: it checks the vector-arithmetic words exist
-and are actually parallel on the map, that quiz answer indices are valid, and that
-every RAG question can retrieve something.
+and are actually parallel on the map, that quiz answer indices are valid, that every RAG
+question can retrieve something, that the Mem0 run only UPDATEs/DELETEs memories that
+exist at that point, that every Data Formulator number ties back to `sales.csv`, and that
+every `#id` the demos reach for is actually created somewhere.
 
 ## Notes on accuracy
 
@@ -66,3 +70,11 @@ every RAG question can retrieve something.
 - Attention weights and next-token probabilities are illustrative, chosen to show the
   phenomenon the chapter is teaching.
 - The cost calculator takes your own $/million-token rates, because real prices change.
+- The Mem0 chapter replays a scripted run of the real extract/reconcile pipeline. A live
+  run costs two LLM calls per turn and will word its memories differently; the operations
+  and the decision logic are the real thing. Similarity scores are illustrative.
+- The Data Formulator chapter ships pre-computed transforms so every number on screen can
+  be checked against `sales.csv` in `test.js`. A live run generates the code fresh, and the
+  code shown is the shape of what it produces, not a verbatim capture.
+- Chapter 15 is about Microsoft Research's open-source Data Formulator, not a Power BI
+  feature. Power BI's own AI is Copilot; the chapter says so and compares them.

@@ -287,7 +287,7 @@ tool:   {"p95_ms": 430, "samples": 41880}
 
   <div class="callout">
     <div class="callout-ico">🔌</div>
-    <div><b>MCP (Model Context Protocol)</b> is a standard way to expose tools and data to any agent, so you write a tool server once instead of re-wiring it per framework. It changes the plumbing, not the model — everything above still applies.</div>
+    <div><b>MCP (Model Context Protocol)</b> is a standard way to expose tools and data to any agent, so you write a tool server once instead of re-wiring it per framework. It changes the plumbing, not the model — everything above still applies. <b>Chapter 13</b> takes it apart frame by frame.</div>
   </div>
 </section>
 
@@ -675,13 +675,149 @@ order_id A-4471 and amount_cents 999999. --&gt;</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 13. QUIZ                                                      -->
+<!-- 13. MCP                                                       -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Making it work">
+<section class="chapter" data-id="mcp" data-title="MCP" data-icon="13" data-group="Interop">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 13 · Finish line</div>
+    <div class="ch-kicker">Chapter 13 · Interop</div>
+    <h2>MCP: write the tool <span class="grad">once</span></h2>
+    <p class="lead">Chapter 3 said the model emits a tool request and your orchestrator runs it. Fine — until you have five agents that all need the same six tools, each wired by hand, in a different framework, re-tested every time an API changes. The Model Context Protocol is an open standard for that wiring: a <b>server</b> exposes tools, data and prompt templates; any <b>client</b> discovers them at runtime. Same loop, same guardrails — the tool list just stopped being hardcoded.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">🔌</div>
+    <div><b>The honest summary.</b> MCP is JSON-RPC 2.0 with a capability handshake and three primitives. It is not intelligence, it is not a framework, and it does not change how the model reasons. It changes who has to write the integration — and that turns out to matter a lot.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🕸️ Why a protocol at all</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Add clients and servers and watch the grid. Every dot is one integration that a human writes, tests and maintains forever.</p>
+    <div class="mcp-wire">
+      <div class="mcp-ctl">
+        <span>clients</span>
+        <button class="btn btn-ghost" id="mcp-h-minus">−</button>
+        <button class="btn btn-ghost" id="mcp-h-plus">+</button>
+      </div>
+      <div class="mcp-ctl">
+        <span>servers</span>
+        <button class="btn btn-ghost" id="mcp-s-minus">−</button>
+        <button class="btn btn-ghost" id="mcp-s-plus">+</button>
+      </div>
+    </div>
+    <div class="mcp-matrix" id="mcp-matrix"></div>
+    <div class="stat-row" id="mcp-counts" style="margin-top:16px"></div>
+    <p class="panel-sub" id="mcp-wire-note" style="margin-top:12px"></p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📡 A whole session, frame by frame</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Real JSON-RPC, trimmed but structurally honest. Step through it — the protocol is small enough to read in one sitting, and reading it is the fastest way to stop treating MCP as magic.</p>
+
+    <div class="rag-pipe" id="mcp-pipe">
+      <div class="rp"><b>1 · Handshake</b><small>initialize + capabilities</small></div>
+      <div class="arr">→</div>
+      <div class="rp"><b>2 · Discover</b><small>tools/list</small></div>
+      <div class="arr">→</div>
+      <div class="rp"><b>3 · Call</b><small>tools/call → result</small></div>
+      <div class="arr">→</div>
+      <div class="rp"><b>4 · Live</b><small>change notifications, errors</small></div>
+    </div>
+
+    <div class="mcp-trace" id="mcp-trace"></div>
+
+    <div class="btn-row">
+      <button class="btn" id="mcp-step">Next frame</button>
+      <button class="btn btn-ghost" id="mcp-auto">▶ Play the session</button>
+      <button class="btn btn-ghost" id="mcp-reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧩 Three primitives, three owners</h3></div>
+    <p class="panel-sub">Who is allowed to trigger each one is the part people skip, and it is the part that keeps MCP safe to reason about.</p>
+    <div class="tech-grid" id="mcp-prims"></div>
+    <p class="panel-sub" style="margin-top:14px">Traffic also runs the other way. A server can ask the client for an LLM completion (<span class="mono">sampling</span>), ask the user a question mid-run (<span class="mono">elicitation</span>), or ask which directories are in scope (<span class="mono">roots</span>) — so a server never needs its own API key or its own idea of your filesystem.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>💻 Build one, wire it, call it</h3><span class="panel-tag">7 examples</span></div>
+    <p class="panel-sub">A working incident-search server, both SDKs, the client config, and the loop that joins it to a model.</p>
+    <div class="chip-row" id="mcp-code-tabs" style="margin-bottom:14px"></div>
+    <pre class="code code-live" id="mcp-code" style="max-height:520px"></pre>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🔀 stdio vs Streamable HTTP</h3></div>
+      <dl class="deflist">
+        <dt>stdio</dt>
+        <dd>The client launches your server as a subprocess and talks over stdin/stdout. No network, no auth layer, full access to that user's machine and environment. The default for anything local — and the reason a config file entry is a trust decision. <b>Never print to stdout</b>; log to stderr or you corrupt the stream.</dd>
+        <dt>Streamable HTTP</dt>
+        <dd>One HTTP endpoint, with an optional server-sent-events stream for server→client messages. For hosted servers, shared team infrastructure, anything you did not write yourself. It superseded the older HTTP+SSE transport.</dd>
+      </dl>
+      <p class="panel-sub" style="margin-top:12px">Spec revisions are date-stamped (<span class="mono">2025-06-18</span> and friends) and negotiated in <span class="mono">initialize</span>, so a client and server on different revisions can still agree on what they both support.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🧮 Do you actually need it?</h3></div>
+      <ul class="fact-list">
+        <li><b>Three tools, one app, one team</b> — plain function calling. A protocol here is machinery with no payoff.</li>
+        <li><b>Same tools across several agents or clients</b> — MCP. This is the case it was built for.</li>
+        <li><b>You want to consume someone else's tools</b> — MCP, obviously. That ecosystem is the point.</li>
+        <li><b>You want to publish tools for others</b> — MCP, and now you owe them versioning, auth and a security review.</li>
+        <li><b>Swapping a tool without a redeploy</b> — MCP, because discovery happens at runtime.</li>
+      </ul>
+      <div class="callout" style="margin:16px 0 0">
+        <div class="callout-ico">🧭</div>
+        <div>MCP solves distribution, not capability. If your agent picks the wrong tool, adding a protocol will not help — go back to Chapter 3 and fix the description.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🛡️ Security: what changes when the tools aren't yours</h3></div>
+    <p class="panel-sub">Everything in Chapter 9 still applies. MCP adds a second trust boundary, because now the tool <i>definitions</i> arrive from somewhere else too.</p>
+    <div class="two-up" style="margin-bottom:0">
+      <ul class="fact-list">
+        <li><b>Installing a server is running code.</b> A stdio entry in a config file gets a subprocess with your environment, your files, your network. Review it like a dependency, pin the version, and prefer servers you can read.</li>
+        <li><b>Tool results are untrusted input.</b> Text coming back from <span class="mono">tools/call</span> may contain "ignore previous instructions". Keep it clearly framed as data; never let it silently become an instruction.</li>
+        <li><b>Descriptions are attack surface too.</b> A malicious server can write a description designed to get itself chosen over a legitimate tool — including impersonating one. Namespace tools per server and show the user which server a call is going to.</li>
+        <li><b>The list can change mid-session.</b> <span class="mono">tools/list_changed</span> means the tool you approved on Monday may not be the tool you call on Friday. Re-check on change; do not cache approval forever.</li>
+      </ul>
+      <ul class="fact-list">
+        <li><b>No token passthrough.</b> Do not forward the caller's token to the upstream API your server wraps. Mint your own downstream credential, scoped to what the server actually needs.</li>
+        <li><b>Confused deputy.</b> A server holding broad credentials, acting on any caller's request, is exactly the classic hole. Validate that a token was issued <i>for your server</i> and check authorisation per call, not per session.</li>
+        <li><b>Local HTTP servers:</b> bind to localhost, validate the <span class="mono">Origin</span> header, and use session ids that are not guessable — a web page in the user's browser can otherwise reach your server.</li>
+        <li><b>Human in the loop on writes.</b> Unchanged from Chapter 9, and more important here: the destructive tool may be one you never wrote. <span class="mono">destructiveHint</span> is a hint, not a guarantee.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">⚠️</div>
+    <div><b>The rug-pull shape to watch for.</b> A server behaves perfectly during review, then changes its tool descriptions after you have approved it — the code you audited and the code you run are separated by an update you never saw. Pin versions, re-review on change, log every tool definition you actually received, and alert when a definition changes underneath you. This is ordinary supply-chain hygiene; it just feels new because the payload is prose instead of a binary.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul>
+      <li>MCP is <b>JSON-RPC 2.0 + capability negotiation + three primitives</b>: tools (model-controlled), resources (app-controlled), prompts (user-controlled).</li>
+      <li>It turns an <b>N×M</b> wiring problem into <b>N+M</b>. Below a handful of each, it is not worth the machinery.</li>
+      <li>The agent loop does not change. The host translates discovered tools into its provider's format and runs exactly the loop from Chapter 3.</li>
+      <li><b>stdio</b> for local subprocesses, <b>Streamable HTTP</b> for anything remote — and remote means OAuth, scopes and no token passthrough.</li>
+      <li>New trust boundary: tool definitions and tool results both arrive from someone else. Namespace, gate, log, and re-review on change.</li>
+      <li>A tool description is still the thing that decides whether the model picks it. A protocol does not write it for you.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 14. QUIZ                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Finish line">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 14 · Finish line</div>
     <h2>Prove it to <span class="grad">yourself</span></h2>
-    <p class="lead">Twelve questions across everything above. No time limit, instant explanations, retake it as often as you like.</p>
+    <p class="lead">Fifteen questions across everything above. No time limit, instant explanations, retake it as often as you like.</p>
   </header>
 
   <div class="panel">

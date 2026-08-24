@@ -2,7 +2,7 @@
 
 An interactive, animated course on agentic AI — from "what actually makes something
 an agent" to "I can review someone's agent design and name what will break".
-Thirteen chapters, every concept attached to something you can step, drag or break.
+Fourteen chapters, every concept attached to something you can step, drag or break.
 
 Companion to [`genai_flow`](../genai_flow) (tokens → RAG),
 [`langgraph`](../langgraph) (stateful graphs) and
@@ -37,7 +37,8 @@ open index.html           # macOS
 | 10 | Reliability maths | Sliders for per-step accuracy and step count; watch 95% become 36% |
 | 11 | Evaluating agents | Four runs graded on outcome *and* trajectory — two pass an outcome-only eval and shouldn't |
 | 12 | Ship it | Cost calculator showing quadratic growth, architecture, and a checklist that saves |
-| 13 | Final quiz | 12 questions with explanations, plus a 30-term glossary |
+| 13 | MCP | Step a whole JSON-RPC session frame by frame, and watch the N×M wiring grid collapse |
+| 14 | Final quiz | 15 questions with explanations, plus a glossary |
 
 Progress, XP and the checklist persist in `localStorage`.
 
@@ -59,7 +60,8 @@ definitions, guardrail verdicts, quiz questions, glossary. `demos.js` only rende
 
 `test.js` guards the invariants that are easy to break by hand — quiz answer indices,
 plan dependencies pointing backwards, loop traces that terminate, irreversible actions
-never marked auto-approve. Run it after editing content:
+never marked auto-approve, every MCP frame parsing as real JSON-RPC, and every `#id` the
+demos reach for actually existing. Run it after editing content:
 
 ```
 node test.js

@@ -558,6 +558,66 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .reveal{opacity:0;transform:translateY(18px)}
 .reveal.in{opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
 
+/* ---------- ch14 mem0 ---------- */
+.mem-log{max-height:420px}
+.trace .mem-why{font-size:12px;color:var(--txt-3);margin-top:5px;line-height:1.55}
+.trace.op-add{border-left-color:var(--green)}.trace.op-add .tk{color:var(--green)}
+.trace.op-update{border-left-color:var(--cyan)}.trace.op-update .tk{color:var(--cyan)}
+.trace.op-delete{border-left-color:var(--red)}.trace.op-delete .tk{color:var(--red)}
+.trace.op-noop,.trace.noop{border-left-color:var(--txt-3)}
+.trace.op-noop .tk,.trace.noop .tk{color:var(--txt-3)}
+.mem-store{display:flex;flex-direction:column;gap:7px;max-height:420px;overflow-y:auto;padding-right:4px}
+.mem-card{display:grid;grid-template-columns:34px 1fr auto;gap:9px;align-items:center;
+  background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:10px;padding:9px 11px;
+  font-size:13px;transition:border-color .3s var(--ease),background .3s var(--ease)}
+.mem-card.fresh{border-color:var(--green);background:rgba(52,211,153,.11);animation:slideIn .3s var(--ease)}
+.mem-id{font-family:var(--mono);font-size:11px;color:var(--txt-3)}
+.mem-cat{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--txt-3);
+  border:1px solid var(--line);border-radius:99px;padding:1px 8px;white-space:nowrap}
+
+/* ---------- ch15 data formulator ---------- */
+.df-table{overflow:auto;max-height:230px;border:1px solid var(--line);border-radius:11px;background:rgba(0,0,0,.28)}
+.dt{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:11.5px}
+.dt th{position:sticky;top:0;background:#0d1020;color:var(--txt-3);text-align:left;font-weight:600;
+  padding:7px 11px;border-bottom:1px solid var(--line);white-space:nowrap}
+.dt th small{display:block;font-size:9.5px;color:var(--violet);font-weight:400;letter-spacing:.4px}
+.dt td{padding:5px 11px;border-bottom:1px solid rgba(255,255,255,.045);color:var(--txt-2);white-space:nowrap}
+.dt tbody tr:hover td{background:rgba(255,255,255,.035);color:var(--txt)}
+
+.df-shelves{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:16px 0}
+.df-shelves label{display:flex;flex-direction:column;gap:6px;font-size:10.5px;text-transform:uppercase;
+  letter-spacing:1.1px;color:var(--txt-3)}
+.df-shelves select{width:100%}
+.df-shelves .dim{text-transform:none;letter-spacing:0}
+.df-fixed{font-family:var(--sans);font-size:13.5px;text-transform:none;letter-spacing:0;color:var(--txt);
+  background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:11px;padding:9px 13px}
+
+.df-chart{background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:11px;padding:14px;min-height:120px}
+.df-group{font-size:10.5px;text-transform:uppercase;letter-spacing:1.1px;color:var(--cyan);
+  margin:10px 0 5px;font-weight:700}
+.df-group:first-child{margin-top:0}
+.df-bar-row{display:grid;grid-template-columns:86px 1fr 92px;gap:9px;align-items:center;margin-bottom:6px}
+.df-bar-lab{font-size:12px;color:var(--txt-2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.df-bar-track{height:16px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden}
+.df-bar{display:block;height:100%;border-radius:4px;min-width:2px;
+  background:linear-gradient(90deg,var(--violet),var(--cyan));
+  animation:dfgrow .55s var(--ease)}
+.df-bar.neg{background:linear-gradient(90deg,var(--red),var(--amber))}
+@keyframes dfgrow{from{transform:scaleX(0);transform-origin:left}to{transform:none}}
+.df-bar-val{font-family:var(--mono);font-size:11.5px;color:var(--txt)}
+
+.df-note{margin-top:16px;font-size:13.5px;color:var(--txt-2);line-height:1.6}
+.df-warn{margin-top:10px;padding:10px 13px;border-radius:10px;font-size:12.5px;color:var(--amber);
+  background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.28)}
+
+.df-threads{display:flex;flex-direction:column;gap:7px}
+.df-thread{display:grid;grid-template-columns:32px 1fr;gap:10px;align-items:start;font-size:13px;
+  background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.df-thread.child{margin-left:22px;border-left:2px solid var(--violet)}
+.df-thread.on{border-color:var(--cyan);background:rgba(34,211,238,.1)}
+.df-tid{font-family:var(--mono);font-size:11px;color:var(--cyan)}
+.df-tf{font-family:var(--mono);font-size:11px;margin-top:3px}
+
 /* ---------- responsive ---------- */
 @media(max-width:1000px){
   .sidebar{transform:translateX(-100%)}

@@ -66,4 +66,39 @@ assert(Math.abs(Math.pow(0.95, 20) - 0.3585) < 0.01, '0.95^20 is not ~36% — th
 const combos = new Set(C.evalRuns.map(r => r.outcome + '/' + r.trajectory));
 assert(combos.size === 4, `evalRuns should cover all 4 pass/fail combinations, got ${combos.size}`);
 
+// MCP: every frame that claims to be JSON-RPC must actually parse, or the
+// chapter is teaching malformed protocol
+const MCP_DIRS = ['c2s', 's2c', 'host', 'model', 'err'];
+C.mcpFrames.forEach((f, i) => {
+  assert(MCP_DIRS.includes(f.dir), `mcpFrames[${i}]: unknown direction "${f.dir}"`);
+  assert(f.m && f.n && f.tag, `mcpFrames[${i}]: needs a method, a tag and a note`);
+  if (!f.j.trim().startsWith('{')) return;                 // code sample, not a frame
+  let parsed;
+  try { parsed = JSON.parse(f.j); }
+  catch (e) { assert.fail(`mcpFrames[${i}] (${f.m}) is not valid JSON: ${e.message}`); }
+  if (parsed.jsonrpc) {
+    assert(parsed.jsonrpc === '2.0', `mcpFrames[${i}]: wrong jsonrpc version`);
+    // requests carry an id and a method; notifications carry a method and no id
+    if (parsed.method) assert(!('result' in parsed), `mcpFrames[${i}]: both method and result`);
+    else assert('id' in parsed, `mcpFrames[${i}]: a result must echo the request id`);
+  }
+});
+// the session must show the handshake before anything else, and all three of
+// request / notification / result — that is the whole point of the walkthrough
+assert(C.mcpFrames[0].m === 'initialize', 'the MCP session must open with initialize');
+assert(C.mcpFrames.some(f => f.m === 'tools/list'), 'no discovery frame in the MCP session');
+assert(C.mcpFrames.some(f => f.m === 'tools/call'), 'no tool call in the MCP session');
+assert(C.mcpFrames.some(f => f.dir === 'err'), 'no error frame — the failure path is half the lesson');
+C.mcpPrimitives.forEach(p => assert(p.h && p.who && p.c, 'mcpPrimitives entries need a name, an owner and code'));
+assert(C.mcpCode.length >= 5, 'the MCP chapter should carry the full worked example set');
+
+// every id the demos reach for must exist somewhere, or a chapter is quietly dead
+const demos = fs.readFileSync('js/demos.js', 'utf8');
+const html = fs.readFileSync('index.html', 'utf8');
+const ids = new Set();
+// ids built by concatenation ('#c-' + name) end in a dash — not a real id, skip them
+for (const m of demos.matchAll(/\$\$?\('#([a-z0-9-]+)/g)) if (!m[1].endsWith('-')) ids.add(m[1]);
+ids.forEach(id => assert(html.includes('id="' + id + '"') || demos.includes('id="' + id + '"'),
+  `demos.js targets #${id}, which nothing ever creates`));
+
 console.log('ok — content data is consistent');

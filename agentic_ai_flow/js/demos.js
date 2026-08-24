@@ -706,10 +706,115 @@ function initQuiz() {
   renderG('');
 }
 
+/* ============================================================
+   Ch13 — MCP: the session, frame by frame, and the N×M argument
+   ============================================================ */
+function initMcp() {
+  const trace = $('#mcp-trace');
+  if (!trace) return;
+
+  /* ---- which pipeline stage each frame belongs to ---- */
+  const STAGE = [0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3];
+  let step = 0, auto = null;
+
+  function light(s) {
+    $$('#mcp-pipe .rp').forEach((n, i) => n.classList.toggle('lit', i === s));
+  }
+
+  function next() {
+    if (step >= C.mcpFrames.length) { stop(); return; }
+    const f = C.mcpFrames[step];
+    light(STAGE[step]);
+    step++;
+
+    const card = el('div', 'mcp-frame dir-' + f.dir,
+      '<div class="mcp-fh"><span class="tk">' + f.tag + '</span>' +
+      '<b class="mono">' + f.m + '</b></div>' +
+      '<pre class="code">' + esc(f.j) + '</pre>' +
+      '<div class="mcp-fn">' + f.n + '</div>');
+    trace.appendChild(card);
+    trace.scrollTop = trace.scrollHeight;
+
+    if (step === C.mcpFrames.length) {
+      xp(10, '+10 XP — you have read a whole MCP session');
+      stop();
+    }
+  }
+
+  function stop() {
+    if (auto) { clearInterval(auto); auto = null; $('#mcp-auto').textContent = '▶ Play the session'; }
+  }
+  function reset() {
+    stop(); step = 0; light(-1);
+    trace.innerHTML = '<div class="mcp-frame dir-idle"><div class="mcp-fn">' +
+      'Eleven frames: handshake, discovery, one tool call, one live change. ' +
+      'JSON-RPC 2.0 over stdio or Streamable HTTP — nothing here is model-specific.' +
+      '</div></div>';
+  }
+
+  $('#mcp-step').onclick = () => { next(); xp(1); };
+  $('#mcp-auto').onclick = e => {
+    if (auto) return stop();
+    e.target.textContent = '⏸ Pause';
+    auto = setInterval(next, 2600);
+  };
+  $('#mcp-reset').onclick = reset;
+  reset();
+
+  /* ---- the three primitives ---- */
+  $('#mcp-prims').innerHTML = C.mcpPrimitives.map(p =>
+    '<div class="tech"><h5>' + p.h + ' <span class="pill">' + p.who + '</span></h5>' +
+    '<p>' + p.p + '</p><pre class="code">' + esc(p.c) + '</pre></div>').join('');
+
+  /* ---- code tabs ---- */
+  const row = $('#mcp-code-tabs'), blk = $('#mcp-code');
+  C.mcpCode.forEach((it, i) => {
+    const b = el('button', 'chip' + (i === 0 ? ' active' : ''), it.t);
+    b.onclick = () => {
+      $$('.chip', row).forEach(c => c.classList.remove('active'));
+      b.classList.add('active'); blk.textContent = it.code;
+    };
+    row.appendChild(b);
+  });
+  blk.textContent = C.mcpCode[0].code;
+
+  /* ---- N×M: every client wired to every tool, by hand ---- */
+  let hosts = 3, servers = 4;
+  const grid = $('#mcp-matrix'), counts = $('#mcp-counts');
+
+  function paintWire() {
+    let cells = '';
+    for (let h = 0; h < hosts; h++) {
+      for (let s = 0; s < servers; s++) cells += '<span class="mcp-dot"></span>';
+    }
+    grid.style.gridTemplateColumns = 'repeat(' + servers + ', 1fr)';
+    grid.innerHTML = cells;
+
+    const bespoke = hosts * servers, viaMcp = hosts + servers;
+    counts.innerHTML =
+      '<div class="stat"><div class="stat-v">' + bespoke + '</div>' +
+        '<div class="stat-k">bespoke integrations</div></div>' +
+      '<div class="stat"><div class="stat-v">' + viaMcp + '</div>' +
+        '<div class="stat-k">with MCP · ' + hosts + ' clients + ' + servers + ' servers</div></div>' +
+      '<div class="stat"><div class="stat-v">' + (bespoke - viaMcp) + '</div>' +
+        '<div class="stat-k">integrations you did not write</div></div>';
+    $('#mcp-wire-note').innerHTML = bespoke <= viaMcp
+      ? 'At this size MCP is pure overhead — <b>two clients and two tools do not need a protocol.</b> Add a few and look again.'
+      : 'Every dot is a bespoke integration someone maintains, re-tests on every API change, and re-implements for the next client. ' +
+        'MCP turns the grid into <b>' + hosts + ' + ' + servers + '</b> — each side implements the protocol once.';
+  }
+
+  $('#mcp-h-plus').onclick  = () => { hosts = clamp(hosts + 1, 1, 8); paintWire(); };
+  $('#mcp-h-minus').onclick = () => { hosts = clamp(hosts - 1, 1, 8); paintWire(); };
+  $('#mcp-s-plus').onclick  = () => { servers = clamp(servers + 1, 1, 10); paintWire(); xp(1); };
+  $('#mcp-s-minus').onclick = () => { servers = clamp(servers - 1, 1, 10); paintWire(); };
+  paintWire();
+}
+
 /* ---------- boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   [initBackground, initAgency, initLoop, initTools, initReact, initPlan, initMemory,
-   initReflect, initTopo, initGuard, initReliability, initEval, initShip, initQuiz]
+   initReflect, initTopo, initGuard, initReliability, initEval, initShip, initMcp, initQuiz]
     .forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 });
 })();
