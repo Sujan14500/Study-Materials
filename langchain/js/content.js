@@ -412,3 +412,181 @@ C.glossary = [
   ['bind()', 'Pins arguments for later invocations, e.g. `model.bind(tools=[...])`.'],
   ['with_fallbacks()', 'Try the next runnable if this one raises. Common for cheap-model-first routing.']
 ];
+
+/* ------------------------------------------------------------
+   Plain-English openers — one per chapter, keyed by data-id.
+   Rendered by initPlain() into a <details> under each ch-head.
+   Every entry pairs an everyday example with the same idea in code.
+   ------------------------------------------------------------ */
+C.plain = {
+
+welcome: {
+  q: 'What even is LangChain?',
+  lay: {
+    t: 'A box of parts, not a robot',
+    b: 'LangChain and LangGraph are free Python packages — things you install, like adding a plugin to a word processor. They are not an AI. They do not think, and they cannot answer a question.\n\nThe AI itself lives somewhere else, on a company’s server, and you talk to it over the internet. These packages are the wiring around that call: fetching the right document first, remembering what was said earlier, retrying when it fails.\n\nIf the restaurant is the AI, LangChain is the delivery bike. It does not cook.'
+  },
+  tech: {
+    t: 'They are ordinary dependencies',
+    b: 'Installed with pip, imported like anything else. No account, no server, no background process.',
+    code: 'pip install langchain langgraph\n\n# then, in your own code:\nfrom langchain_core.prompts import ChatPromptTemplate\nfrom langgraph.graph import StateGraph\n\n# you still need an API key for the actual model,\n# and you still pay that provider per call'
+  }
+},
+
+why: {
+  q: 'Why not just call the AI directly?',
+  lay: {
+    t: 'Hanging one picture vs fitting a kitchen',
+    b: 'One picture on the wall: buy a hammer. Buying a whole workshop for it is silly — you would spend the afternoon learning the tools instead of hanging the picture.\n\nFitting an entire kitchen: now the workshop pays for itself. Twenty jobs, each needing a different tool, and every tool you skip is one you have to make yourself.\n\nSame trade here. One question, one answer? Call the AI directly — six lines, done. Loading documents, remembering conversations, calling tools, retrying when things fail? That is the kitchen, and LangChain is the workshop.'
+  },
+  tech: {
+    t: 'The six-line version really is six lines',
+    b: 'This is the whole app, when the app is one call. A framework on top of this buys you nothing.',
+    code: 'import anthropic\nclient = anthropic.Anthropic()\n\nmsg = client.messages.create(\n    model="claude-sonnet-5",\n    max_tokens=500,\n    messages=[{"role": "user", "content": "What is a Python list?"}],\n)\nprint(msg.content[0].text)\n\n# now add: your PDFs, conversation memory, three tools,\n# retries and streaming. that is when it stops being six lines.'
+  }
+},
+
+models: {
+  q: 'Does the AI remember me?',
+  lay: {
+    t: 'It has no memory whatsoever',
+    b: 'Picture writing to a pen pal who forgets you completely the moment they post their reply. Not rude — genuinely blank.\n\nSo to hold a conversation, you re-send the entire correspondence every single time. Your first letter, their reply, your second letter, their reply, and finally your new question. All of it, every time.\n\nThat is exactly what a chat app does behind the scenes. The "conversation" is an illusion built by resending the transcript. Which is also why long chats get slower and cost more — the letter keeps getting fatter.'
+  },
+  tech: {
+    t: 'A list goes in, one message comes out',
+    b: 'That is the entire contract, and it is identical across providers — which is what makes swapping them a one-line change.',
+    code: 'messages = [\n    {"role": "system",    "content": "You are a terse assistant."},\n    {"role": "user",      "content": "What is Python?"},\n    {"role": "assistant", "content": "A programming language."},\n    {"role": "user",      "content": "Who made it?"},   # <- only this is new\n]\n\n# all four go over the wire, on every call.\n# nothing is stored on their end between calls.'
+  }
+},
+
+prompts: {
+  q: 'Why not just use an f-string?',
+  lay: {
+    t: 'A blank form beats a blank page',
+    b: 'Two ways to take a customer order. One: hand someone a blank sheet and hope they write down everything you need. Two: hand them a form with labelled boxes — Name, Address, Item.\n\nThe form wins for a dull reason. If a box is empty you notice at the counter, immediately. With the blank sheet you find out three days later, when the parcel cannot be delivered.\n\nA prompt template is that form. It knows which blanks exist and complains the moment one is missing — instead of quietly sending the AI a sentence with a hole in it.'
+  },
+  tech: {
+    t: 'A missing variable is an error, not a strange answer',
+    b: 'The f-string fails silently and you debug it at 2am. The template fails immediately and names the blank.',
+    code: 'from langchain_core.prompts import ChatPromptTemplate\n\ntpl = ChatPromptTemplate.from_template(\n    "Translate to {language}: {text}"\n)\n\ntpl.invoke({"language": "French", "text": "hello"})   # fine\ntpl.invoke({"text": "hello"})                          # KeyError: language\n\n# the f-string version would have cheerfully sent\n# "Translate to : hello" and left you wondering'
+  }
+},
+
+lcel: {
+  q: 'What does the | symbol do?',
+  lay: {
+    t: 'A conveyor belt in a sandwich shop',
+    b: 'Bread station, filling station, wrapping station. Each one takes what the last handed over and passes its work along the belt.\n\nNobody needs to understand the whole sandwich. Each station knows one job and where to put the result.\n\nThe `|` symbol is that belt. `prompt | model | parser` reads left to right: fill in the prompt, hand it to the AI, tidy up the reply. Swap the filling station for a different one and the bread and wrapping carry on unbothered.'
+  },
+  tech: {
+    t: 'Each step’s output is the next step’s input',
+    b: 'And the result is itself a component, so a chain drops inside a bigger chain without ceremony.',
+    code: 'chain = prompt | model | parser\n\nchain.invoke({"question": "How many holidays do I get?"})\n\n# swap the middle station; nothing else changes:\nchain = prompt | other_model | parser\n\n# and because a chain is a component too:\nbigger = retriever | chain | formatter'
+  }
+},
+
+parsers: {
+  q: 'How do I get data instead of a paragraph?',
+  lay: {
+    t: 'Ask for a form, not a chat',
+    b: 'Ask someone "where do you live?" and you get "oh, just off the high street, near the big Tesco". True, friendly, useless for posting a parcel.\n\nHand them a form with House Number, Street, Postcode and you get three fields you can type straight into a system.\n\nSame with the AI. Ask loosely and you get prose you have to pick apart — phrased differently every Tuesday. Give it a form and it fills in the boxes.'
+  },
+  tech: {
+    t: 'Constrain what it may produce, don’t tidy up after',
+    b: 'The schema goes over as a tool definition, so the model is not free to ramble. You get back a validated object, not a dict you hope has the right keys.',
+    code: 'from pydantic import BaseModel\n\nclass Address(BaseModel):\n    house: str\n    street: str\n    postcode: str\n\nstructured = model.with_structured_output(Address)\nout = structured.invoke("I live at 12 Mill Lane, EC1 4AB")\n\nout.postcode        # "EC1 4AB" — a real field, already validated\n# not: json.loads(reply) and a prayer'
+  }
+},
+
+splitters: {
+  q: 'Why chop up my documents?',
+  lay: {
+    t: 'Index cards from a textbook',
+    b: 'You cannot hand the AI a 500-page handbook — there is a size limit on one message. So you copy it onto index cards and hand over only the few cards that matter.\n\nCard size is the whole game. Too small and a fact gets sliced in half — "holiday allowance is" on one card, "28 days" on the next. Neither card can answer the question, and no amount of clever AI repairs that.\n\nToo big and you waste the space handing over four paragraphs of nothing to reach one useful line. Hence the overlap: let each card repeat the tail of the one before, so nothing falls down the crack.'
+  },
+  tech: {
+    t: 'chunk_size and chunk_overlap are the two dials',
+    b: 'This is where retrieval quality is actually decided. Everyone tunes the prompt; almost nobody tunes this.',
+    code: 'from langchain_text_splitters import RecursiveCharacterTextSplitter\n\nsplitter = RecursiveCharacterTextSplitter(\n    chunk_size=1000,      # characters per card\n    chunk_overlap=200,    # repeat the tail so facts survive the cut\n)\nchunks = splitter.split_documents(docs)\n\nlen(chunks)      # 500 pages -> a few thousand cards'
+  }
+},
+
+vectors: {
+  q: 'How does it find the right page?',
+  lay: {
+    t: 'Give every sentence a map coordinate',
+    b: 'Word search is brittle. Someone asks "how do I undo a release?" and your handbook says "rollback procedure". No shared words, no results — and the answer was sitting right there.\n\nSo instead, every sentence gets a coordinate on a map, placed by meaning rather than spelling. "Undo a release" and "rollback procedure" land on neighbouring streets. "Cheese" is in another county.\n\nFinding the right page becomes: put the question on the map, look at what is nearby. That is all a vector search is — a map where meaning decides the address.'
+  },
+  tech: {
+    t: 'Text becomes numbers; near means similar',
+    b: 'An embedding model returns a list of numbers. The store indexes them and answers "what are the k nearest to this one?"',
+    code: 'vec = embeddings.embed_query("how do I undo a release?")\nlen(vec)        # 1536 numbers — the coordinate\n\nhits = store.similarity_search("how do I undo a release?", k=3)\nfor d in hits:\n    print(d.page_content[:60])\n\n# -> "Rollback procedure: to revert a deployment..."\n# matched on meaning. not one keyword in common.'
+  }
+},
+
+rag: {
+  q: 'How does it answer about MY documents?',
+  lay: {
+    t: 'An open-book exam',
+    b: 'You would not make a new starter memorise the staff handbook. You hand them the handbook and let them look things up.\n\nThat is the whole trick, and it carries an ugly three-letter name (RAG) for something quite simple. A question arrives, you find the relevant pages first, staple them to the question, and ask the AI to answer only from what is stapled on.\n\nThe AI never learned your handbook. It is reading it over your shoulder for that one question, then forgetting it again.'
+  },
+  tech: {
+    t: 'Retrieve, staple, ask',
+    b: 'No special model and no special API. A chain built from parts you have already met.',
+    code: 'chain = (\n    {"context": retriever, "question": RunnablePassthrough()}\n    | prompt      # "Answer using ONLY this context: {context}"\n    | model\n    | parser\n)\n\nchain.invoke("How many holidays do I get?")\n\n# switch the retriever off and it still answers — confidently,\n# from general knowledge, about somebody else’s company.'
+  }
+},
+
+history: {
+  q: 'How do chatbots remember the conversation?',
+  lay: {
+    t: 'A notebook you read aloud every time',
+    b: 'Back to the pen pal with no memory. The fix is unglamorous: keep a notebook of everything said so far, and read the whole thing aloud before each new question.\n\nTwo things follow, and both bite people in production.\n\nIt gets slower and dearer with every exchange, because the notebook you re-read keeps growing. And if you mix up whose notebook is whose, you read one customer’s conversation aloud to another. That is not a mysterious AI bug — it is a filing error, and it is entirely yours.'
+  },
+  tech: {
+    t: 'Store by session id, splice in before the call',
+    b: '"Memory" means exactly this and nothing more. Two sessions, two notebooks, one chain.',
+    code: 'from langchain_core.runnables.history import RunnableWithMessageHistory\n\nchat = RunnableWithMessageHistory(\n    chain,\n    lambda sid: get_history(sid),      # <- one notebook per session id\n    input_messages_key="question",\n    history_messages_key="history",\n)\n\nchat.invoke({"question": "and who made it?"},\n            config={"configurable": {"session_id": "user-42"}})\n\n# the wrong session_id here is one user reading another’s chat'
+  }
+},
+
+agents: {
+  q: 'What makes something an "agent"?',
+  lay: {
+    t: 'An assistant allowed to go and check',
+    b: 'A chain is a recipe: these four steps, in order, stop. Fine — until the task needs something looked up.\n\nAn agent is an assistant with a phone and a calculator on the desk. You ask a question. They might answer straight away, or say "hold on, let me check", make a call, read the answer, and only then decide whether they need another call before replying.\n\nYou did not decide how many calls. They did, while working. That is the appeal, and also the danger: an assistant with no instruction to stop will happily be on the phone all afternoon, on your bill. Hence the cap.'
+  },
+  tech: {
+    t: 'A loop that ends when the model stops asking',
+    b: 'Each turn the model either requests a tool or gives a final answer. The executor keeps going until it stops requesting. You write the tools and the cap.',
+    code: 'agent = create_tool_calling_agent(model, tools, prompt)\nexecutor = AgentExecutor(\n    agent=agent,\n    tools=tools,\n    max_iterations=6,        # <- the cap. do not skip this.\n)\n\nexecutor.invoke({"input": "What is 17% of last month’s revenue?"})\n\n# it calls the revenue tool, reads the number, calls the\n# calculator, then answers. two tool calls, and you\n# specified neither of them.'
+  }
+},
+
+graph: {
+  q: 'When is a chain not enough?',
+  lay: {
+    t: 'A recipe vs a board game',
+    b: 'A recipe goes one way. Step 1, 2, 3, serve. You never go back to step 2, and if the kitchen catches fire you start again tomorrow from the beginning.\n\nA board game is different. You can land on a square that sends you back three. You can pause overnight and resume where you left off. You can wait for another player to take their turn.\n\nChains are recipes. Some jobs are board games — check the answer and retry if it is poor, wait for a manager to approve, survive the server restarting. LangGraph is for those.'
+  },
+  tech: {
+    t: 'The edge that points backwards',
+    b: 'One line a chain cannot express, and the reason the whole library exists.',
+    code: 'from langgraph.graph import StateGraph\n\ng = StateGraph(dict)\ng.add_node("retrieve", retrieve)\ng.add_node("grade",    grade)\ng.add_node("rewrite",  rewrite)\n\ng.add_edge("retrieve", "grade")\ng.add_conditional_edges("grade", decide)   # good? finish. poor? rewrite.\ng.add_edge("rewrite", "retrieve")          # <- backwards. no pipe does this.'
+  }
+},
+
+ship: {
+  q: 'What changes when it goes live?',
+  lay: {
+    t: 'Fit the dashcam before the crash',
+    b: 'On your own laptop you can see everything, because you printed it. In production the app is off doing thousands of runs while you are asleep, and the only thing you hear is "it gave a weird answer yesterday".\n\nWithout a recording you are guessing. Was the question odd? Did it fetch the wrong page? Did the AI simply have a bad day?\n\nTracing is the dashcam. Two settings, switched on before you launch, and every run is recorded — what went in, what came back, how long it took, what it cost. Turn it on first, not after the first complaint.'
+  },
+  tech: {
+    t: 'Two environment variables',
+    b: 'That is the entire setup. Every step of every run then appears with inputs, outputs, tokens and latency.',
+    code: 'export LANGSMITH_TRACING=true\nexport LANGSMITH_API_KEY=...\n\n# no code change. the chain you already wrote is now recorded.\n\n# the debugging order when an answer is wrong:\n#   1. what did the retriever fetch?      (usually here)\n#   2. what did the prompt become?\n#   3. what did the model actually say?\n#   4. blame the model                    (rarely here)'
+  }
+}
+
+};

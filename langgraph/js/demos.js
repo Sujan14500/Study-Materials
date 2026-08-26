@@ -972,9 +972,49 @@ function initScoped() {
   window.addEventListener('chapterchange', e => { if (e.detail === 'scoped') paint(); });
 }
 
+/* ============================================================
+   Plain-English opener — injected under every chapter heading.
+   Content lives in C.plain (content.js), keyed by data-id.
+   Left column: an everyday example. Right column: the same
+   idea in code. Collapsible via native <details>, open by default.
+   ============================================================ */
+function initPlain() {
+  if (!window.C || !C.plain) return;
+  const md = s => esc(s).replace(/`([^`]+)`/g, '<span class="mono">$1</span>');
+  const paras = s => s.split('\n\n').map(p => '<p>' + md(p) + '</p>').join('');
+
+  $$('.chapter').forEach(ch => {
+    const p = C.plain[ch.dataset.id];
+    if (!p) return;
+    const anchor = $('.ch-head', ch) || $('.hero-sub', ch);
+    if (!anchor) return;
+
+    const d = el('details', 'plain');
+    d.open = true;
+    d.innerHTML =
+      '<summary class="plain-sum">' +
+        '<span class="plain-ico">\uD83D\uDCA1</span>' +
+        '<span class="plain-q">' + esc(p.q) + '</span>' +
+        '<span class="plain-hint">plain English</span>' +
+      '</summary>' +
+      '<div class="plain-grid">' +
+        '<div class="plain-col">' +
+          '<h4>\uD83C\uDF0D Everyday version</h4>' +
+          '<h5>' + esc(p.lay.t) + '</h5>' + paras(p.lay.b) +
+        '</div>' +
+        '<div class="plain-col">' +
+          '<h4>\uD83D\uDCBB The same thing in code</h4>' +
+          '<h5>' + esc(p.tech.t) + '</h5>' + paras(p.tech.b) +
+          '<pre class="code">' + esc(p.tech.code) + '</pre>' +
+        '</div>' +
+      '</div>';
+    anchor.insertAdjacentElement('afterend', d);
+  });
+}
+
 /* ---------- boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
-  [initBackground, initShape, initState, initBuilder, initRouter, initCycle, initReact,
+  [initPlain, initBackground, initShape, initState, initBuilder, initRouter, initCycle, initReact,
    initScoped, initPersist, initHitl, initTimeTravel, initStream, initMulti, initMemory,
    initShip, initQuiz]
     .forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });

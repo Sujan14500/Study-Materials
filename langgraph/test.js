@@ -205,4 +205,28 @@ assert(puts.length !== new Set(puts).size, 'reuse one key name across namespaces
     `demos.js targets #${id}, which nothing ever creates`));
 }
 
+
+// plain-English openers: every chapter bar the quiz must have one, and each must be
+// complete — a half-filled entry renders as an empty column instead of failing loudly
+{
+  const html = fs.readFileSync('index.html', 'utf8');
+  const chapters = [...html.matchAll(/<section class="chapter" data-id="([a-z0-9-]+)"/g)].map(m => m[1]);
+  assert(chapters.length > 5, 'could not read the chapter list out of index.html');
+
+  chapters.filter(id => id !== 'quiz').forEach(id => {
+    const p = C.plain[id];
+    assert(p, `chapter "${id}" has no C.plain entry — it would render with no plain-English opener`);
+    [['q', p.q], ['lay.t', p.lay && p.lay.t], ['lay.b', p.lay && p.lay.b],
+     ['tech.t', p.tech && p.tech.t], ['tech.b', p.tech && p.tech.b],
+     ['tech.code', p.tech && p.tech.code]
+    ].forEach(([name, v]) =>
+      assert(typeof v === 'string' && v.trim(), `C.plain.${id} is missing ${name}`));
+    assert(p.tech.code.includes('\n'),
+      `C.plain.${id}.tech.code is a single line — the technical half needs a real example`);
+  });
+
+  Object.keys(C.plain).forEach(id =>
+    assert(chapters.includes(id), `C.plain."${id}" matches no chapter — it can never render`));
+}
+
 console.log('ok — content data is consistent');

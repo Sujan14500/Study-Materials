@@ -43,6 +43,19 @@ Code examples are Python.
 | 14 | Ship it | A checkpoint-storage calculator, six production concerns, and a checklist that saves |
 | 15 | Final quiz | 12 questions with explanations, plus a 32-term glossary |
 
+### Every chapter opens in plain English
+
+Under each chapter heading sits a collapsible **plain English** block with two columns:
+an everyday example on the left — no code, no jargon — and the same idea in Python on the
+right. It is pitched at someone who knows a little Python and nothing about LLMs, and it
+collapses once you no longer need it.
+
+The text lives in `C.plain` in `js/content.js`, keyed by each chapter's `data-id`. Each
+entry is `{ q, lay: {t, b}, tech: {t, b, code} }` — `q` is the question in the summary
+bar, `lay` the everyday column, `tech` the code column. Blank lines in `b` become
+paragraphs and `backticks` become inline code. `test.js` fails if a chapter has no entry
+or an entry is half-filled.
+
 Progress, XP and the checklist persist in `localStorage`.
 
 ## Files
@@ -58,9 +71,9 @@ test.js           node test.js — checks the course data is self-consistent
 
 ## Changing it
 
-Almost everything you'd want to edit is in `js/content.js`: the graph node and edge lists,
-the traces, the checkpoint history, the store operations, quiz and glossary. `demos.js`
-only renders it.
+Almost everything you'd want to edit is in `js/content.js`: the plain-English openers, the
+graph node and edge lists, the traces, the checkpoint history, the store operations, quiz
+and glossary. `demos.js` only renders it.
 
 `test.js` guards the invariants that are easy to break by hand — quiz answer indices,
 graph edges pointing at nodes that exist, the cycle demo actually containing a cycle and

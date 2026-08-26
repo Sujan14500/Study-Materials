@@ -657,3 +657,207 @@ C.lgsNotes = [
   ['Tool schemas are resent every step', 'Twelve bound tools is roughly 1.4k tokens of JSON on every single call, all run long. Three is 320.'],
   ['Write permissions are yours to enforce', 'LangGraph merges anything a node returns. If only one node should set `patch`, wrap the node and assert it — the framework will not do it for you.']
 ];
+
+/* ------------------------------------------------------------
+   Plain-English openers — one per chapter, keyed by data-id.
+   Rendered by initPlain() into a <details> under each ch-head.
+   Every entry pairs an everyday example with the same idea in code.
+   ------------------------------------------------------------ */
+C.plain = {
+
+welcome: {
+  q: 'What even is LangGraph?',
+  lay: {
+    t: 'A board game engine for AI steps',
+    b: 'LangGraph is a free Python package — something you install, not a website you sign up to. It is not an AI and it does not answer questions.\n\nWhat it does is run your steps in an order that can change while it runs. Go back a step. Wait for a person. Survive the server restarting and carry on from where it stopped.\n\nA chain is a recipe: front to back, once. LangGraph is a board game: squares that send you backwards, turns you can pause, and a save file. Same steps, different rules about how you move between them.'
+  },
+  tech: {
+    t: 'An ordinary dependency',
+    b: 'Installed with pip. You still call the model yourself; LangGraph only decides what runs next.',
+    code: 'pip install langgraph\n\nfrom langgraph.graph import StateGraph, START, END\n\n# a node is a plain function. no base class, no decorator.\ndef greet(state):\n    return {"reply": "hello " + state["name"]}'
+  }
+},
+
+why: {
+  q: 'Chain or graph — how do I choose?',
+  lay: {
+    t: 'Two questions, and only two',
+    b: 'Forget the diagrams. Ask two things about the job.\n\nFirst: does it ever need to go backwards? Checking the answer and trying again, retrying a failed step, an assistant that keeps looking things up until it is satisfied. All backwards.\n\nSecond: does it need to outlive the program? Waiting for a manager to approve something on Thursday, or picking up cleanly after the server restarts.\n\nBoth no — use a chain, it is smaller and there is nothing to configure. Either one yes — no amount of chain cleverness gets you there. You need a graph.'
+  },
+  tech: {
+    t: 'What a chain physically cannot express',
+    b: 'A pipe is a one-way street. There is no syntax for going back, and no place for the run to be saved.',
+    code: '# chain: fine, and simpler. use this when you can.\nchain = prompt | model | parser\n\n# graph: needed the moment either answer is yes\ng.add_edge("rewrite", "retrieve")     # backwards\ngraph = g.compile(checkpointer=saver) # survives the process'
+  }
+},
+
+state: {
+  q: 'What is "state" and why does it need rules?',
+  lay: {
+    t: 'A clipboard passed around a team',
+    b: 'One clipboard goes round the office. Each person reads it, writes their bit, hands it on. That clipboard is the state — the only thing every step shares.\n\nThe catch is what "writing your bit" means for each box. On the Name box you cross out the old value and write yours. On the Notes box you add a line at the bottom and leave everyone else’s alone.\n\nGet that backwards and you get the nastiest bug in LangGraph: a step overwrites the Notes box, four people’s notes vanish, nothing crashes, no error appears, and the answer is quietly wrong.'
+  },
+  tech: {
+    t: 'The reducer decides how a key merges',
+    b: 'Default is overwrite. Annotate with a reducer to append instead. Getting this wrong fails silently — nothing raises.',
+    code: 'from typing import Annotated, TypedDict\nimport operator\n\nclass State(TypedDict):\n    question: str                                   # overwrite (default)\n    notes:    Annotated[list, operator.add]         # append\n\n# a node returns UPDATES, it does not mutate state:\ndef research(state):\n    return {"notes": ["found the pricing page"]}    # appended\n\n# drop the Annotated and this same line silently\n# throws away every earlier note.'
+  }
+},
+
+nodes: {
+  q: 'What is a node?',
+  lay: {
+    t: 'A person with an in-tray',
+    b: 'Each node is one worker at one desk. The clipboard lands in their tray, they read what they need, do their one job, and write their result back on it.\n\nThey do not know who comes next. They do not know who came before. They just do their bit and put the clipboard down.\n\nWhich is why this is easier than it sounds: a node is an ordinary function. Nothing to inherit, nothing to register — which also means you can test one on its own, at your desk, with no AI involved at all.'
+  },
+  tech: {
+    t: 'Takes the state, returns a dict of updates',
+    b: 'That is the entire interface. No base class, no decorator — so a node is testable with a plain assert.',
+    code: 'def grade(state):\n    good = len(state["docs"]) > 0\n    return {"verdict": "good" if good else "poor"}\n\ng.add_node("grade", grade)\ng.add_edge(START, "grade")\n\n# and the test needs no model, no network, no mocking:\nassert grade({"docs": []}) == {"verdict": "poor"}'
+  }
+},
+
+routing: {
+  q: 'How does it decide what runs next?',
+  lay: {
+    t: 'A receptionist reading your form',
+    b: 'You hand in a form at reception. They glance at it and say "room 3". Not "yes". Not "true". The name of a room.\n\nThat is a conditional edge — a function that looks at the clipboard and returns where it should go next. Repair goes to room 3, returns go to room 5, complaints go to the manager, finished ones go out the front door.\n\nOnce that clicks, branching, looping and finishing stop being three separate features. They are all just the receptionist naming a different room.'
+  },
+  tech: {
+    t: 'Return a node name, not a boolean',
+    b: 'Same mechanism for branching, looping and ending. END is just another destination.',
+    code: 'def decide(state):\n    if state["verdict"] == "good":\n        return "answer"          # a node name\n    if state["tries"] >= 3:\n        return END               # finishing is a destination too\n    return "rewrite"             # looping is a destination too\n\ng.add_conditional_edges("grade", decide)'
+  }
+},
+
+cycles: {
+  q: 'What happens if it loops forever?',
+  lay: {
+    t: 'Snakes and ladders needs a rule about giving up',
+    b: 'Going back a square is the whole point — but a board with only snakes and no rule about quitting is a game nobody finishes.\n\nAn AI that grades its own answer, decides it is poor, rewrites the question, and tries again is exactly that board. Usually it improves and stops. Sometimes it decides every answer is poor, forever, and cheerfully bills you for each attempt.\n\nSo whoever adds the backwards arrow owns the stopping rule. That is the trade: you got the loop, and the loop is now yours to end.'
+  },
+  tech: {
+    t: 'Own the stopping condition — twice',
+    b: 'Your own counter for the sensible exit, and recursion_limit as the backstop that stops the bill.',
+    code: 'def decide(state):\n    if state["tries"] >= 3:      # 1. your rule\n        return END\n    return "rewrite"\n\ng.add_edge("rewrite", "retrieve")     # the backwards edge\n\ngraph.invoke(inp, {"recursion_limit": 10})   # 2. the backstop\n# GraphRecursionError instead of an infinite bill'
+  }
+},
+
+react: {
+  q: 'Do I have to build the agent myself?',
+  lay: {
+    t: 'The loop comes ready-made in a box',
+    b: 'An assistant with tools is always the same two rooms. Room one: think about it. Room two: go and look something up. Back to room one with what you found. Repeat until you can answer.\n\nYou could draw those two rooms yourself every time. Or take the one that comes in a box, already wired.\n\nAnd because what comes out of the box is an ordinary board — not some sealed appliance — everything else still works on it. Save files, pauses, live updates. It is a normal graph that someone else drew for you.'
+  },
+  tech: {
+    t: 'Two nodes and one conditional edge, prebuilt',
+    b: 'Returns an ordinary compiled graph, so checkpointers, interrupts, streaming and the store all still apply.',
+    code: 'from langgraph.prebuilt import create_react_agent\n\nagent = create_react_agent(model, tools, checkpointer=saver)\n\nagent.invoke(\n    {"messages": [("user", "What is 17% of last month’s revenue?")]},\n    {"configurable": {"thread_id": "abc"}},\n)\n\n# identical to the graph you would have drawn:\n#   agent -> (tools needed?) -> tools -> back to agent -> END'
+  }
+},
+
+scoped: {
+  q: 'Why not give the agent every tool?',
+  lay: {
+    t: 'Which keys does the intern actually need?',
+    b: 'A new intern needs the stationery cupboard key. You do not hand over the whole keyring including the server room, and then write a strongly worded note asking them not to go in there.\n\nBut that is precisely what "bind every tool to the model and tell it in the prompt to be careful" amounts to. On a good day it behaves. On a bad day it deploys to production during a research task, and you are left arguing with a prompt.\n\nA graph lets you hand each room its own small keyring. The researcher literally cannot deploy — not because you asked nicely, but because the key is not in the room.'
+  },
+  tech: {
+    t: 'Bind different tools per node',
+    b: 'Turns a prompt-engineering problem into something the wiring cannot express. Same for state: give every key exactly one writer.',
+    code: 'def research(state):\n    return model.bind_tools([search, read_docs]).invoke(...)\n\ndef deploy(state):\n    return model.bind_tools([ship_it]).invoke(...)\n\n# the research node cannot call ship_it. not "should not" —\n# it was never handed to that model call.'
+  }
+},
+
+persist: {
+  q: 'What happens if the server restarts?',
+  lay: {
+    t: 'A save file after every move',
+    b: 'A game that only exists in the console’s memory is lost the moment the power goes. A game that saves after every move is not.\n\nA checkpointer saves the clipboard after every step, filed under a run id. Nothing clever — just write it down each time.\n\nThat one boring habit is where the next three chapters come from. Resuming after a crash, pausing for a human, and rewinding to an earlier point are not three features. They are three things you get free once every moment has been written down.'
+  },
+  tech: {
+    t: 'One argument at compile time',
+    b: 'The full state is written after every super-step, keyed by thread_id. Same thread_id later = same conversation.',
+    code: 'from langgraph.checkpoint.sqlite import SqliteSaver\n\ngraph = g.compile(checkpointer=SqliteSaver.from_conn_string("chk.db"))\n\ncfg = {"configurable": {"thread_id": "user-42"}}\ngraph.invoke({"question": "hi"}, cfg)\n\n# kill the process. start it again. same cfg:\ngraph.invoke({"question": "and then?"}, cfg)   # it remembers'
+  }
+},
+
+hitl: {
+  q: 'Can it stop and ask a person?',
+  lay: {
+    t: 'The form in the manager’s in-tray',
+    b: 'An expense claim over £500 needs a signature. The claim does not get cancelled and it does not sit there with someone standing over it — it waits in a tray until Thursday, when the manager gets round to it.\n\nA graph can do the same, and it costs nothing while it waits. The process can exit. The server can be redeployed twice. Nothing is running, because the whole run is sitting in the save file.\n\nWhen the answer finally arrives, it carries on from the exact step where it paused. Approve, edit or reject — three different endings from the same paused moment.'
+  },
+  tech: {
+    t: 'interrupt() pauses; the state is already saved',
+    b: 'Not a sleeping thread — the run genuinely stops and lives in the checkpointer until you resume it.',
+    code: 'from langgraph.types import interrupt, Command\n\ndef approval(state):\n    decision = interrupt({"amount": state["amount"]})   # stops here\n    return {"approved": decision == "yes"}\n\n# hours or days later, possibly a different process entirely:\ngraph.invoke(Command(resume="yes"), cfg)'
+  }
+},
+
+timetravel: {
+  q: 'Can I go back and change something?',
+  lay: {
+    t: 'Every save slot kept, not just the latest',
+    b: 'Most games keep one save and overwrite it. This keeps every one — every move, its own slot, each with a name.\n\nSo when a run finishes badly, you do not start over. You load the slot from halfway through, change one thing, and play a different ending from there.\n\nThe original is untouched beside it. Both endings exist, from the same first half, which is how you find out whether the poor answer came from the search or from the question — instead of guessing.'
+  },
+  tech: {
+    t: 'Every checkpoint has an id you can resume from',
+    b: 'Fork from any past moment. The original branch stays intact next to the new one.',
+    code: 'for snap in graph.get_state_history(cfg):\n    print(snap.config["configurable"]["checkpoint_id"], snap.next)\n\n# pick one from the middle, change a value, run a new future:\nforked = graph.update_state(old_cfg, {"question": "rephrased"})\ngraph.invoke(None, forked)'
+  }
+},
+
+streaming: {
+  q: 'Why does "streaming" not work?',
+  lay: {
+    t: 'Five different things people mean by "live"',
+    b: 'A parcel delivery tells you several live things and they are not the same thing. Where the van is. Which depot it just left. The driver’s note. Each is a different feed, and asking for one and expecting another is why people say tracking is broken.\n\nA graph run is the same. It can tell you the words appearing one at a time, or which step just finished, or the whole clipboard as it stands, or your own progress messages.\n\nThey are separate feeds and you pick which. "Streaming does not work" is nearly always the right feed being asked of the wrong subscription.'
+  },
+  tech: {
+    t: 'stream_mode picks the feed',
+    b: 'Different modes answer different questions. Wanting typing-out-letter-by-letter and asking for "updates" is the usual mix-up.',
+    code: 'for chunk in graph.stream(inp, cfg, stream_mode="updates"):\n    print(chunk)          # which node just finished, and what it wrote\n\nfor chunk in graph.stream(inp, cfg, stream_mode="messages"):\n    print(chunk)          # model tokens, one at a time <- "typing"\n\n# also: "values" (whole state), "custom" (your own events), "debug"\ngraph.stream(inp, cfg, stream_mode=["updates", "messages"])   # or several'
+  }
+},
+
+multi: {
+  q: 'How do I combine several agents?',
+  lay: {
+    t: 'A department is just an employee from outside',
+    b: 'A manager hands work to "Legal". From the manager’s side Legal is one name on the org chart: send it there, get something back.\n\nInside, Legal is a whole team with its own desks and its own procedure. The manager neither knows nor cares.\n\nGraphs nest the same way, and there is no special API for it — because a finished graph takes a clipboard and returns updates, which is the exact description of a node. Multi-agent systems are that, plus a way to say "go here, and take this with you".'
+  },
+  tech: {
+    t: 'A compiled graph is a node',
+    b: 'Same shape in, same shape out — so it nests with no special API. Command routes and updates in one move.',
+    code: 'legal = legal_builder.compile()\nparent.add_node("legal", legal)        # a whole graph, used as one node\n\nfrom langgraph.types import Command\n\ndef supervisor(state):\n    return Command(\n        goto="legal",                          # where next\n        update={"task": "check the contract"}, # and what to hand over\n    )'
+  }
+},
+
+memory: {
+  q: 'Why does it forget me in a new chat?',
+  lay: {
+    t: 'Save file vs player profile',
+    b: 'A save file remembers this game — where you are, what is in your inventory. Start a new game and it knows nothing, which is correct. That is what a save file is for.\n\nYour player profile is different. Name, settings, achievements. It follows you across every game you start.\n\nThe checkpointer is the save file: this conversation. It is not memory of the person. "Prefers metric units" belongs in the profile — the store — or it dies with the chat and you ask them again next week.'
+  },
+  tech: {
+    t: 'Checkpointer is per-thread; the store is not',
+    b: 'Two different things. Facts that should outlive a conversation go in the store, scoped by namespace rather than thread.',
+    code: 'from langgraph.store.memory import InMemoryStore\nstore = InMemoryStore()\n\nstore.put(("users", "42"), "prefs", {"units": "metric"})\n\ndef node(state, *, store):\n    prefs = store.get(("users", "42"), "prefs")   # survives new threads\n\ngraph = g.compile(checkpointer=saver, store=store)'
+  }
+},
+
+ship: {
+  q: 'What breaks in production?',
+  lay: {
+    t: 'Four ways, and only four',
+    b: 'Almost every production problem is one of four, and all four are cheap to prevent and expensive to discover.\n\nThe clipboard got fat — every step appended, nobody trimmed, and now each save is enormous. The loop had no stopping rule and ran up a bill. A step that is not safe to repeat got repeated after a resume, and the customer was charged twice.\n\nAnd the quiet one: somebody renamed a room. Every saved game in flight pointed at the old name, and now none of them can resume.'
+  },
+  tech: {
+    t: 'Trim, cap, make it re-runnable, never rename',
+    b: 'Resume replays from the last checkpoint, so a node can run twice. Design for that rather than hoping.',
+    code: '# 1. state grows -> trim, or the checkpoint table explodes\nmessages: Annotated[list, add_messages]   # + a trim step\n\n# 2. loops -> always pass a limit\ngraph.invoke(inp, {"recursion_limit": 10})\n\n# 3. side effects -> make the node safe to re-run\ncharge(order_id, idempotency_key=state["run_id"])\n\n# 4. node names are part of your saved data.\n#    renaming one breaks resume for every in-flight thread.'
+  }
+}
+
+};
