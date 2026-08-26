@@ -121,4 +121,88 @@ C.memOps.forEach(o => {
 const puts = C.memOps.filter(o => o.op === 'put').map(o => (o.args.match(/,\s*"([^"]+)",\s*\{/) || [])[1]);
 assert(puts.length !== new Set(puts).size, 'reuse one key name across namespaces, or the isolation point is not shown');
 
+
+// ---- ch7: scoped tools. The chapter's whole argument is that the scoped run
+// and the unscoped run differ only in which tools were reachable, so the data
+// has to actually encode that.
+{
+  const phases = new Set(C.lgsPhases.map(p => p.id));
+  const byName = {};
+  C.lgsTools.forEach(t => { byName[t.n] = t; });
+
+  // every phase must own tools, or scoping that node binds nothing
+  C.lgsPhases.forEach(p => assert(C.lgsTools.some(t => t.ph === p.id),
+    `phase "${p.id}" has no tools, so the scoped graph would bind an empty set`));
+
+  // the dangerous tools must sit OUTSIDE every phase, or the scoped run could
+  // legally reach them and the demo proves nothing
+  C.lgsTools.filter(t => t.danger).forEach(t => assert(!phases.has(t.ph),
+    `dangerous tool ${t.n} is scoped into phase "${t.ph}" — the scoped run could call it`));
+  assert(C.lgsTools.some(t => t.danger), 'without a dangerous tool the unscoped run has no consequence to show');
+
+  // every step names a real phase, and every tool call it makes is one that
+  // phase can produce — except the wide-only steps, which by definition cannot
+  C.lgsRun.forEach((s, i) => {
+    assert(phases.has(s.ph), `lgsRun[${i}] runs in unknown phase "${s.ph}"`);
+    const fn = s.act.split('(')[0];
+    const tool = byName[fn];
+    assert(tool, `lgsRun[${i}] calls ${fn}, which is not in C.lgsTools`);
+    if (s.wide) assert(tool.ph !== s.ph,
+      `lgsRun[${i}] is marked wide-only but ${fn} is in scope for "${s.ph}" — it would happen either way`);
+    else assert(tool.ph === s.ph,
+      `lgsRun[${i}] calls ${fn} from "${s.ph}", which the scoped graph would not allow`);
+  });
+
+  // the wide-only steps are the payoff; there has to be more than one, and each
+  // needs the explanation the demo renders
+  const wide = C.lgsRun.filter(s => s.wide);
+  assert(wide.length >= 2, 'the unscoped run needs at least two extra steps to be worth showing');
+  wide.forEach(s => assert(s.note && s.bad, `wide-only step "${s.act}" is missing its note or bad flag`));
+
+  // every state key a step writes must be declared, and declared to that node
+  const schema = {};
+  C.lgsSchema.forEach(r => { schema[r.k] = r.w; });
+  const writable = {};
+  C.lgsPhases.forEach(p => { writable[p.id] = new Set(p.writes); });
+  C.lgsRun.forEach((s, i) => Object.keys(s.w || {}).forEach(k => {
+    assert(schema[k], `lgsRun[${i}] writes "${k}", which C.lgsSchema does not declare`);
+    assert(writable[s.ph].has(k),
+      `lgsRun[${i}] writes "${k}" from "${s.ph}", but that node's write list does not include it`);
+    assert(schema[k] === s.ph || schema[k] === 'every node',
+      `C.lgsSchema says "${k}" is written by ${schema[k]}, but lgsRun[${i}] writes it from ${s.ph}`);
+  }));
+
+  // the scoped run has to actually finish: tests pass, then a PR
+  const scoped = C.lgsRun.filter(s => !s.wide);
+  const last = scoped[scoped.length - 1];
+  assert(last.w && last.w.pr, 'the scoped run does not end with a PR, so it never demonstrates completion');
+  assert(scoped.some(s => s.w && s.w.test_result === 'pass'),
+    'nothing in the scoped run ever reaches a passing test — the exit condition is never met');
+
+  // the graph the demo draws must be connected to the phases it steps through
+  const nodeIds = new Set(C.lgsNodes.map(n => n.id));
+  C.lgsEdges.forEach(e => assert(nodeIds.has(e[0]) && nodeIds.has(e[1]),
+    `lgsEdges: ${e[0]}->${e[1]} references a node that does not exist`));
+  C.lgsPhases.forEach(p => assert(nodeIds.has(p.id),
+    `phase "${p.id}" has no node in C.lgsNodes, so stepping into it lights nothing`));
+
+  // scoping has to be a real token saving, since the panel prints the number
+  const all = C.lgsTools.reduce((a, t) => a + t.tk, 0);
+  C.lgsPhases.forEach(p => {
+    const some = C.lgsTools.filter(t => t.ph === p.id).reduce((a, t) => a + t.tk, 0);
+    assert(some < all / 2, `scoping to "${p.id}" saves less than half the schema tokens`);
+  });
+}
+
+// every id the demos reach for must exist somewhere, or a chapter is quietly dead
+{
+  const demosSrc = fs.readFileSync('js/demos.js', 'utf8');
+  const html = fs.readFileSync('index.html', 'utf8');
+  const ids = new Set();
+  // ids built by concatenation ('#c-' + name) end in a dash — not a real id, skip them
+  for (const m of demosSrc.matchAll(/\$\$?\('#([a-z0-9-]+)/g)) if (!m[1].endsWith('-')) ids.add(m[1]);
+  ids.forEach(id => assert(html.includes('id="' + id + '"') || demosSrc.includes('id="' + id + '"'),
+    `demos.js targets #${id}, which nothing ever creates`));
+}
+
 console.log('ok — content data is consistent');

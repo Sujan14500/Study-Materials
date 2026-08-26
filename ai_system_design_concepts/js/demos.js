@@ -801,6 +801,152 @@ function initRagScale() {
 /* ============================================================
    Ch12 — model cascade
    ============================================================ */
+/* ============================================================
+   Ch13 — the KV cache ceiling
+
+   usable      = accelerator memory * (1 - overhead) - weights
+   kv per req  = context tokens * KV bytes per token
+   concurrency = floor(usable / kv per req)
+
+   The whole point of the widget: the second term scales with every
+   concurrent request and the first does not, so context length — not
+   model size — is what sets how many users one accelerator holds.
+   ============================================================ */
+function initKv() {
+  const calc = $('#kvcalc'); if (!calc) return;
+  calc.innerHTML = C.kvDefaults.map(f =>
+    '<div class="calc-f"><label for="k-' + f[0] + '">' + f[1] + '</label>' +
+    '<input id="k-' + f[0] + '" type="number" min="0" value="' + f[2] + '"></div>').join('') +
+    '<div class="calc-out" id="kv-out"></div>';
+
+  function concurrency(gpu, w, kvKB, ctx) {
+    const usable = gpu * (1 - C.kvOverhead) - w;
+    const perReq = ctx * kvKB / 1048576;              // KB -> GB
+    return { usable, perReq, max: perReq > 0 ? Math.max(0, Math.floor(usable / perReq)) : 0 };
+  }
+
+  function run() {
+    const v = id => Math.max(0, +($('#k-' + id).value || 0));
+    const gpu = v('gpu'), w = v('w'), kvKB = v('kv'), ctx = v('ctx');
+    const r = concurrency(gpu, w, kvKB, ctx);
+    const half = concurrency(gpu, w, kvKB, ctx / 2).max;
+    const quant = concurrency(gpu, w / 4, kvKB, ctx).max;   // 4-bit weights, same KV
+
+    $('#kv-out').innerHTML =
+      stat(r.max, 'concurrent requests', r.max ? '#14b8a6' : '#f43f5e') +
+      stat(r.perReq.toFixed(2) + ' GB', 'KV cache per request') +
+      stat(Math.max(0, r.usable).toFixed(1) + ' GB', 'memory left for KV') +
+      stat(half, 'at half the context', '#14b8a6') +
+      stat(quant, 'at 4-bit weights');
+
+    const kvUsed = Math.min(r.max * r.perReq, gpu);
+    const oh = gpu * C.kvOverhead;
+    $('#kv-bars').innerHTML =
+      bar('weights', gpu ? w / gpu * 100 : 0, '#7c5cff', w.toFixed(0) + ' GB') +
+      bar('KV cache', gpu ? kvUsed / gpu * 100 : 0, '#14b8a6', kvUsed.toFixed(0) + ' GB') +
+      bar('runtime overhead', C.kvOverhead * 100, '#64748b', oh.toFixed(0) + ' GB');
+
+    const note = $('#kv-note');
+    if (!r.max) {
+      note.innerHTML = '<b style="color:#f43f5e">This does not fit.</b> The weights plus one request’s ' +
+        'KV cache already exceed the accelerator. Shrink the context, quantize the weights, or shard the ' +
+        'model across devices — in that order of cheapness.';
+      return;
+    }
+    note.innerHTML = 'At ' + ctx.toLocaleString() + ' context tokens each request reserves <b>' +
+      r.perReq.toFixed(2) + ' GB</b> of KV cache, so one accelerator holds <b>' + r.max +
+      '</b> at once. Halving the context roughly doubles that to <b>' + half + '</b>; quantizing the ' +
+      'weights to 4-bit only gets you <b>' + quant + '</b>, because the weights were never the term that ' +
+      'scaled. This is why long-context features quietly cost you throughput, and why an admission-control ' +
+      'limit on context length is a capacity decision, not a product one.';
+  }
+  $$('input', calc).forEach(i => i.oninput = run);
+  run();
+}
+
+/* ============================================================
+   Ch13 — prefill vs decode, and which lever moves which
+
+   prefill_ms = prompt tokens / prefillRate
+   decode_ms  = output tokens / decodeRate / speculative speedup
+   speculative speedup = E / (1 + g*c),  E = (1 - a^(g+1)) / (1 - a)
+
+   test.js re-derives all of it and asserts the claims the chapter makes.
+   ============================================================ */
+function decodeTiming(on) {
+  const M = C.decodeModel, P = M.promptTokens, O = M.outputTokens;
+  const step = 1000 / M.decodeRate;
+  const fresh = on.cache ? P * (1 - M.cachedFrac) + P * M.cachedFrac / M.cacheSpeedup : P;
+  const prefill = fresh / M.prefillRate * 1000;
+
+  const perRound = (1 - Math.pow(M.accept, M.draftBlock + 1)) / (1 - M.accept);
+  const roundCost = 1 + M.draftBlock * M.draftCost;
+  const speedup = on.spec ? perRound / roundCost : 1;
+  const decode = O * step / speedup;
+
+  const total = M.overheadMs + prefill + decode;
+  const firstStep = on.spec ? roundCost * step : step;
+  const billed = on.cache ? P * (1 - M.cachedFrac) + P * M.cachedFrac * M.cacheDiscount : P;
+
+  return {
+    prefill: prefill, decode: decode, total: total,
+    ttft: on.stream ? M.overheadMs + prefill + firstStep : total,
+    tps: O / (decode / 1000), billed: billed, speedup: speedup
+  };
+}
+
+function initDecode() {
+  const chips = $('#lever-chips'); if (!chips) return;
+  const on = { stream: true, cache: false, spec: false };
+  const ms = t => t >= 1000 ? (t / 1000).toFixed(1) + 's' : Math.round(t) + 'ms';
+
+  C.decodeLevers.forEach(l => {
+    const b = el('button', 'chip' + (on[l.k] ? ' active' : ''), l.n);
+    b.onclick = () => { on[l.k] = !on[l.k]; b.classList.toggle('active', on[l.k]); run(); };
+    chips.appendChild(b);
+  });
+
+  function run() {
+    const r = decodeTiming(on);
+    const base = decodeTiming({ stream: false, cache: false, spec: false });
+    const span = Math.max(r.prefill + r.decode, 1);
+
+    $('#lever-bars').innerHTML =
+      bar('prefill', r.prefill / span * 100, '#7c5cff', ms(r.prefill)) +
+      bar('decode', r.decode / span * 100, '#14b8a6', ms(r.decode)) +
+      bar('first token', r.ttft / span * 100, r.ttft < 1500 ? '#22c55e' : '#f59e0b', ms(r.ttft));
+
+    $('#lever-stats').innerHTML =
+      stat(ms(r.ttft), 'time to first token', r.ttft < 1500 ? '#22c55e' : '#f43f5e') +
+      stat(ms(r.total), 'total time') +
+      stat(r.tps.toFixed(0), 'tokens / second') +
+      stat(Math.round(r.billed).toLocaleString(), 'input tokens billed',
+           r.billed < base.billed ? '#22c55e' : undefined);
+
+    const lines = C.decodeLevers.map(l =>
+      '<b>' + l.n + '</b> ' + (on[l.k] ? 'on' : 'off') + ' — ' + (on[l.k] ? l.on : l.off));
+    const deltas = [];
+    if (on.stream) deltas.push('Streaming cut the perceived wait from ' + ms(base.total) + ' to ' +
+      ms(r.ttft) + ' <i>without changing total time or cost by one token</i>.');
+    if (on.cache) deltas.push('Prompt caching took prefill from ' + ms(base.prefill) + ' to ' +
+      ms(r.prefill) + ' and billed input from ' + Math.round(base.billed).toLocaleString() + ' to ' +
+      Math.round(r.billed).toLocaleString() + ' tokens — and left tokens/second at exactly ' +
+      base.tps.toFixed(0) + '.');
+    if (on.spec) deltas.push('Speculative decoding is running at ' + r.speedup.toFixed(2) +
+      '× on decode. That is real latency, bought with real extra compute: on a GPU that is already ' +
+      'saturated it is a throughput loss.');
+    if (!on.stream) deltas.push('<b style="color:#f43f5e">Not streaming:</b> the user stares at nothing for ' +
+      ms(r.total) + '. This is the cheapest fix on the page and it is switched off.');
+
+    $('#lever-note').innerHTML = lines.join('<br>') + '<br><br>' + deltas.join(' ');
+  }
+  run();
+
+  const lessons = $('#decode-lessons');
+  if (lessons) lessons.innerHTML = C.decodeLessons.map(l =>
+    '<div class="gterm"><b>' + l[0] + '</b><span>' + l[1] + '</span></div>').join('');
+}
+
 function initCascade() {
   const out = $('#cascade-out'); if (!out) return;
   const share = $('#cas-share'), acc = $('#cas-acc'), cache = $('#cas-cache');
@@ -998,11 +1144,845 @@ function initQuiz() {
   renderG('');
 }
 
+/* ============================================================
+   Ch16 — the fifteen patterns: an animated diagram each, then a
+   drill that gives you a situation and asks for the name.
+   ============================================================ */
+
+/* --- tiny SVG helpers. Animation is SMIL, so no timers run per card. --- */
+const svgWrap = (body, h) =>
+  '<svg class="pdia" viewBox="0 0 320 ' + h + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' + body + '</svg>';
+const pbox = (x, y, w, h, label, cls) =>
+  '<rect class="pd-box ' + (cls || '') + '" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="7"/>' +
+  '<text class="pd-t' + (cls === 'hot' ? ' b' : '') + '" x="' + (x + w / 2) + '" y="' + (y + h / 2 + 1) + '">' + esc(label) + '</text>';
+const pline = (d, cls) => '<path class="pd-line ' + (cls || '') + '" d="' + d + '"/>';
+const pdot = (d, dur, begin, cls) =>
+  '<circle class="pd-dot ' + (cls || '') + '" r="3.4">' +
+  '<animateMotion dur="' + dur + 's" begin="' + begin + 's" repeatCount="indefinite" path="' + d + '"/></circle>';
+
+const DIA = {
+  /* a request travelling left to right through N boxes */
+  flow(d) {
+    const n = d.nodes.length, gap = 22, w = (304 - gap * (n - 1)) / n, y = 30, h = 34;
+    let s = '';
+    d.nodes.forEach((label, i) => {
+      const x = 8 + i * (w + gap);
+      s += pbox(x, y, w, h, label, i === 1 ? 'hot' : '');
+      if (i) s += pline('M' + (x - gap + 3) + ',47 H' + (x - 4), 'arrow');
+    });
+    return svgWrap(s + pdot('M12,47 H308', 3, 0), 90);
+  },
+
+  /* one hub, three spokes — out for Observer and Facade, in for Singleton */
+  fan(d) {
+    const out = d.dir === 'out';
+    const hx = out ? 8 : 200, sx = out ? 196 : 8, sw = 116, hw = 112;
+    let s = pbox(hx, 28, hw, 34, d.hub, 'hot');
+    d.spokes.forEach((label, i) => {
+      const sy = 6 + i * 30;
+      s += pbox(sx, sy, sw, 24, label);
+      const path = out
+        ? 'M' + (hx + hw) + ',45 C' + (hx + hw + 40) + ',45 ' + (sx - 40) + ',' + (sy + 12) + ' ' + sx + ',' + (sy + 12)
+        : 'M' + (sx + sw) + ',' + (sy + 12) + ' C' + (sx + sw + 40) + ',' + (sy + 12) + ' ' + (hx - 40) + ',45 ' + hx + ',45';
+      s += pline(path, 'dash') + pdot(path, 2.6, i * 0.45);
+    });
+    return svgWrap(s, 90);
+  },
+
+  /* concentric wrappers: Decorator from the outside in, Composite as containment */
+  nest(d) {
+    const W = [304, 214, 126], H = [78, 54, 28];
+    let s = '';
+    d.layers.forEach((label, i) => {
+      const w = W[i], h = H[i], x = (320 - w) / 2, y = (90 - h) / 2;
+      s += '<rect class="pd-box' + (i === 2 ? ' hot' : '') + '" x="' + x + '" y="' + y + '" width="' + w +
+           '" height="' + h + '" rx="9"><animate attributeName="stroke-opacity" values="1;.28;1" dur="3s" begin="' +
+           (2 - i) * 0.5 + 's" repeatCount="indefinite"/></rect>';
+      s += i === 2
+        ? '<text class="pd-t b" x="160" y="46">' + esc(label) + '</text>'
+        : '<text class="pd-t s" x="' + (x + 9) + '" y="' + (y + 9) + '" text-anchor="start">' + esc(label) + '</text>';
+    });
+    return svgWrap(s, 90);
+  },
+
+  /* a fixed skeleton of steps, lit one at a time; one step may be the overridden hole */
+  steps(d) {
+    const n = d.items.length, h = 16, gap = 5, top = 4;
+    let s = '<rect class="pd-hl" x="34" y="' + top + '" width="252" height="' + h + '" rx="5">' +
+      '<animate attributeName="y" values="' + d.items.map((_, i) => top + i * (h + gap)).join(';') +
+      ';" dur="' + (n * 0.9) + 's" calcMode="discrete" repeatCount="indefinite"/></rect>';
+    d.items.forEach((label, i) => {
+      const y = top + i * (h + gap), hot = i === d.override;
+      s += '<rect class="pd-box' + (hot ? ' hot' : '') + '" x="34" y="' + y + '" width="252" height="' + h + '" rx="5"/>' +
+        '<text class="pd-t' + (hot ? ' b' : '') + '" x="46" y="' + (y + h / 2 + 1) + '" text-anchor="start">' + esc(label) +
+        (hot ? '  ← overridden' : '') + '</text>';
+    });
+    return svgWrap(s, top + n * (h + gap) + 2);
+  },
+
+  /* a cursor stepping through cells without anyone seeing the storage */
+  cells(d) {
+    const n = d.vals.length, w = 44, gap = 8, y = 36, h = 32;
+    let s = '<text class="pd-t b" x="160" y="14">' + esc(d.label) + '</text>';
+    s += '<rect class="pd-hl" x="8" y="' + y + '" width="' + w + '" height="' + h + '" rx="7">' +
+      '<animate attributeName="x" values="' + d.vals.map((_, i) => 8 + i * (w + gap)).join(';') +
+      ';" dur="' + (n * 0.7) + 's" calcMode="discrete" repeatCount="indefinite"/></rect>';
+    d.vals.forEach((v, i) => { s += pbox(8 + i * (w + gap), y, w, h, v); });
+    return svgWrap(s, 78);
+  },
+
+  /* states on a ring, with the transition doing the walking */
+  cycle(d) {
+    const pts = [[46, 45], [160, 14], [274, 45], [160, 76]];
+    const ring = 'M46,45 A114,31 0 0,1 274,45 A114,31 0 0,1 46,45';
+    let s = pline(ring, 'dash');
+    d.states.forEach((label, i) => {
+      s += '<circle class="pd-box' + (i === 0 ? ' hot' : '') + '" cx="' + pts[i][0] + '" cy="' + pts[i][1] + '" r="17"/>' +
+           '<text class="pd-t" x="' + pts[i][0] + '" y="' + (pts[i][1] + 1) + '">' + esc(label) + '</text>';
+    });
+    return svgWrap(s + pdot(ring, 5, 0), 94);
+  },
+
+  /* same input, same output, three interchangeable middles */
+  switch(d) {
+    const ox = 92, ow = 116;
+    let s = pbox(4, 32, 76, 28, d.input) + pbox(216, 32, 100, 28, d.output);
+    d.opts.forEach((label, i) => {
+      const y = 4 + i * 30, on = i === d.active;
+      const a = 'M80,46 C' + (ox - 20) + ',46 ' + (ox - 20) + ',' + (y + 12) + ' ' + ox + ',' + (y + 12);
+      const b = 'M' + (ox + ow) + ',' + (y + 12) + ' C' + (ox + ow + 20) + ',' + (y + 12) + ' ' + (ox + ow + 20) + ',46 216,46';
+      s += pline(a, on ? '' : 'faint') + pline(b, on ? '' : 'faint') +
+           pbox(ox, y, ow, 24, label, on ? 'hot' : 'dim');
+      if (on) s += pdot(a + ' ' + b.replace('M', 'L'), 2.4, 0);
+    });
+    return svgWrap(s, 96);
+  }
+};
+
+function patternDia(k) {
+  const d = C.patternDia[k];
+  if (!d || !DIA[d.kind]) return '';
+  return DIA[d.kind](d);
+}
+
+function initPatterns() {
+  const grid = $('#pattern-cards'), cats = $('#pattern-cats');
+  if (grid) {
+    grid.innerHTML = C.patterns.map(p =>
+      '<div class="labcard patcard" data-cat="' + p.cat + '">' +
+        '<div class="lab-h">' + C.patternCats[p.cat].ico + ' <b>' + p.num + '. ' + p.n + '</b></div>' +
+        patternDia(p.k) +
+        '<p>' + esc(p.one) + '</p>' +
+        '<div class="pcard-foot"><span class="pill">' + C.patternCats[p.cat].name + '</span></div>' +
+        '<button class="btn btn-ghost pat-btn">Problem, code, trap</button>' +
+        '<div class="sortcard-why">' +
+          '<b>The problem.</b> ' + esc(p.problem) + '<br><br>' +
+          '<b>Where it shows up here.</b> ' + esc(p.ai) +
+          '<pre class="code">' + esc(p.code) + '</pre>' +
+          '<div class="ds-gotcha">⚠️ ' + esc(p.trap) + '</div>' +
+        '</div>' +
+      '</div>').join('');
+
+    /* SMIL ignores prefers-reduced-motion, so stop it ourselves */
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)
+      $$('.pdia', grid).forEach(s => s.pauseAnimations && s.pauseAnimations());
+    const opened = new Set();
+    $$('.pat-btn', grid).forEach((b, i) => b.onclick = () => {
+      $$('.sortcard-why', grid)[i].classList.toggle('show');
+      if (!opened.has(i)) { opened.add(i); xp(2); }
+      if (opened.size === C.patterns.length) xp(12, 'All fifteen. Most of them you had already built.');
+    });
+  }
+
+  if (cats) {
+    const groups = [['all', 'All 15']].concat(Object.keys(C.patternCats).map(k =>
+      [k, C.patternCats[k].ico + ' ' + C.patternCats[k].name]));
+    groups.forEach(([k, label], i) => {
+      const b = el('button', 'chip' + (i === 0 ? ' active' : ''), label);
+      b.onclick = () => {
+        $$('.chip', cats).forEach(c => c.classList.remove('active')); b.classList.add('active');
+        $$('.labcard', grid).forEach(c => {
+          const show = k === 'all' || c.dataset.cat === k;
+          c.style.display = show ? '' : 'none';
+          if (show) { c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); }
+        });
+      };
+      cats.appendChild(b);
+    });
+  }
+
+  /* the drill: a situation from an earlier chapter, four plausible patterns */
+  const root = $('#pattern-drill'); if (!root) return;
+  const byKey = {}; C.patterns.forEach(p => byKey[p.k] = p);
+  let done = 0, score = 0;
+
+  C.patternDrill.forEach(d => {
+    const card = el('div', 'sortcard');
+    card.appendChild(el('div', 'sortcard-t', esc(d.s)));
+    const opts = el('div', 'sortcard-opts');
+    d.o.forEach(k => {
+      const b = el('button', 'sortopt', '<span class="so-n">' + byKey[k].n + '</span>');
+      b.onclick = () => {
+        if (card.dataset.done) return;
+        card.dataset.done = '1'; done++;
+        $$('.sortopt', opts).forEach((x, xi) => { x.disabled = true; if (d.o[xi] === d.a) x.classList.add('correct'); });
+        if (k !== d.a) b.classList.add('incorrect'); else { score++; xp(4); }
+        $('.sortcard-why', card).classList.add('show');
+        if (done === C.patternDrill.length)
+          xp(10, score >= 5 ? 'You can name the shape — that is the whole point of the vocabulary'
+                            : 'Re-read the near-misses: most pairs differ by when the choice is made');
+      };
+      opts.appendChild(b);
+    });
+    card.appendChild(opts);
+    card.appendChild(el('div', 'sortcard-why', '<b>' + byKey[d.a].n + '.</b> ' + esc(d.why)));
+    root.appendChild(card);
+  });
+
+  const here = $('#pattern-here');
+  if (here) here.innerHTML = C.patternsHere.map(h =>
+    '<div class="gterm"><b>' + h[0] + '</b><span>' + h[1] + '</span></div>').join('');
+
+  const rules = $('#pattern-rules');
+  if (rules) rules.innerHTML = C.patternRules.map(r =>
+    '<div class="gterm"><b>' + r[0] + '</b><span>' + r[1] + '</span></div>').join('');
+}
+
+/* ============================================================
+   Ch17 — Redis: four cards, then name the use case from a situation
+   ============================================================ */
+function initRedis() {
+  const grid = $('#redis-cards');
+  if (grid) {
+    grid.innerHTML = C.redisUses.map(u =>
+      '<div class="labcard">' +
+        '<div class="lab-h">' + u.ico + ' <b>' + u.num + '. ' + u.n + '</b> → ' + esc(u.head) + '</div>' +
+        '<p>' + esc(u.one) + '</p>' +
+        '<div class="pcard-foot"><span class="pill">' + esc(u.type) + '</span></div>' +
+        '<button class="btn btn-ghost redis-btn">Problem, commands, trap</button>' +
+        '<div class="sortcard-why">' +
+          '<b>The problem.</b> ' + esc(u.problem) + '<br><br>' +
+          '<b>Where it shows up here.</b> ' + esc(u.ai) +
+          '<pre class="code">' + esc(u.code) + '</pre>' +
+          '<div class="ds-gotcha">⚠️ ' + esc(u.trap) + '</div>' +
+        '</div>' +
+      '</div>').join('');
+
+    const opened = new Set();
+    $$('.redis-btn', grid).forEach((b, i) => b.onclick = () => {
+      $$('.sortcard-why', grid)[i].classList.toggle('show');
+      if (!opened.has(i)) { opened.add(i); xp(3); }
+      if (opened.size === C.redisUses.length) xp(10, 'All four. Every one of them is a cache of something you can rebuild.');
+    });
+  }
+
+  /* the drill: a Snackr situation, four plausible use cases */
+  const root = $('#redis-drill'); if (!root) return;
+  const byKey = {}; C.redisUses.forEach(u => byKey[u.k] = u);
+  let done = 0, score = 0;
+
+  C.redisDrill.forEach(d => {
+    const card = el('div', 'sortcard');
+    card.appendChild(el('div', 'sortcard-t', esc(d.s)));
+    const opts = el('div', 'sortcard-opts');
+    d.o.forEach(k => {
+      const b = el('button', 'sortopt', '<span class="so-n">' + byKey[k].ico + ' ' + byKey[k].n + '</span>');
+      b.onclick = () => {
+        if (card.dataset.done) return;
+        card.dataset.done = '1'; done++;
+        $$('.sortopt', opts).forEach((x, xi) => { x.disabled = true; if (d.o[xi] === d.a) x.classList.add('correct'); });
+        if (k !== d.a) b.classList.add('incorrect'); else { score++; xp(4); }
+        $('.sortcard-why', card).classList.add('show');
+        if (done === C.redisDrill.length)
+          xp(10, score === 4 ? 'Four for four — that is the cheat sheet'
+                             : 'Re-read the near-misses: each pair differs by whether the answer is a ranking, a decision or a place');
+      };
+      opts.appendChild(b);
+    });
+    card.appendChild(opts);
+    card.appendChild(el('div', 'sortcard-why', '<b>' + byKey[d.a].n + '.</b> ' + esc(d.why)));
+    root.appendChild(card);
+  });
+
+  const types = $('#redis-types');
+  if (types) types.innerHTML = C.redisTypes.map(t =>
+    '<div class="gterm"><b>' + t[0] + '</b><span>' + t[1] + '</span></div>').join('');
+
+  const rules = $('#redis-rules');
+  if (rules) rules.innerHTML = C.redisRules.map(r =>
+    '<div class="gterm"><b>' + r[0] + '</b><span>' + r[1] + '</span></div>').join('');
+}
+
+/* ============================================================
+   Ch13 — vector indexes
+
+   Four widgets: IVF built live on a 2-D corpus, the nprobe sweep
+   that comes out of that same index, the four index families,
+   product quantization, and a greedy walk down an HNSW graph.
+   The IVF panel is the only one doing real work — everything it
+   reports (recall, vectors scanned) is measured against a brute
+   force search over the same points, never faked.
+   ============================================================ */
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* one rAF tween, cancellable, shared by the IVF and HNSW animations */
+function tween(ms, onFrame, done) {
+  if (REDUCED) { onFrame(1); done && done(); return { cancel() {} }; }
+  let start = null, id = 0, dead = false;
+  const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  const frame = ts => {
+    if (dead) return;
+    if (start === null) start = ts;
+    const t = Math.min(1, (ts - start) / ms);
+    onFrame(ease(t));
+    if (t < 1) id = requestAnimationFrame(frame); else done && done();
+  };
+  id = requestAnimationFrame(frame);
+  return { cancel() { dead = true; cancelAnimationFrame(id); } };
+}
+
+function initAnn() { initIvf(); initAnnFamilies(); initPq(); initHnsw(); }
+
+/* ---------- the IVF map ---------- */
+function initIvf() {
+  const cv = $('#ivf-canvas'); if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const N = 380, TOPK = 10, GRID = 8;
+
+  const base = document.createElement('canvas');
+  base.width = W; base.height = H;
+  const bctx = base.getContext('2d');
+
+  let pts = [], cents = [], assign = [], cell = null;
+  let nlist = 10, nprobe = 1, seed = 7, iter = 0, built = false;
+  let query = { x: W * .62, y: H * .40 };
+  let probed = new Set(), top = [], scanned = N, recall = 1, curve = [];
+  let anim = null, awarded = false;
+
+  const d2 = (a, b) => (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y);
+  const hue = i => (i * 47 + 15) % 360;
+  const gauss = r => { const u = Math.max(1e-9, r()), v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(6.2831853 * v); };
+
+  function makeCorpus() {
+    const r = lcg(seed);
+    const blobs = Array.from({ length: 9 }, () => ({ x: 80 + r() * (W - 160), y: 60 + r() * (H - 120), s: 24 + r() * 42 }));
+    pts = Array.from({ length: N }, (_, i) => {
+      const b = blobs[Math.floor(r() * blobs.length)];
+      return { id: i, x: clamp(b.x + gauss(r) * b.s, 10, W - 10), y: clamp(b.y + gauss(r) * b.s, 10, H - 10) };
+    });
+    built = false; probed = new Set(); top = []; scanned = N; recall = 1; curve = [];
+  }
+
+  /* k-means++ : spread the seeds out, or one blob quietly gets two centroids */
+  function kppInit(k, r) {
+    const cs = [{ x: pts[Math.floor(r() * N)].x, y: pts[Math.floor(r() * N)].y }];
+    while (cs.length < k) {
+      const w = pts.map(p => cs.reduce((m, c) => Math.min(m, d2(p, c)), Infinity));
+      const sum = w.reduce((a, b) => a + b, 0);
+      let t = r() * sum, i = 0;
+      while (i < N - 1 && t > w[i]) { t -= w[i]; i++; }
+      cs.push({ x: pts[i].x, y: pts[i].y });
+    }
+    return cs;
+  }
+
+  const nearest = p => { let bi = 0, bd = Infinity; cents.forEach((c, i) => { const d = d2(p, c); if (d < bd) { bd = d; bi = i; } }); return bi; };
+  const assignAll = () => { assign = pts.map(nearest); };
+
+  function means() {
+    const sx = new Float64Array(cents.length), sy = new Float64Array(cents.length), n = new Float64Array(cents.length);
+    pts.forEach((p, i) => { const a = assign[i]; sx[a] += p.x; sy[a] += p.y; n[a]++; });
+    return cents.map((c, i) => n[i] ? { x: sx[i] / n[i], y: sy[i] / n[i] } : { x: c.x, y: c.y });
+  }
+
+  function topK(list, k, q) {
+    return list.map(p => ({ p, d: d2(p, q || query) })).sort((a, b) => a.d - b.d).slice(0, k).map(o => o.p);
+  }
+
+  /* the cells are a coarse nearest-centroid grid — a Voronoi diagram you can
+     paint with fillRect instead of computing the polygons */
+  function buildCells() {
+    const cols = Math.ceil(W / GRID), rows = Math.ceil(H / GRID);
+    cell = { cols, rows, id: new Uint8Array(cols * rows) };
+    for (let gy = 0; gy < rows; gy++)
+      for (let gx = 0; gx < cols; gx++)
+        cell.id[gy * cols + gx] = nearest({ x: gx * GRID + GRID / 2, y: gy * GRID + GRID / 2 });
+  }
+
+  /* ---------- drawing ---------- */
+  function cross(c, x, y, r, color, w) {
+    c.strokeStyle = color; c.lineWidth = w; c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(x - r, y - r); c.lineTo(x + r, y + r);
+    c.moveTo(x + r, y - r); c.lineTo(x - r, y + r);
+    c.stroke();
+  }
+
+  function renderBase() {
+    bctx.clearRect(0, 0, W, H);
+    bctx.fillStyle = 'rgba(4,6,14,.72)';
+    bctx.fillRect(0, 0, W, H);
+
+    if (built && cell) {
+      for (let gy = 0; gy < cell.rows; gy++)
+        for (let gx = 0; gx < cell.cols; gx++) {
+          const id = cell.id[gy * cell.cols + gx];
+          const hot = probed.has(id);
+          bctx.fillStyle = 'hsla(' + hue(id) + ',' + (hot ? '72%,55%,.17' : '20%,45%,.05') + ')';
+          bctx.fillRect(gx * GRID, gy * GRID, GRID, GRID);
+        }
+    }
+
+    const topIds = new Set(top.map(p => p.id));
+    pts.forEach((p, i) => {
+      const id = built ? assign[i] : -1;
+      const hot = built && probed.has(id);
+      const color = !built ? 'rgba(200,206,230,.72)'
+        : hot ? 'hsl(' + hue(id) + ' 85% 68%)'
+              : 'hsla(' + hue(id) + ',30%,55%,.28)';
+      cross(bctx, p.x, p.y, topIds.has(p.id) ? 5.5 : 3.6, color, topIds.has(p.id) ? 2.4 : 1.7);
+      if (topIds.has(p.id)) {
+        bctx.strokeStyle = 'rgba(52,211,153,.9)'; bctx.lineWidth = 1.4;
+        bctx.beginPath(); bctx.arc(p.x, p.y, 9, 0, 6.2832); bctx.stroke();
+      }
+    });
+
+    cents.forEach((c, i) => {
+      const hot = probed.has(i);
+      bctx.fillStyle = hot ? 'hsl(' + hue(i) + ' 90% 62%)' : 'rgba(160,168,200,.55)';
+      bctx.strokeStyle = 'rgba(8,10,20,.9)'; bctx.lineWidth = 2;
+      bctx.beginPath();
+      bctx.moveTo(c.x, c.y - 8); bctx.lineTo(c.x + 8, c.y); bctx.lineTo(c.x, c.y + 8); bctx.lineTo(c.x - 8, c.y);
+      bctx.closePath(); bctx.fill(); bctx.stroke();
+      if (hot) {
+        bctx.strokeStyle = 'hsla(' + hue(i) + ',90%,70%,.55)'; bctx.lineWidth = 1.5;
+        bctx.beginPath(); bctx.arc(c.x, c.y, 15, 0, 6.2832); bctx.stroke();
+      }
+    });
+  }
+
+  function paint(ring) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(base, 0, 0);
+
+    if (top.length) {
+      ctx.strokeStyle = 'rgba(52,211,153,.35)'; ctx.lineWidth = 1;
+      top.forEach(p => { ctx.beginPath(); ctx.moveTo(query.x, query.y); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+    }
+    if (ring != null) {
+      ctx.strokeStyle = 'rgba(251,191,36,' + (0.55 * (1 - ring)) + ')'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(query.x, query.y, ring * Math.max(W, H) * .55, 0, 6.2832); ctx.stroke();
+    }
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath(); ctx.arc(query.x, query.y, 6, 0, 6.2832); ctx.fill();
+    ctx.strokeStyle = 'rgba(251,191,36,.7)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(query.x, query.y, 13, 0, 6.2832); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(query.x - 20, query.y); ctx.lineTo(query.x - 13, query.y);
+    ctx.moveTo(query.x + 13, query.y); ctx.lineTo(query.x + 20, query.y);
+    ctx.moveTo(query.x, query.y - 20); ctx.lineTo(query.x, query.y - 13);
+    ctx.moveTo(query.x, query.y + 13); ctx.lineTo(query.x, query.y + 20);
+    ctx.stroke();
+  }
+
+  /* ---------- build, animated ---------- */
+  function build(animate) {
+    if (anim) anim.cancel();
+    cents = kppInit(nlist, lcg(seed * 31 + nlist));
+    iter = 0; built = false; probed = new Set(); top = [];
+    assignAll(); renderBase(); paint();
+    badge('training · k-means iteration 0');
+    if (animate && !REDUCED) stepKmeans(); else { for (let i = 0; i < 14 && lloyd(); i++); finish(); }
+  }
+
+  function lloyd() {
+    assignAll();
+    const next = means();
+    const moved = Math.max(...cents.map((c, i) => Math.hypot(c.x - next[i].x, c.y - next[i].y)));
+    cents = next;
+    return moved > 0.7;
+  }
+
+  function stepKmeans() {
+    assignAll(); renderBase(); paint();
+    badge('training · k-means iteration ' + (iter + 1) + ' — every × joins its nearest centroid');
+    const from = cents.map(c => ({ x: c.x, y: c.y }));
+    const to = means();
+    const moved = Math.max(...from.map((c, i) => Math.hypot(c.x - to[i].x, c.y - to[i].y)));
+    anim = tween(380, t => {
+      cents = from.map((c, i) => ({ x: c.x + (to[i].x - c.x) * t, y: c.y + (to[i].y - c.y) * t }));
+      renderBase(); paint();
+    }, () => {
+      iter++;
+      if (moved > 0.7 && iter < 14) setTimeout(stepKmeans, 70);
+      else finish();
+    });
+  }
+
+  function finish() {
+    assignAll(); buildCells(); built = true;
+    badge('indexed · ' + nlist + ' cells, ' + iter + ' k-means iterations');
+    sweep();
+    search(true);
+    if (!awarded) { awarded = true; xp(6, 'Index built. Those ' + nlist + ' diamonds are the entire index — everything else is bookkeeping.'); }
+  }
+
+  /* ---------- search ---------- */
+  function search(animate) {
+    if (!built) {
+      probed = new Set(); top = topK(pts, TOPK); scanned = N; recall = 1;
+      renderBase(); paint(); out(); return;
+    }
+    const order = cents.map((c, i) => ({ i, d: d2(c, query) })).sort((a, b) => a.d - b.d);
+    probed = new Set(order.slice(0, nprobe).map(o => o.i));
+    const cand = pts.filter((p, i) => probed.has(assign[i]));
+    const exact = new Set(topK(pts, TOPK).map(p => p.id));
+    top = topK(cand, TOPK);
+    recall = top.filter(p => exact.has(p.id)).length / TOPK;
+    scanned = cand.length;
+    renderBase(); out();
+    if (animate && !REDUCED) { if (anim) anim.cancel(); anim = tween(620, t => paint(t), () => paint()); }
+    else paint();
+  }
+
+  const badge = t => { const b = $('#ivf-badge'); if (b) b.textContent = t; };
+
+  function out() {
+    const host = $('#ivf-out'); if (!host) return;
+    const compared = built ? scanned + nlist : N;
+    const pct = compared / N * 100;
+    host.innerHTML =
+      '<div class="stat-row">' +
+        stat(fmt(compared), 'vectors compared', pct < 30 ? '#34d399' : pct < 70 ? '#fbbf24' : '#fb7185') +
+        stat((recall * 100).toFixed(0) + '%', 'recall@10', recall > .9 ? '#34d399' : recall > .7 ? '#fbbf24' : '#fb7185') +
+        stat((N / compared).toFixed(1) + '×', 'less work than flat') +
+        stat((built ? nprobe : nlist) + '/' + nlist, 'cells opened') +
+      '</div>' +
+      bar('corpus scanned', pct, pct < 30 ? '#34d399' : '#fbbf24', pct.toFixed(0) + '%') +
+      bar('recall@10', recall * 100, recall > .9 ? '#34d399' : '#fb7185', (recall * 100).toFixed(0) + '%');
+    const note = $('#ivf-advice');
+    if (note) note.innerHTML = advice();
+    renderCurve();
+  }
+
+  function advice() {
+    if (!built) return '🧱 <b>No index yet — this is Flat search.</b> Every query compares against all ' + N +
+      ' vectors, which is exact and, at ten million vectors, unaffordable. Press <b>Run k-means</b> and watch the corpus get carved into cells.';
+    const pct = (scanned + nlist) / N * 100;
+    if (nprobe >= nlist) return '🐌 <b>nprobe = nlist, so you are opening every cell.</b> That is brute force plus the cost of scanning ' +
+      nlist + ' centroids first — strictly worse than Flat. The index only pays when you refuse to look at most of it.';
+    if (recall < 0.75) return '⚠️ <b>Recall ' + (recall * 100).toFixed(0) + '% at nprobe=' + nprobe + '.</b> Look at the query crosshair: some of its true nearest neighbours are sitting just across a cell boundary, in a cell you did not open. This is the <b>edge effect</b>, and it is the characteristic failure of IVF — nothing is broken, you simply told it not to look there.';
+    if (recall === 1 && pct < 30) return '✅ <b>Perfect recall while touching ' + pct.toFixed(0) + '% of the corpus.</b> Now drag the query onto a cell boundary and watch it drop. Recall is not a property of the index — it is a property of the index <i>and this particular query</i>, which is why you measure it over a golden set rather than once.';
+    return '💡 <b>' + (recall * 100).toFixed(0) + '% recall for ' + pct.toFixed(0) + '% of the work.</b> That is the entire trade, in two numbers. Raise nprobe until recall stops moving and stop there — the sweep below shows exactly where that point is for this index.';
+  }
+
+  /* ---------- the nprobe sweep: same index, 24 random queries ---------- */
+  function sweep() {
+    const r = lcg(4242);
+    const qs = Array.from({ length: 24 }, () => ({ x: 20 + r() * (W - 40), y: 20 + r() * (H - 40) }));
+    const exact = qs.map(q => new Set(topK(pts, TOPK, q).map(p => p.id)));
+    curve = [];
+    for (let np = 1; np <= nlist; np++) {
+      let rec = 0, sc = 0;
+      qs.forEach((q, qi) => {
+        const set = new Set(cents.map((c, i) => ({ i, d: d2(c, q) })).sort((a, b) => a.d - b.d).slice(0, np).map(o => o.i));
+        const cand = pts.filter((p, i) => set.has(assign[i]));
+        sc += cand.length;
+        rec += topK(cand, TOPK, q).filter(p => exact[qi].has(p.id)).length / TOPK;
+      });
+      curve.push({ np, recall: rec / qs.length, scan: (sc / qs.length + nlist) / N });
+    }
+  }
+
+  function renderCurve() {
+    const c = $('#ivf-curve'); if (!c || !curve.length) return;
+    const g = c.getContext('2d'), CW = c.width, CH = c.height;
+    const L = 46, R = CW - 16, T = 18, B = CH - 30;
+    g.clearRect(0, 0, CW, CH);
+    g.font = '11px "JetBrains Mono", monospace';
+
+    for (let p = 0; p <= 100; p += 25) {
+      const y = B - (B - T) * p / 100;
+      g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(L, y); g.lineTo(R, y); g.stroke();
+      g.fillStyle = '#6f7594'; g.textAlign = 'right';
+      g.fillText(p + '%', L - 8, y + 4);
+    }
+    const X = np => L + (R - L) * (curve.length === 1 ? .5 : (np - 1) / (curve.length - 1));
+    const Y = v => B - (B - T) * clamp(v, 0, 1);
+
+    const line = (key, color) => {
+      g.strokeStyle = color; g.lineWidth = 2.2; g.beginPath();
+      curve.forEach((d, i) => i ? g.lineTo(X(d.np), Y(d[key])) : g.moveTo(X(d.np), Y(d[key])));
+      g.stroke();
+    };
+    line('scan', '#7c5cff');
+    line('recall', '#34d399');
+
+    const here = curve[Math.min(nprobe, curve.length) - 1];
+    g.strokeStyle = 'rgba(251,191,36,.7)'; g.setLineDash([4, 4]); g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(X(here.np), T); g.lineTo(X(here.np), B); g.stroke();
+    g.setLineDash([]);
+    [['recall', '#34d399'], ['scan', '#7c5cff']].forEach(([k, col]) => {
+      g.fillStyle = col; g.beginPath(); g.arc(X(here.np), Y(here[k]), 4.5, 0, 6.2832); g.fill();
+    });
+
+    g.textAlign = 'center'; g.fillStyle = '#6f7594';
+    curve.forEach(d => { if (curve.length <= 12 || d.np % 2 === 1) g.fillText(d.np, X(d.np), B + 16); });
+    g.fillText('nprobe (cells opened per query)', (L + R) / 2, CH - 2);
+    g.textAlign = 'left';
+    g.fillStyle = '#34d399'; g.fillText('■ recall@10', L + 6, T + 2);
+    g.fillStyle = '#7c5cff'; g.fillText('■ corpus scanned', L + 96, T + 2);
+    g.fillStyle = '#fbbf24'; g.fillText('▲ you are here: nprobe=' + here.np, L + 232, T + 2);
+  }
+
+  /* ---------- controls ---------- */
+  const at = e => {
+    const r = cv.getBoundingClientRect();
+    return { x: clamp((e.clientX - r.left) * (W / r.width), 4, W - 4), y: clamp((e.clientY - r.top) * (H / r.height), 4, H - 4) };
+  };
+  let dragging = false;
+  cv.addEventListener('pointerdown', e => { dragging = true; cv.setPointerCapture(e.pointerId); query = at(e); search(false); });
+  cv.addEventListener('pointermove', e => { if (dragging) { query = at(e); search(false); } });
+  cv.addEventListener('pointerup', () => { dragging = false; xp(2); });
+
+  const nl = $('#ivf-nlist'), np = $('#ivf-nprobe');
+  nl.oninput = () => { $('#ivf-nlist-v').textContent = nl.value; };
+  nl.onchange = () => { nlist = +nl.value; nprobe = Math.min(nprobe, nlist); np.max = nlist; np.value = nprobe; $('#ivf-nprobe-v').textContent = nprobe; build(true); };
+  np.oninput = () => { nprobe = +np.value; $('#ivf-nprobe-v').textContent = nprobe; search(false); };
+
+  $('#ivf-run').onclick = () => build(true);
+  $('#ivf-search').onclick = () => { if (!built) return build(true); search(true); xp(3); };
+  $('#ivf-new').onclick = () => { seed = (seed * 7 + 13) % 9973; makeCorpus(); build(true); };
+
+  const phases = $('#ivf-phases');
+  if (phases) phases.innerHTML = C.ivfPhases.map(p =>
+    '<div class="pcard"><div class="pcard-badge">' + p[0] + '</div><div class="pcard-desc">' + p[1] + '</div></div>').join('');
+
+  makeCorpus();
+  search(false);
+}
+
+/* ---------- the four families, then pick one ---------- */
+function initAnnFamilies() {
+  const grid = $('#ann-cards');
+  const byKey = {}; C.annFamilies.forEach(f => byKey[f.k] = f);
+  if (grid) {
+    const maxB = Math.max(...C.annFamilies.map(f => f.bytes));
+    const maxQ = Math.max(...C.annFamilies.map(f => f.qps));
+    grid.innerHTML = C.annFamilies.map(f =>
+      '<div class="labcard">' +
+        '<div class="lab-h">' + f.ico + ' <b>' + f.n + '</b> <span class="pill">' + f.tag + '</span></div>' +
+        '<p>' + esc(f.one) + '</p>' +
+        bar('recall@10', f.recall, '#34d399', f.recall + '%') +
+        bar('throughput', f.qps / maxQ * 100, '#22d3ee', f.qps + '×') +
+        bar('memory', f.bytes / maxB * 100, '#fb7185', f.bytes >= 1000 ? (f.bytes / 1024).toFixed(1) + ' KB' : f.bytes + ' B') +
+        '<button class="btn btn-ghost ann-btn">What it wins, what it costs</button>' +
+        '<div class="sortcard-why">' +
+          '<b>Wins.</b> ' + f.win + '<br><br><b>Costs.</b> ' + f.cost +
+          '<div class="ds-gotcha">📍 ' + esc(f.when) + '</div>' +
+        '</div>' +
+      '</div>').join('');
+    const opened = new Set();
+    $$('.ann-btn', grid).forEach((b, i) => b.onclick = () => {
+      $$('.sortcard-why', grid)[i].classList.toggle('show');
+      if (!opened.has(i)) { opened.add(i); xp(3); }
+      if (opened.size === C.annFamilies.length)
+        xp(8, 'All four. Note that none of them wins on all three bars — that is the whole decision.');
+    });
+  }
+
+  const root = $('#ann-drill'); if (!root) return;
+  let done = 0, score = 0;
+  C.annDrill.forEach(d => {
+    const card = el('div', 'sortcard');
+    card.appendChild(el('div', 'sortcard-t', esc(d.s)));
+    const opts = el('div', 'sortcard-opts three');
+    d.o.forEach(k => {
+      const b = el('button', 'sortopt', '<span class="so-n">' + byKey[k].ico + ' ' + byKey[k].n + '</span>');
+      b.onclick = () => {
+        if (card.dataset.done) return;
+        card.dataset.done = '1'; done++;
+        $$('.sortopt', opts).forEach((x, xi) => { x.disabled = true; if (d.o[xi] === d.a) x.classList.add('correct'); });
+        if (k !== d.a) b.classList.add('incorrect'); else { score++; xp(4); }
+        $('.sortcard-why', card).classList.add('show');
+        if (done === C.annDrill.length)
+          xp(10, score === C.annDrill.length ? 'Four for four — you sized the memory before you picked the index'
+                                             : 'Re-read the misses: each one is decided by a constraint, not by which index is best');
+      };
+      opts.appendChild(b);
+    });
+    card.appendChild(opts);
+    card.appendChild(el('div', 'sortcard-why', '<b>' + byKey[d.a].n + '.</b> ' + d.why));
+    root.appendChild(card);
+  });
+
+  const notes = $('#ann-notes');
+  if (notes) notes.innerHTML = C.annNotes.map(n =>
+    '<div class="gterm"><b>' + n[0] + '</b><span>' + n[1] + '</span></div>').join('');
+}
+
+/* ---------- product quantization ---------- */
+function initPq() {
+  const host = $('#pq-knobs'); if (!host) return;
+  const val = {}; C.pqKnobs.forEach(k => val[k.k] = k.val);
+
+  host.innerHTML = C.pqKnobs.map(k =>
+    '<div class="ctrl"><label for="pq-' + k.k + '">' + k.name + ' <span class="mono" id="pq-' + k.k + '-v">' + k.val + k.unit + '</span></label>' +
+    '<input type="range" id="pq-' + k.k + '" min="' + k.min + '" max="' + k.max + '" step="' + k.step + '" value="' + k.val + '"></div>').join('');
+  C.pqKnobs.forEach(k => $('#pq-' + k.k).oninput = e => {
+    val[k.k] = +e.target.value;
+    $('#pq-' + k.k + '-v').textContent = val[k.k] + k.unit;
+    render();
+  });
+
+  function render() {
+    const dims = val.dims, m = Math.min(val.m, dims), bits = val.bits;
+    const per = Math.round(dims / m);                 // dimensions each single code stands for
+    const raw = dims * 4;                             // float32
+    const pq = Math.ceil(m * bits / 8);
+    const shown = Math.min(m, 16);
+    // stand-in for the real curve: the more dimensions one code must represent, the more it loses
+    const recall = clamp(0.995 - 0.0016 * per * (8 / bits), 0.4, 0.995);
+    const gb = b => (b * 1e8 / 1073741824).toFixed(b > 500 ? 0 : 1) + ' GB';
+
+    $('#pq-strip').innerHTML = Array.from({ length: shown }, (_, i) =>
+      '<div class="pq-seg" style="--h:' + ((i * 37) % 360) + ';animation-delay:' + (i * 28) + 'ms">' +
+      '<span>' + per + 'd</span></div>').join('') + (m > shown ? '<div class="pq-more">+' + (m - shown) + '</div>' : '');
+
+    $('#pq-codes').innerHTML = Array.from({ length: shown }, (_, i) =>
+      '<div class="pq-code" style="--h:' + ((i * 37) % 360) + ';animation-delay:' + (140 + i * 28) + 'ms">' +
+      ((i * 53 + 17) % (1 << bits)).toString(16).toUpperCase() + '</div>').join('') +
+      (m > shown ? '<div class="pq-more">+' + (m - shown) + '</div>' : '');
+
+    $('#pq-out').innerHTML =
+      '<div class="stat-row">' +
+        stat(raw + ' B', 'float32 vector') +
+        stat(pq + ' B', 'quantized', '#34d399') +
+        stat((raw / pq).toFixed(0) + '×', 'smaller', '#22d3ee') +
+        stat((recall * 100).toFixed(0) + '%', 'recall before rerank', recall > .9 ? '#34d399' : recall > .8 ? '#fbbf24' : '#fb7185') +
+      '</div>' +
+      bar('100M vectors, raw', 100, '#fb7185', gb(raw)) +
+      bar('100M vectors, PQ', pq / raw * 100, '#34d399', gb(pq)) +
+      '<div class="tnote">' + pqAdvice(per, bits, recall, raw / pq) + '</div>';
+  }
+
+  function pqAdvice(per, bits, recall, ratio) {
+    if (per > 32) return '⚠️ <b>Each code is standing in for ' + per + ' dimensions.</b> One byte cannot describe a 32-dimensional sub-space, so distances between codes stop tracking distances between vectors and recall falls off a cliff. Raise m before you raise anything else.';
+    if (bits === 4) return '💡 <b>4 bits gives you 16 centroids per sub-space</b> instead of 256. Half the memory of 8-bit, and a noticeably coarser vector. It is a real option at billion scale and a bad default below it.';
+    if (ratio > 40) return '✅ <b>' + ratio.toFixed(0) + '× compression at ' + (recall * 100).toFixed(0) + '% recall.</b> Now add the move that makes PQ practical: retrieve the top few hundred on codes, then rescore just those against the full-precision vectors. Most of the lost recall comes straight back for a few milliseconds.';
+    return '💡 <b>' + ratio.toFixed(0) + '× smaller, ' + (recall * 100).toFixed(0) + '% recall.</b> PQ is the only knob here that changes which hardware you need rather than how fast it runs. Pair it with a rerank pass on exact vectors and the recall cost mostly disappears.';
+  }
+  render();
+}
+
+/* ---------- HNSW: greedy hops, coarse layers first ---------- */
+function initHnsw() {
+  const svg = $('#hnsw-svg'); if (!svg) return;
+  const NS = 'http://www.w3.org/2000/svg';
+  const r = lcg(31);
+  const nodes = Array.from({ length: 30 }, (_, i) => ({ i, x: .06 + r() * .88, y: .08 + r() * .84 }));
+  const q = { x: .74, y: .68 };
+  // layer membership shrinks geometrically, exactly as HNSW assigns levels
+  const layers = [nodes, nodes.filter((_, i) => i % 3 === 0), nodes.filter((_, i) => i % 9 === 0)];
+  const planeY = [300, 180, 60];
+  const P = (n, l) => ({ x: 70 + n.x * 560 + (1 - n.y) * 100, y: planeY[l] + n.y * 84 });
+
+  const near = (list, from, k) => list.filter(n => n !== from)
+    .map(n => ({ n, d: (n.x - from.x) ** 2 + (n.y - from.y) ** 2 })).sort((a, b) => a.d - b.d).slice(0, k).map(o => o.n);
+
+  const mk = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+  svg.innerHTML = '';
+
+  const nodeEls = {};
+  [2, 1, 0].forEach(l => {
+    const list = layers[l];
+    const g = mk('g', { class: 'hnsw-layer' });
+    const c1 = P({ x: 0, y: 0 }, l), c2 = P({ x: 1, y: 0 }, l), c3 = P({ x: 1, y: 1 }, l), c4 = P({ x: 0, y: 1 }, l);
+    g.appendChild(mk('polygon', { points: [c1, c2, c3, c4].map(p => p.x + ',' + p.y).join(' '), class: 'hnsw-plane' }));
+    g.appendChild(mk('text', { x: 18, y: planeY[l] + 46, class: 'hnsw-ltext' })).textContent = 'L' + l;
+
+    list.forEach(n => near(list, n, l === 0 ? 3 : 2).forEach(o => {
+      const a = P(n, l), b = P(o, l);
+      g.appendChild(mk('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'hnsw-edge', 'data-e': l + ':' + Math.min(n.i, o.i) + '-' + Math.max(n.i, o.i) }));
+    }));
+    list.forEach(n => {
+      const p = P(n, l);
+      const c = mk('circle', { cx: p.x, cy: p.y, r: 6, class: 'hnsw-node' });
+      g.appendChild(c);
+      nodeEls[l + ':' + n.i] = c;
+    });
+    if (l === 0) {
+      const p = P(q, 0);
+      g.appendChild(mk('circle', { cx: p.x, cy: p.y, r: 9, class: 'hnsw-query' }));
+      g.appendChild(mk('text', { x: p.x + 15, y: p.y + 4, class: 'hnsw-qtext' })).textContent = 'query';
+    }
+    svg.appendChild(g);
+  });
+  const marker = mk('circle', { r: 9, class: 'hnsw-marker', cx: -50, cy: -50 });
+  svg.appendChild(marker);
+
+  /* greedy descent: best node in this layer becomes the entry point of the next */
+  function plan() {
+    const path = [];
+    let cur = layers[2][0];
+    for (let l = 2; l >= 0; l--) {
+      if (!layers[l].includes(cur)) cur = near(layers[l], cur, 1)[0];
+      path.push({ l, n: cur });
+      for (;;) {
+        const better = near(layers[l], cur, 4)
+          .filter(o => (o.x - q.x) ** 2 + (o.y - q.y) ** 2 < (cur.x - q.x) ** 2 + (cur.y - q.y) ** 2)
+          .sort((a, b) => ((a.x - q.x) ** 2 + (a.y - q.y) ** 2) - ((b.x - q.x) ** 2 + (b.y - q.y) ** 2))[0];
+        if (!better) break;
+        cur = better;
+        path.push({ l, n: cur });
+      }
+    }
+    return path;
+  }
+
+  let anim = null;
+  function run() {
+    if (anim) anim.cancel();
+    $$('.hnsw-node', svg).forEach(n => n.classList.remove('on'));
+    $$('.hnsw-edge', svg).forEach(e => e.classList.remove('on'));
+    const path = plan();
+    let i = 0;
+    const cap = $('#hnsw-cap');
+    const hop = () => {
+      const cur = path[i], next = path[i + 1];
+      const a = P(cur.n, cur.l);
+      nodeEls[cur.l + ':' + cur.n.i].classList.add('on');
+      marker.setAttribute('cx', a.x); marker.setAttribute('cy', a.y);
+      if (cap && (i === 0 || path[i - 1].l !== cur.l)) {
+        const s = C.hnswSteps[2 - cur.l];
+        cap.innerHTML = '<b>' + s[0] + '.</b> ' + s[1];
+      }
+      if (!next) { xp(3); return; }
+      const b = P(next.n, next.l);
+      if (cur.l === next.l) {
+        const e = svg.querySelector('[data-e="' + cur.l + ':' + Math.min(cur.n.i, next.n.i) + '-' + Math.max(cur.n.i, next.n.i) + '"]');
+        if (e) e.classList.add('on');
+      }
+      anim = tween(cur.l === next.l ? 520 : 760, t => {
+        marker.setAttribute('cx', a.x + (b.x - a.x) * t);
+        marker.setAttribute('cy', a.y + (b.y - a.y) * t);
+      }, () => { i++; hop(); });
+    };
+    hop();
+  }
+
+  $('#hnsw-run').onclick = run;
+  const cap = $('#hnsw-cap');
+  if (cap) cap.innerHTML = '<b>' + C.hnswSteps[0][0] + '.</b> ' + C.hnswSteps[0][1];
+}
+
 /* ---------- boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   [initPlain, initJargon, initBackground, initClarify, initMetrics, initLabels, initSkew, initLadder, initFunnel,
-   initBudget, initCapacity, initEval, initLoop, initRagScale, initCascade, initDesigns,
-   initShip, initQuiz]
+   initBudget, initCapacity, initEval, initLoop, initRagScale, initCascade, initKv, initDecode, initDesigns,
+   initShip, initPatterns, initRedis, initAnn, initQuiz]
     .forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 });
 })();

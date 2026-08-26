@@ -787,3 +787,93 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .rescard p{font-size:12.7px;color:var(--txt-2);margin-bottom:10px;line-height:1.55}
 
 .feat-plain{display:block;font-size:12.5px;color:var(--txt-3);font-weight:400;margin-top:4px}
+
+/* ---------- ch16: pattern cards + their diagrams ---------- */
+.patcard{display:flex;flex-direction:column}
+.patcard.pop{animation:pop .32s var(--ease)}
+.patcard .pat-btn{width:100%;margin-top:auto}
+.patcard .sortcard-why{background:rgba(0,0,0,.3);border:1px solid var(--line)}
+.patcard .sortcard-why .code{margin:12px 0 0;font-size:11.5px;line-height:1.65;white-space:pre;overflow-x:auto}
+
+.pdia{display:block;width:100%;height:auto;margin:2px 0 11px;
+      background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:11px;padding:2px}
+.pd-box{fill:rgba(255,255,255,.05);stroke:var(--line-2);stroke-width:1.1}
+.pd-box.hot{fill:rgba(124,92,255,.2);stroke:var(--violet)}
+.pd-box.dim{opacity:.42}
+.pd-t{fill:var(--txt-2);font-family:var(--sans);font-size:9.5px;text-anchor:middle;dominant-baseline:middle}
+.pd-t.b{fill:var(--txt);font-weight:700}
+.pd-t.s{font-size:8.5px;fill:var(--txt-3)}
+.pd-line{fill:none;stroke:var(--line-2);stroke-width:1.2}
+.pd-line.dash{stroke-dasharray:4 4}
+.pd-line.faint{opacity:.3}
+.pd-dot{fill:var(--cyan)}
+.pd-hl{fill:rgba(34,211,238,.16);stroke:var(--cyan);stroke-width:1.2}
+
+/* respect the reader's setting — the cards still read fine standing still */
+@media(prefers-reduced-motion:reduce){
+  .pdia *{animation:none!important}
+  .patcard.pop{animation:none}
+}
+
+/* ---------- ch13 KV ceiling + prefill/decode levers ---------- */
+.kv-bars{margin-top:18px}
+/* the bars are re-rendered on every input, so grow them each time — the
+   movement is the point: you are meant to see the ceiling drop */
+.kv-bars .mrow-fill{animation:kvgrow .5s var(--ease)}
+@keyframes kvgrow{from{transform:scaleX(0);transform-origin:left}to{transform:none}}
+#lever-chips{margin-bottom:4px}
+#lever-note b{color:var(--txt)}
+@media(prefers-reduced-motion:reduce){
+  .kv-bars .mrow-fill{animation:none}
+}
+
+/* ============================================================
+   ch13 — vector indexes: the IVF map, PQ strip, HNSW graph
+   ============================================================ */
+.ivf-wrap{display:grid;grid-template-columns:minmax(0,1fr) 316px;gap:20px;align-items:start}
+@media(max-width:1000px){.ivf-wrap{grid-template-columns:1fr}}
+.ivf-stage{position:relative}
+#ivf-canvas{display:block;width:100%;height:auto;border-radius:13px;border:1px solid var(--line);
+  background:#05070f;cursor:crosshair;touch-action:none}
+.ivf-badge{position:absolute;top:11px;left:11px;font-family:var(--mono);font-size:11px;
+  color:var(--txt-2);background:rgba(6,8,18,.8);border:1px solid var(--line);
+  border-radius:99px;padding:4px 12px;backdrop-filter:blur(6px);pointer-events:none}
+.ivf-side{display:flex;flex-direction:column;gap:15px}
+.ivf-side .stat-row{grid-template-columns:1fr 1fr}
+.ivf-hint{font-size:11.5px;color:var(--txt-3);line-height:1.55}
+.ivf-curve{display:block;width:100%;height:auto;border-radius:13px;border:1px solid var(--line);
+  background:rgba(0,0,0,.28)}
+
+/* product quantization */
+.pq-wrap{display:grid;grid-template-columns:290px minmax(0,1fr);gap:22px;align-items:center}
+@media(max-width:860px){.pq-wrap{grid-template-columns:1fr}}
+.pq-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--txt-3);margin-bottom:8px}
+.pq-strip,.pq-codes{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.pq-seg{flex:1 1 34px;height:36px;border-radius:7px;display:grid;place-items:center;
+  font-family:var(--mono);font-size:10px;color:var(--txt-2);
+  background:hsl(var(--h) 70% 55% / .22);border:1px solid hsl(var(--h) 70% 62% / .45);
+  animation:pqIn .42s var(--ease) backwards}
+.pq-code{width:40px;height:30px;border-radius:7px;display:grid;place-items:center;
+  font-family:var(--mono);font-size:11.5px;font-weight:600;color:#eaf7f2;
+  background:hsl(var(--h) 70% 45% / .5);border:1px solid hsl(var(--h) 70% 62% / .6);
+  animation:pqPop .42s var(--ease) backwards}
+.pq-more{font-family:var(--mono);font-size:11px;color:var(--txt-3);padding:0 6px}
+.pq-arrow{text-align:center;font-size:11.5px;color:var(--txt-3);margin:14px 0 16px;letter-spacing:.3px}
+@keyframes pqIn{from{opacity:0;transform:translateY(-8px) scaleY(.5)}}
+@keyframes pqPop{from{opacity:0;transform:translateY(14px) scale(.6)}}
+
+/* hnsw graph */
+.hnsw-svg{display:block;width:100%;height:auto;margin-bottom:6px}
+.hnsw-plane{fill:rgba(124,92,255,.055);stroke:rgba(255,255,255,.1);stroke-width:1}
+.hnsw-edge{stroke:rgba(255,255,255,.16);stroke-width:1;transition:stroke .3s,stroke-width .3s}
+.hnsw-edge.on{stroke:var(--cyan);stroke-width:2.2}
+.hnsw-node{fill:#141a2e;stroke:rgba(180,190,220,.6);stroke-width:1.5;transition:fill .3s,stroke .3s}
+.hnsw-node.on{fill:var(--cyan);stroke:#fff}
+.hnsw-query{fill:none;stroke:var(--amber);stroke-width:2.2;animation:qPulse 1.8s var(--ease) infinite}
+.hnsw-marker{fill:var(--violet);stroke:#fff;stroke-width:1.5;filter:drop-shadow(0 0 8px rgba(124,92,255,.9))}
+.hnsw-ltext{fill:var(--txt-3);font-family:var(--mono);font-size:12px}
+.hnsw-qtext{fill:var(--amber);font-family:var(--mono);font-size:11px}
+@keyframes qPulse{50%{r:13;opacity:.55}}
+@media(prefers-reduced-motion:reduce){
+  .pq-seg,.pq-code,.hnsw-query{animation:none}
+}

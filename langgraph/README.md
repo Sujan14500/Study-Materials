@@ -2,7 +2,7 @@
 
 An interactive, animated course on LangGraph — from "why does a chain not just do this"
 to rewinding a finished run and forking a different future from the middle of it.
-Fourteen chapters, every idea attached to something you can step and break.
+Fifteen chapters, every idea attached to something you can step and break.
 
 Companion to [`genai_flow`](../genai_flow) (tokens → RAG concepts),
 [`langchain`](../langchain) (the framework),
@@ -33,14 +33,15 @@ Code examples are Python.
 | 4 | Conditional edges | Four questions, one router, and the branch that lights up for each |
 | 5 | Cycles & limits | Step a loop backwards through a node — then drop `recursion_limit` to 3 and watch it abort |
 | 6 | `create_react_agent` | Step the two-node agent loop, messages accumulating in state |
-| 7 | Checkpointers | Two threads, one graph; then kill the process and bring it back |
-| 8 | Interrupts & HITL | Run until it pauses, then approve, edit or reject with a reason — three different endings |
-| 9 | Time travel | Pick a checkpoint from the middle of a finished run, change one field, fork |
-| 10 | Streaming | The same run through all five `stream_mode` values, side by side |
-| 11 | Subgraphs & handoffs | Step a supervisor delegating with `Command(goto=…, update=…)` |
-| 12 | Long-term memory | Store lab: namespaces, the same key in two of them, and a search that cannot escape one |
-| 13 | Ship it | A checkpoint-storage calculator, six production concerns, and a checklist that saves |
-| 14 | Final quiz | 12 questions with explanations, plus a 32-term glossary |
+| 7 | Scoped tools & state | Replay one task through two graphs — scoped per node, then everything bound everywhere — and watch two production side effects appear from nothing but the wiring |
+| 8 | Checkpointers | Two threads, one graph; then kill the process and bring it back |
+| 9 | Interrupts & HITL | Run until it pauses, then approve, edit or reject with a reason — three different endings |
+| 10 | Time travel | Pick a checkpoint from the middle of a finished run, change one field, fork |
+| 11 | Streaming | The same run through all five `stream_mode` values, side by side |
+| 12 | Subgraphs & handoffs | Step a supervisor delegating with `Command(goto=…, update=…)` |
+| 13 | Long-term memory | Store lab: namespaces, the same key in two of them, and a search that cannot escape one |
+| 14 | Ship it | A checkpoint-storage calculator, six production concerns, and a checklist that saves |
+| 15 | Final quiz | 12 questions with explanations, plus a 32-term glossary |
 
 Progress, XP and the checklist persist in `localStorage`.
 

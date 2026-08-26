@@ -58,7 +58,7 @@
     <div class="hero-tag">interactive course · no signup · no server</div>
     <h1 class="hero-title">How <span class="grad">Generative AI</span><br>actually works</h1>
     <p class="hero-sub">
-      Fourteen chapters. Every idea is something you can <b>touch</b> — drag a slider,
+      Eighteen chapters. Every idea is something you can <b>touch</b> — drag a slider,
       break a prompt, watch a model pick its next word in slow motion.
       Nothing here stays a black box.
     </p>
@@ -351,11 +351,105 @@ sim("dog", "database")  -> 0.07</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 6. TRAINING LIFECYCLE                                         -->
+<!-- 6. MAKING IT FAST                                             -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="training" data-title="How models are trained" data-icon="6" data-group="Inside the model">
+<section class="chapter" data-id="speed" data-title="Making it fast" data-icon="6" data-group="Inside the model">
   <header class="ch-head">
     <div class="ch-kicker">Chapter 6 · Inside the model</div>
+    <h2>One token at a time is <span class="grad">slow</span>. Here's how it stops feeling slow.</h2>
+    <p class="lead">Chapter 5 showed the loop: predict a token, append it, run again. That loop is why generation is slow, and every serious speed trick is an attack on one part of it — <b>streaming</b> hides the wait, the <b>KV cache</b> stops you redoing work you already did, and <b>speculative decoding</b> gets more than one token out of a single pass.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⏱️ Two phases, two completely different bottlenecks</h3></div>
+    <p class="panel-sub">Everything on this page follows from the fact that a request is really two jobs, and they behave nothing like each other.</p>
+    <div class="phase-split" id="phase-split"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏁 Bulk vs streaming</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Same model, same answer, same total time. Press race and watch which side a user would rather be sitting in front of.</p>
+    <div class="race">
+      <div class="race-pane" id="race-bulk">
+        <div class="race-title">Bulk response <small>wait for the whole thing</small></div>
+        <div class="race-body" id="race-bulk-body"></div>
+        <div class="race-timer" id="race-bulk-timer">idle</div>
+      </div>
+      <div class="race-pane" id="race-stream">
+        <div class="race-title">Streaming response <small>tokens as they are produced</small></div>
+        <div class="race-body" id="race-stream-body"></div>
+        <div class="race-timer" id="race-stream-timer">idle</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="race-go">▶ Race them</button>
+      <button class="btn btn-ghost" id="race-reset">↺ Reset</button>
+    </div>
+    <div class="callout">
+      <div class="callout-ico">👁️</div>
+      <div><b>Streaming makes nothing faster.</b> Both sides finish at the same instant. What moves is <i>time to first token</i> — the number users actually experience as "is this thing broken?". It is also the cheapest win on this whole page: a flag on the request and an event-stream reader on the client.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧮 The inference lab</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Set the shape of a request, then turn the three tricks on and off. Watch which number each one moves — and which it leaves completely alone.</p>
+
+    <div class="sampler-controls">
+      <div class="ctrl">
+        <label for="spd-in">Prompt tokens <span class="val" id="spd-in-val">4000</span></label>
+        <input type="range" id="spd-in" min="200" max="32000" step="200" value="4000">
+        <div class="ctrl-hint">System prompt + retrieved context + conversation history. This is the prefill job.</div>
+      </div>
+      <div class="ctrl">
+        <label for="spd-out">Output tokens <span class="val" id="spd-out-val">400</span></label>
+        <input type="range" id="spd-out" min="20" max="2000" step="20" value="400">
+        <div class="ctrl-hint">The answer. This is the decode job — one forward pass each, no way around it.</div>
+      </div>
+    </div>
+
+    <div class="three-up" id="spd-toggles"></div>
+
+    <div class="stat-row" id="spd-stats"></div>
+    <div class="spd-bars" id="spd-bars"></div>
+    <div class="spd-curve" id="spd-curve"></div>
+    <div class="spd-note" id="spd-note"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎲 Speculative decoding, block by block</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">A small draft model guesses the next few tokens. The big model checks all of them in <i>one</i> pass and accepts the longest correct prefix. Everything after the first wrong guess is thrown away — which is why the acceptance rate is the whole ballgame.</p>
+    <div class="spec-run" id="spec-run"></div>
+    <div class="btn-row">
+      <button class="btn" id="spec-step">Draft the next block</button>
+      <button class="btn btn-ghost" id="spec-reset">↺ Reset</button>
+    </div>
+    <div class="score-wrap">
+      <span>accepted</span>
+      <div class="score-bar"><span class="score-fill" id="spec-fill"></span></div>
+      <span id="spec-score">—</span>
+    </div>
+    <p class="panel-sub" id="spec-note" style="margin-top:14px"></p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🚫 What each trick does <i>not</i> do</h3></div>
+    <p class="panel-sub">The most common way to waste a week is to reach for the wrong one of these.</p>
+    <div class="deflist" id="spd-myths"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list" id="spd-takeaways"></ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 7. TRAINING LIFECYCLE                                         -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="training" data-title="How models are trained" data-icon="7" data-group="Inside the model">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 7 · Inside the model</div>
     <h2>From <span class="grad">raw internet</span> to helpful assistant</h2>
     <p class="lead">A base model trained on raw text is a very good autocomplete and a terrible assistant. Three stages turn one into the other. Click through them.</p>
   </header>
@@ -390,11 +484,11 @@ sim("dog", "database")  -> 0.07</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 7. PROMPTING                                                  -->
+<!-- 8. PROMPTING                                                  -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="prompting" data-title="Prompt engineering" data-icon="7" data-group="Building with it">
+<section class="chapter" data-id="prompting" data-title="Prompt engineering" data-icon="8" data-group="Building with it">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 7 · Building with it</div>
+    <div class="ch-kicker">Chapter 8 · Building with it</div>
     <h2>The prompt is your <span class="grad">program</span></h2>
     <p class="lead">You can't edit the weights, so the prompt is the only lever you have at runtime. Good prompting isn't magic words — it's supplying the context a competent new hire would need, in a form the model can't misread.</p>
   </header>
@@ -430,11 +524,11 @@ sim("dog", "database")  -> 0.07</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 8. CONTEXT WINDOW                                             -->
+<!-- 9. CONTEXT WINDOW                                             -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="context" data-title="Context &amp; memory" data-icon="8" data-group="Building with it">
+<section class="chapter" data-id="context" data-title="Context &amp; memory" data-icon="9" data-group="Building with it">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 8 · Building with it</div>
+    <div class="ch-kicker">Chapter 9 · Building with it</div>
     <h2>The model has <span class="grad">no memory</span></h2>
     <p class="lead">Every API call is a fresh brain with amnesia. "Conversation" is an illusion created by resending the entire chat history each turn. Everything you resend has to fit in the context window — and you pay for it every single turn.</p>
   </header>
@@ -475,11 +569,11 @@ sim("dog", "database")  -> 0.07</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 9. RAG                                                        -->
+<!-- 10. RAG                                                        -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="rag" data-title="RAG" data-icon="9" data-group="Building with it">
+<section class="chapter" data-id="rag" data-title="RAG" data-icon="10" data-group="Building with it">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 9 · Building with it</div>
+    <div class="ch-kicker">Chapter 10 · Building with it</div>
     <h2><span class="grad">RAG</span>: give the model an open book</h2>
     <p class="lead">Retrieval-Augmented Generation. The model doesn't know your company's refund policy and never will. So don't ask it to remember — look the policy up first and paste it into the prompt. This is the single most common GenAI architecture in production.</p>
   </header>
@@ -532,11 +626,200 @@ sim("dog", "database")  -> 0.07</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 10. CHOOSING AN APPROACH                                      -->
+<!-- 11. ADVANCED RAG                                              -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="choose" data-title="Prompt vs RAG vs tune" data-icon="10" data-group="Building with it">
+<section class="chapter" data-id="ragplus" data-title="Advanced RAG" data-icon="11" data-group="Building with it">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 10 · Building with it</div>
+    <div class="ch-kicker">Chapter 11 · Building with it</div>
+    <h2>Simple RAG is a <span class="grad">demo</span>. This is the rest of it.</h2>
+    <p class="lead">Chunk, embed, top-k, answer. That works for the first ten questions and falls over on the next hundred — one embedding of one question, searched one way. Three upgrades fix most of it: <b>search several ways at once</b>, <b>ask several questions at once</b>, and <b>measure retrieval separately from generation</b> so you know which half is broken.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪜 Simple RAG, and what production adds to it</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">The top row is the pipeline from the last chapter. The bottom row is everything this chapter adds — each piece bolted onto the exact stage it repairs.</p>
+
+    <div class="ladder-wrap">
+      <svg viewBox="0 0 760 250" class="ladder-svg" role="img" aria-label="Simple RAG pipeline with the advanced additions underneath">
+        <defs>
+          <linearGradient id="ragGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#7c5cff"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#34d399"/>
+          </linearGradient>
+        </defs>
+
+        <path id="ragline" d="M62,58 H698" fill="none" stroke="url(#ragGrad)" stroke-width="2" stroke-dasharray="5 6" opacity=".5"/>
+        <circle r="5" fill="#22d3ee"><animateMotion dur="5s" repeatCount="indefinite"><mpath href="#ragline"/></animateMotion></circle>
+        <circle r="4" fill="#7c5cff"><animateMotion dur="5s" begin="1.6s" repeatCount="indefinite"><mpath href="#ragline"/></animateMotion></circle>
+        <circle r="4" fill="#34d399"><animateMotion dur="5s" begin="3.2s" repeatCount="indefinite"><mpath href="#ragline"/></animateMotion></circle>
+
+        <g class="lsn"><rect x="12"  y="34" width="100" height="48" rx="11"/><text x="62"  y="54">documents</text><text x="62"  y="70" class="lsub">structured + not</text></g>
+        <g class="lsn"><rect x="140" y="34" width="92"  height="48" rx="11"/><text x="186" y="54">chunks</text><text x="186" y="70" class="lsub">200–800 tokens</text></g>
+        <g class="lsn"><rect x="260" y="34" width="112" height="48" rx="11"/><text x="316" y="54">vector DB</text><text x="316" y="70" class="lsub">embeddings</text></g>
+        <g class="lsn"><rect x="400" y="34" width="112" height="48" rx="11"/><text x="456" y="54">top-k chunks</text><text x="456" y="70" class="lsub">cosine, k=5</text></g>
+        <g class="lsn"><rect x="540" y="34" width="146" height="48" rx="11"/><text x="613" y="54">answer</text><text x="613" y="70" class="lsub">LLM + citations</text></g>
+
+        <text x="223" y="102" class="lmod">↑ text embedding model</text>
+        <text x="596" y="102" class="lmod">↑ large language model</text>
+
+        <line x1="316" y1="118" x2="316" y2="146" class="lhook"/>
+        <line x1="456" y1="118" x2="456" y2="146" class="lhook"/>
+        <line x1="613" y1="118" x2="613" y2="146" class="lhook"/>
+        <line x1="186" y1="118" x2="186" y2="146" class="lhook"/>
+
+        <g class="ladn a1"><rect x="118" y="150" width="136" height="56" rx="12"/><text x="186" y="172">multi-query</text><text x="186" y="190" class="lsub">1 question → 5 searches</text></g>
+        <g class="ladn a2"><rect x="248" y="150" width="136" height="56" rx="12"/><text x="316" y="172">hybrid lanes</text><text x="316" y="190" class="lsub">dense + sparse + late</text></g>
+        <g class="ladn a3"><rect x="388" y="150" width="136" height="56" rx="12"/><text x="456" y="172">fuse + rerank</text><text x="456" y="190" class="lsub">RRF, then cross-encoder</text></g>
+        <g class="ladn a4"><rect x="545" y="150" width="136" height="56" rx="12"/><text x="613" y="172">evaluation</text><text x="613" y="190" class="lsub">retrieval ≠ generation</text></g>
+
+        <text x="380" y="232" class="lfoot">every box below costs latency — you add them because a metric moved, not because a blog post said so</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔀 Hybrid retrieval, lane by lane</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Same nine-chunk knowledge base, three completely different ways of searching it. Pick a question, then <b>click a lane to switch it off</b> and watch what stops being found. The chunks a human judge marked relevant are outlined in green.</p>
+
+    <div class="chip-row" id="hyb-queries"></div>
+    <div class="rag-pipe" id="hyb-pipe"></div>
+    <div class="hyb-lanes" id="hyb-lanes"></div>
+
+    <div class="hyb-ctrl">
+      <button class="toggle on" id="hyb-rerank">
+        <span class="toggle-box">&#10003;</span>
+        <div><b>Cross-encoder reranker</b><small>re-scores the fused candidates by reading query + chunk together</small></div>
+      </button>
+    </div>
+
+    <div class="hyb-out">
+      <div>
+        <div class="lab-pane-title">Fused candidates <span class="dim">— reciprocal rank fusion, k=60</span></div>
+        <div class="hyb-list" id="hyb-fused"></div>
+      </div>
+      <div>
+        <div class="lab-pane-title">Into the prompt <span class="dim">— top 3 after reranking</span></div>
+        <div class="hyb-list" id="hyb-final"></div>
+      </div>
+    </div>
+
+    <div class="stat-row" id="hyb-stats" style="margin-top:16px"></div>
+    <div class="hyb-note" id="hyb-note"></div>
+  </div>
+
+  <div class="three-up">
+    <div class="pcard reveal">
+      <div class="pcard-badge">dense</div>
+      <h3>One vector per chunk</h3>
+      <p class="pcard-desc">Cosine similarity in embedding space. Understands that "single sign-on" and "SSO" are the same thing.</p>
+      <pre class="code">q = embed("how long for a refund")
+hits = index.search(q, k=50)</pre>
+      <div class="pcard-foot"><span class="pill good">Paraphrase</span><span class="pill bad">Error codes</span></div>
+    </div>
+    <div class="pcard reveal">
+      <div class="pcard-badge">sparse</div>
+      <h3>One weight per term</h3>
+      <p class="pcard-desc">BM25 over an inverted index. Thirty years old, still the only thing that reliably finds <span class="mono">E-4021</span>.</p>
+      <pre class="code">hits = bm25.search(
+    "refund failed E-4021", k=50)</pre>
+      <div class="pcard-foot"><span class="pill good">Exact strings</span><span class="pill bad">Synonyms</span></div>
+    </div>
+    <div class="pcard reveal">
+      <div class="pcard-badge">late interaction</div>
+      <h3>One vector per token</h3>
+      <p class="pcard-desc">ColBERT-style MaxSim: every query token finds its best match inside the chunk, then the matches are summed. Catches answers buried in long passages.</p>
+      <pre class="code">score = sum(
+    max(q_i · d_j for d_j in doc)
+    for q_i in query)</pre>
+      <div class="pcard-foot"><span class="pill good">Partial matches</span><span class="pill bad">~100× storage</span></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🎯</div>
+    <div><b>A reranker cannot fix recall.</b> It only re-sorts what retrieval already handed it. If the right chunk is at rank 200, the reranker never sees it — and every metric downstream is capped by that. Switch off the lane that finds it in the lab above and watch every number fall at once.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎏 RAG-Fusion: one question, five searches</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Users write bad queries. Instead of trying to embed a bad query better, have the LLM rewrite it four ways, search all five, and fuse the rankings. Cheap, parallel, and it beats almost every clever single-query trick.</p>
+
+    <div class="fan" id="rrf-fan"></div>
+
+    <div class="sampler-controls">
+      <div class="ctrl">
+        <label for="rrf-k">RRF constant k <span class="val" id="rrf-kv">60</span></label>
+        <input type="range" id="rrf-k" min="1" max="120" step="1" value="60">
+        <div class="ctrl-hint">Small k makes rank 1 dominate everything. Large k flattens the curve so a doc that placed 3rd in four lists beats one that placed 1st in a single list. 60 is the number from the original paper, and it is a good default rather than a law.</div>
+      </div>
+      <div class="ctrl">
+        <label>Fusion method</label>
+        <button class="toggle on" id="rrf-mode">
+          <span class="toggle-box">&#10003;</span>
+          <div><b>Reciprocal rank fusion</b><small>click to compare against naive concatenation</small></div>
+        </button>
+        <div class="ctrl-hint">RRF only ever looks at <i>positions</i>, never at scores — which is exactly why it can merge BM25 and cosine without normalising anything.</div>
+      </div>
+    </div>
+
+    <div class="btn-row"><button class="btn" id="rrf-run">▶ Run the fan-out</button></div>
+
+    <div id="rrf-table"></div>
+    <div class="rrf-final" id="rrf-final"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧰 The query-rewriting family</h3></div>
+      <ul class="fact-list">
+        <li><b>Multi-query / RAG-Fusion</b> — n paraphrases, n searches, fuse with RRF. Best effort-to-payoff ratio here.</li>
+        <li><b>HyDE</b> — have the model <i>hallucinate</i> an answer, embed that, and search with it. A fake answer sits closer to a real one than a question does.</li>
+        <li><b>Step-back</b> — ask the broader question first ("what governs refund timing?") to pull in the policy the specific question assumes.</li>
+        <li><b>Decomposition</b> — split a compound question into parts, retrieve per part, then answer once. The only thing that handles "compare A and B".</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>💸 What it costs</h3></div>
+      <ul class="fact-list">
+        <li><b>+1 LLM call</b> before retrieval — small model, ~200ms, run it while nothing else is happening.</li>
+        <li><b>5× search load</b> — but the searches are independent, so fire them in parallel and pay one search of latency.</li>
+        <li><b>Reranking is the expensive part</b> — a cross-encoder scores every pair. Cap the candidate list at 50 and it stays under 100ms.</li>
+        <li><b>Do not stack all four.</b> Add one, measure, keep it only if a retrieval metric moved.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📐 What "good RAG" actually measures</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">One number for "quality" tells you nothing. Four families do, because each one fails in a way the others cannot see. Pick a broken run and watch which ring collapses — then read the fix. <span class="dim" id="rev-hint"></span></p>
+
+    <div class="chip-row" id="rev-runs"></div>
+
+    <div class="rev-grid">
+      <div class="rev-wheel"><svg id="rev-svg" viewBox="0 0 220 220" role="img" aria-label="Four metric families as a ring"></svg></div>
+      <div class="rev-bars" id="rev-bars"></div>
+    </div>
+
+    <div class="rev-verdict" id="rev-verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>💻 Measuring it for real</h3><span class="panel-tag">3 layers</span></div>
+    <div class="chip-row" id="rev-code-tabs" style="margin-bottom:14px"></div>
+    <pre class="code code-live" id="rev-codeblk" style="max-height:460px"></pre>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🧭</div>
+    <div><b>Debug in this order:</b> is the right chunk in the index → is it in the top 50 → is it in the prompt → did the model use it → did the user get what they came for. Four of those five questions need no LLM to answer, and they are where the bug almost always is.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 12. CHOOSING AN APPROACH                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="choose" data-title="Prompt vs RAG vs tune" data-icon="12" data-group="Building with it">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 12 · Building with it</div>
     <h2>Which lever do you actually <span class="grad">pull</span>?</h2>
     <p class="lead">Almost every "we need to train our own model" conversation ends with "actually we needed better retrieval". Here's the ladder — start at the top, only go down when you've proven you must.</p>
   </header>
@@ -551,11 +834,11 @@ sim("dog", "database")  -> 0.07</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 11. AGENTS                                                    -->
+<!-- 12. AGENTS                                                    -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="agents" data-title="Agents &amp; tools" data-icon="11" data-group="Building with it">
+<section class="chapter" data-id="agents" data-title="Agents &amp; tools" data-icon="13" data-group="Building with it">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 11 · Building with it</div>
+    <div class="ch-kicker">Chapter 13 · Building with it</div>
     <h2>Give it <span class="grad">hands</span></h2>
     <p class="lead">A chat model only produces text. An agent is that same model in a loop, allowed to call tools — search, a database, an API, your codebase — look at the results, and decide what to do next. Same brain, plus the ability to act and check its work.</p>
   </header>
@@ -610,11 +893,11 @@ sim("dog", "database")  -> 0.07</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 12. EVALUATION                                                -->
+<!-- 13. EVALUATION                                                -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="eval" data-title="Evaluation &amp; risk" data-icon="12" data-group="Shipping it">
+<section class="chapter" data-id="eval" data-title="Evaluation &amp; risk" data-icon="14" data-group="Shipping it">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 12 · Shipping it</div>
+    <div class="ch-kicker">Chapter 14 · Shipping it</div>
     <h2>How do you know it's <span class="grad">any good</span>?</h2>
     <p class="lead">"It looked great in the demo" is not a quality bar. The same input can produce a different output every run, so you need evaluation the way normal software needs tests — otherwise every prompt tweak is a coin flip.</p>
   </header>
@@ -651,11 +934,11 @@ sim("dog", "database")  -> 0.07</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 13. SHIPPING                                                  -->
+<!-- 14. SHIPPING                                                  -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="ship" data-title="Ship it" data-icon="13" data-group="Shipping it">
+<section class="chapter" data-id="ship" data-title="Ship it" data-icon="15" data-group="Shipping it">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 13 · Shipping it</div>
+    <div class="ch-kicker">Chapter 15 · Shipping it</div>
     <h2>From demo to <span class="grad">production</span></h2>
     <p class="lead">The prototype takes an afternoon. The last 20% — cost, latency, failure handling, evals — takes the rest. Here's what that 20% is made of.</p>
   </header>
@@ -679,11 +962,11 @@ sim("dog", "database")  -> 0.07</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 14. MEM0                                                      -->
+<!-- 15. MEM0                                                      -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="mem0" data-title="Mem0: agent memory" data-icon="14" data-group="Deep dives">
+<section class="chapter" data-id="mem0" data-title="Mem0: agent memory" data-icon="16" data-group="Deep dives">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 14 · Deep dives</div>
+    <div class="ch-kicker">Chapter 16 · Deep dives</div>
     <h2>Mem0: giving an agent a <span class="grad">long-term memory</span></h2>
     <p class="lead">Chapter 8 showed the problem: the model is stateless, so "memory" means resending the transcript, and the transcript grows until it overflows and costs a fortune. Chapter 9 solved it for <i>documents</i>. Mem0 is the same trick pointed at <i>the user</i> — extract the few durable facts a conversation reveals, store them outside the model, and inject only the ones the current question needs.</p>
   </header>
@@ -831,11 +1114,11 @@ sim("dog", "database")  -> 0.07</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 15. DATA FORMULATOR                                           -->
+<!-- 16. DATA FORMULATOR                                           -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="formulator" data-title="Data Formulator" data-icon="15" data-group="Deep dives">
+<section class="chapter" data-id="formulator" data-title="Data Formulator" data-icon="17" data-group="Deep dives">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 15 · Deep dives</div>
+    <div class="ch-kicker">Chapter 17 · Deep dives</div>
     <h2>Data Formulator: <span class="grad">charts of fields you don't have</span></h2>
     <p class="lead">Every "chat with your data" tool hits the same wall: the chart you want needs a column your table does not contain. Revenue when you only have units and price. Quarter when you only have a date. Growth when you only have totals. Microsoft Research's Data Formulator attacks that by splitting the job — you <b>point</b> at the chart you want using encoding shelves, and you <b>describe</b> the missing field in words. The model's only job is to write the data transformation, and you get to read the code it wrote.</p>
   </header>
@@ -1006,9 +1289,9 @@ SUMX(Sales,
 <!-- ============================================================= -->
 <section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Finish line">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 16 · Finish line</div>
+    <div class="ch-kicker">Chapter 18 · Finish line</div>
     <h2>Prove it to <span class="grad">yourself</span></h2>
-    <p class="lead">Fifteen questions covering everything above. No time limit, instant explanations, and you can retake it.</p>
+    <p class="lead">Nineteen questions covering everything above. No time limit, instant explanations, and you can retake it.</p>
   </header>
 
   <div class="panel">

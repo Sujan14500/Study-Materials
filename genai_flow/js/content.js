@@ -110,7 +110,76 @@ C.genTree = {
   '_default': [[' and', .3], [' then', .25], [' really', .2], [' quietly', .15], [' obviously', .1]]
 };
 
-/* ---------- Ch6: training stages ---------- */
+/* ---------- Ch6: making it fast ----------
+   Every number below is a plausible mid-size-model figure, not a measurement.
+   The demo's arithmetic (see demos.js initSpeed) is the real thing — it is the
+   standard prefill/decode model, so the *shape* of every trade-off is correct
+   even though your provider's constants will differ.                         */
+C.speedModel = {
+  prefillRate: 9000,   // prompt tokens processed per second — one big parallel pass
+  decodeRate:  45,     // tokens generated per second — one forward pass each
+  overheadMs:  120,    // network + queue before any compute starts
+  cachedFrac:  0.85,   // share of the prompt that is a stable, cacheable prefix
+  cacheSpeedup: 12,    // cached prefix tokens are ~this much cheaper than fresh ones
+  draftBlock:  4,      // gamma — tokens the draft model proposes per round
+  draftCost:   0.15,   // cost of one draft token as a fraction of one target pass
+  accept:      0.72    // alpha — probability the target model accepts a drafted token
+};
+
+C.phases = [
+  { n: 'Prefill', ico: '📥', bound: 'compute-bound',
+    t: 'Your whole prompt goes through the model in one pass. 4,000 tokens are not 4,000 steps — they are one step over 4,000 positions, all in parallel.',
+    feels: 'You feel this as the pause before anything appears.',
+    lever: 'Attacked by: prompt caching (skip re-processing a prefix you already sent).' },
+  { n: 'Decode', ico: '📤', bound: 'memory-bandwidth-bound',
+    t: 'Now it generates. One forward pass per token, each one needing the token before it, so this part cannot be parallelised away. The GPU spends most of it waiting on memory, not computing.',
+    feels: 'You feel this as the speed the words appear at.',
+    lever: 'Attacked by: speculative decoding (more than one token per pass) and batching.' }
+];
+
+/* the answer the race demo streams — short enough to watch, long enough to feel */
+C.raceAnswer = 'Streaming does not make the model faster. It changes when you find out. ' +
+  'The tokens arrive in exactly the same order, at exactly the same times — the only difference ' +
+  'is that one side shows them to you and the other holds them back until the last one lands.';
+
+/* scripted speculative-decoding rounds: what the draft proposed, and where the
+   target model stopped agreeing. `ok` = how many of the drafted tokens survived. */
+C.specRounds = [
+  { draft: ['the', ' cat', ' sat', ' on'], ok: 4, fix: null,
+    why: 'Easy, high-probability continuation. The draft model and the big model agree on all four — one verification pass bought four tokens.' },
+  { draft: [' the', ' mat', ' and', ' purred'], ok: 3, fix: ' while',
+    why: 'Three accepted, the fourth rejected. Note the free token: the verification pass also produces the correct replacement, so a rejected block still yields ok+1 tokens.' },
+  { draft: [' the', ' kettle', ' boiled', ' loudly'], ok: 1, fix: ' sun',
+    why: 'Formulaic text is where drafts shine; an unusual turn is where they miss. The 3 rejected tokens were pure wasted compute.' },
+  { draft: [' set', ' over', ' the', ' garden'], ok: 4, fix: null,
+    why: 'Back in predictable territory. Acceptance is not a constant — it swings with how surprising the text is.' },
+  { draft: [' wall', ' and', ' the', ' evening'], ok: 4, fix: null,
+    why: 'Averaged over a whole answer this settles around 60–80% on ordinary prose, which is where the ~2x wall-clock win comes from.' }
+];
+
+C.speedMyths = [
+  ['Streaming does not reduce cost or total time',
+   'The same tokens are generated and billed. It moves time-to-first-token, and that is a perception win, not a throughput win. Do it anyway — it is nearly free.'],
+  ['A KV cache is not optional, and it is not a "cache" you turn on',
+   'Without it the model re-processes the entire sequence for every single token, so generating n tokens costs O(n²) work instead of O(n). Every inference stack already does this. The thing you actually choose is how much GPU memory you will spend on it — and that, not the weights, is usually what caps your concurrency.'],
+  ['Prompt caching does not speed up generation',
+   'It attacks prefill only. A cached 30k-token prefix can cut seconds off the first token and most of the input bill, and then the answer streams out at exactly the same tokens per second as before.'],
+  ['Speculative decoding does not change the output',
+   'The verification step guarantees the same distribution as the target model alone. You get identical-quality text, sooner. What you spend is extra compute on rejected drafts — so on a saturated, fully-batched server it can be a net loss even while it makes each single request faster.'],
+  ['None of them fix a 30k-token prompt',
+   'Caching makes an oversized prompt cheaper to resend; it does not make it a good prompt. Trimming context is still the highest-leverage move on this page.']
+];
+
+C.speedTakeaways = [
+  'A request is two jobs: <b>prefill</b> (your prompt, one parallel pass) and <b>decode</b> (the answer, one pass per token). Every speed trick attacks exactly one of them.',
+  '<b>Streaming</b> changes perceived latency only — first token in ~300ms instead of a blank screen for 8 seconds. Cheapest win available; do it before anything else.',
+  '<b>Prompt caching</b> attacks prefill. It needs a <i>stable prefix</i>: stable content first, volatile content last. A timestamp near the top of the prompt destroys every hit below it.',
+  'The <b>KV cache</b> is what makes decode O(n) instead of O(n²). It grows with batch size × sequence length, and it — not the model weights — is normally what limits how many users you can serve at once.',
+  '<b>Speculative decoding</b> trades extra compute for lower latency: draft cheap, verify in one pass, keep the correct prefix. Output is identical; the win scales with the acceptance rate and vanishes if the draft model is bad.',
+  'Measure <b>time to first token</b> separately from total time. They respond to different fixes, and averaging them together hides both.'
+];
+
+/* ---------- Ch7: training stages ---------- */
 C.trainStages = [
   {
     n: 'Stage 1', name: 'Pretraining', pct: 99,
@@ -141,7 +210,7 @@ C.trainStages = [
   }
 ];
 
-/* ---------- Ch7: prompt lab ---------- */
+/* ---------- Ch8: prompt lab ---------- */
 C.labParts = [
   { id: 'role',    label: 'Role',            hint: 'who the model is',        pts: 10,
     text: 'You are a senior support engineer at a B2B SaaS company.' },
@@ -170,7 +239,7 @@ C.techniques = [
   { h: 'Give it an out', p: 'Explicit permission to say "I don’t know" cuts hallucination more than any threat.', c: 'If the context does not answer the\nquestion, reply exactly: NOT_FOUND' }
 ];
 
-/* ---------- Ch8: context ---------- */
+/* ---------- Ch9: context ---------- */
 C.ctxTurns = [
   { who: 'user', t: 'Hi! I’m planning a trip to Lisbon in March. My name is Priya.', n: 22 },
   { who: 'assistant', t: 'Lovely choice, Priya. March is mild — 15–20°C and quieter than summer.', n: 26 },
@@ -183,7 +252,7 @@ C.ctxTurns = [
   { who: 'user', t: 'Remind me — what was my name again?', n: 12 }
 ];
 
-/* ---------- Ch9: RAG knowledge base ---------- */
+/* ---------- Ch10: RAG knowledge base ---------- */
 C.ragKB = [
   { src: 'refunds.md',   t: 'Refunds are issued within 14 days of purchase for annual plans, and within 7 days for monthly plans. Refunds go back to the original payment method.', k: ['refund','money','back','cancel','14','days','payment'] },
   { src: 'refunds.md',   t: 'Partial refunds are not offered. If a customer cancels mid-term, service continues until the end of the paid period.', k: ['refund','cancel','partial','mid-term','period'] },
@@ -209,7 +278,7 @@ C.ragStages = [
   { b: 'Generate', s: 'grounded answer' }
 ];
 
-/* ---------- Ch10: decision helper + ladder ---------- */
+/* ---------- Ch11: decision helper + ladder ---------- */
 C.deciderQs = [
   { id: 'need', t: 'What is actually missing?', opts: [
     { l: 'It doesn’t know our data', v: 'data' },
@@ -233,7 +302,7 @@ C.rungs = [
   { i: '6️⃣', h: 'Train from scratch', p: 'Almost certainly not. Reserve for frontier labs and genuinely novel modalities.', c: 'months · $$$$$' }
 ];
 
-/* ---------- Ch11: agent runs ---------- */
+/* ---------- Ch12: agent runs ---------- */
 C.agentTasks = [
   { label: 'Is my invoice overdue?',
     steps: [
@@ -267,7 +336,7 @@ C.agentTasks = [
     ]}
 ];
 
-/* ---------- Ch12: hallucination spotting ---------- */
+/* ---------- Ch13: hallucination spotting ---------- */
 C.hallucCards = [
   { q: 'Q: Who wrote "The Pragmatic Programmer" and when?',
     parts: [
@@ -292,7 +361,7 @@ C.hallucCards = [
     exp: 'The flag is fabricated — a very common failure with APIs and CLI flags, because the model has seen a thousand libraries that <i>do</i> have a flag like that. Ground code answers in the actual docs or a real signature.' }
 ];
 
-/* ---------- Ch13: checklist + architecture ---------- */
+/* ---------- Ch14: checklist + architecture ---------- */
 C.checklist = [
   'Golden-set evals run on every prompt change',
   'Model + version pinned (no surprise upgrades)',
@@ -324,7 +393,7 @@ C.arch = [
       { b: 'Eval loop', s: 'golden set + feedback' } ] }
 ];
 
-/* ---------- Ch14: quiz ---------- */
+/* ---------- Ch17: quiz ---------- */
 C.quiz = [
   { q: 'What is a token?', o: ['A single character', 'A chunk of text — often a word or word-piece', 'One complete sentence', 'A security key for the API'], a: 1,
     e: 'Tokens are sub-word chunks. Common words are usually one token; rare words split into several.' },
@@ -356,6 +425,15 @@ C.quiz = [
     e: 'A 40-turn transcript costs 40 turns of tokens every turn. Six retrieved facts cost about fifty. The trade is extra LLM calls at write time.' },
   { q: 'Data Formulator asks you to fill in encoding shelves as well as type a prompt. Why?', o: ['To make it look like Excel', 'The shelves pin down the chart precisely, so the prompt only has to describe the data transform', 'Because the model cannot read text', 'To slow you down for safety'], a: 1,
     e: 'Chart structure is easy to point at and wordy to describe. Splitting the job — UI for the shape, words for the derivation — removes most of the ambiguity a pure chat prompt suffers from.' }
+,
+  { q: 'You switch on streaming. What actually improves?', o: ['Total response time', 'Token cost', 'Time to first token — the perceived wait', 'Answer quality'], a: 2,
+    e: 'The same tokens are generated at the same speed and billed the same. Streaming only changes when you find out about them — which is most of what a user means by "fast".' },
+  { q: 'Prompt caching gives you a hit on a 30k-token prefix. What does NOT change?', o: ['Time to first token', 'Input token cost', 'How fast the answer streams out', 'Prefill compute'], a: 2,
+    e: 'Caching attacks prefill only. Decode still runs one forward pass per output token, so tokens per second is exactly what it was.' },
+  { q: 'Why is a KV cache not optional?', o: ['It improves answer quality', 'Without it, generating n tokens costs O(n²) work instead of O(n)', 'It is required by the API spec', 'It reduces the size of the model weights'], a: 1,
+    e: 'Without cached keys and values, every single generated token re-processes the entire sequence so far. The cost curve bends upward and long answers become impossible. What you really choose is how much GPU memory to give it — which is what limits concurrency.' },
+  { q: 'Speculative decoding with a weak draft model that is usually wrong will:', o: ['Produce lower-quality output', 'Be slower than plain decoding', 'Have no effect', 'Reduce token cost'], a: 1,
+    e: 'Verification guarantees identical output either way — quality never moves. But every rejected draft is compute you spent for nothing, so at a low acceptance rate you pay for the draft passes and still decode roughly one token at a time.' }
 ];
 
 /* ---------- glossary ---------- */
@@ -392,8 +470,15 @@ C.glossary = [
   ['Golden set', 'A fixed set of test inputs with known-good outputs, used as your regression suite.'],
   ['LLM-as-judge', 'Using a model to grade another model’s output against a rubric.'],
   ['Multimodal', 'Handles more than text — images, audio, video.'],
-  ['Prompt caching', 'Reusing the processed prefix of a repeated prompt to cut cost and latency.'],
-  ['Streaming', 'Sending tokens as they are generated so the user sees output immediately.'],
+  ['Prefill', 'The first phase of a request: the whole prompt goes through the model in one parallel pass. Compute-bound.'],
+  ['Decode', 'The second phase: one forward pass per generated token, each needing the one before it. Memory-bandwidth-bound.'],
+  ['KV cache', 'The stored attention keys and values for tokens already processed, so each new token reads them instead of recomputing the whole sequence. Turns O(n²) generation into O(n), and its size — batch × sequence length — is usually what caps concurrency.'],
+  ['Prompt caching', 'Reusing the already-processed prefix of a repeated prompt. Cuts prefill time and input cost; changes generation speed not at all. Needs a stable prefix — put volatile content last.'],
+  ['Streaming', 'Sending tokens as they are generated so the user sees output immediately. Improves perceived latency only: same tokens, same total time, same bill.'],
+  ['Time to first token', 'How long before any output appears. The number users actually feel, and the one a total-latency average hides.'],
+  ['Speculative decoding', 'A small draft model proposes several tokens; the big model verifies them all in one pass and keeps the longest correct prefix. Identical output, fewer passes — but rejected drafts are wasted compute, so the acceptance rate decides whether it pays.'],
+  ['Acceptance rate', 'The share of speculatively drafted tokens the target model agrees with. Drives the whole speculative-decoding speedup; a bad draft model makes it a net loss.'],
+  ['Continuous batching', 'A server merging separate requests into shared forward passes as they arrive, instead of waiting for a fixed batch. The largest throughput lever when self-hosting.'],
   ['Mem0', 'An open-source memory layer that extracts durable facts from conversations and injects only the relevant ones.'],
   ['Memory extraction', 'The LLM pass that turns a conversation turn into a few candidate facts worth keeping.'],
   ['ADD / UPDATE / DELETE / NOOP', 'The four decisions a memory layer makes when a candidate fact meets an existing memory.'],
@@ -405,7 +490,7 @@ C.glossary = [
   ['Derived field', 'A column that does not exist in the source data and must be computed: revenue, quarter, growth %.']
 ];
 
-/* ---------- Ch14: Mem0 — a memory layer for agents ----------
+/* ---------- Ch15: Mem0 — a memory layer for agents ----------
    The turns below are a scripted run of Mem0's two-phase pipeline
    (extract candidate facts -> compare against similar stored memories ->
    emit ADD / UPDATE / DELETE / NOOP). Scripted so the lesson is repeatable;
@@ -659,7 +744,7 @@ def turn(user_id: str, user_msg: str) -> str:
 #           or every user waits on it for no benefit at all` }
 ];
 
-/* ---------- Ch15: Data Formulator ---------- */
+/* ---------- Ch16: Data Formulator ---------- */
 C.dfData = {
   name: 'sales.csv',
   fields: [
@@ -907,4 +992,265 @@ assert (out["qoq_growth_pct"] > -100).all(), "check the no-Q2 regions by hand"
 # The workflow that holds: sketch it in the UI, read the code, then paste the
 # code into your own pipeline. The tool is for exploration. Your repo is for
 # anything a decision depends on.` }
+];
+
+/* ============================================================
+   Ch11: advanced RAG — hybrid retrieval, fusion, evaluation
+   ------------------------------------------------------------
+   The corpus is scored three different ways on purpose:
+     con    the document's "embedding" — hand-written concept weights.
+            Dense retrieval is cosine over this. It knows meaning and
+            nothing else: it cannot see that E-4021 differs from E-4055.
+     t      the literal text. BM25 runs over its tokens. Exact strings
+            only: no synonyms, no paraphrase.
+     tokens for late interaction we compare query tokens to document
+            tokens one by one through C.arTokenCon (below), which is a
+            stand-in for a multi-vector encoder like ColBERT.
+   gold (on each query) is what a human judge said. The reranker is
+   allowed to see it — that is exactly what a cross-encoder approximates —
+   but only for the candidates retrieval already handed up, which is why
+   a reranker can never repair bad recall.
+   ============================================================ */
+
+C.arCorpus = [
+  { id: 'd1', src: 'billing/refunds.md',
+    t: 'Approved refunds are returned to the original payment method within 5 to 7 business days.',
+    con: { refund: 1.0, timing: 0.95, billing: 0.5 } },
+  { id: 'd2', src: 'billing/eligibility.md',
+    t: 'Orders can be refunded for 30 days after delivery. Digital goods are not refundable once downloaded.',
+    con: { refund: 1.0, policy: 0.9, billing: 0.4 } },
+  { id: 'd3', src: 'runbooks/gateway.md',
+    t: 'Error E-4021 means the refund gateway timed out. Retry the refund once, then open a ticket with the charge id.',
+    con: { refund: 0.8, error: 1.0, timing: 0.25 } },
+  { id: 'd4', src: 'runbooks/issuer.md',
+    t: 'Error E-4055 means the card issuer declined the reversal. The customer has to call their bank.',
+    con: { refund: 0.95, error: 1.0, billing: 0.2 } },
+  { id: 'd5', src: 'security/sso.md',
+    t: 'To turn on SSO, upload your SAML metadata in Settings then map the email attribute.',
+    con: { auth: 1.0, setup: 0.9 } },
+  { id: 'd6', src: 'security/scim.md',
+    t: 'SCIM provisioning syncs users hourly. Deprovisioned users lose access at the next sync.',
+    con: { auth: 0.85, provisioning: 1.0, timing: 0.3 } },
+  { id: 'd7', src: 'api/limits.md',
+    t: 'The API allows 600 requests per minute per workspace. Bursts get HTTP 429 with a Retry-After header.',
+    con: { api: 1.0, limits: 1.0, error: 0.35 } },
+  { id: 'd8', src: 'api/webhooks.md',
+    t: 'Webhook deliveries retry with exponential backoff for 24 hours, then land in the dead letter queue.',
+    con: { api: 0.9, delivery: 1.0, timing: 0.4 } },
+  { id: 'd9', src: 'billing/partial.md',
+    t: 'Partial refunds are issued from the dashboard. The remaining balance stays on the original charge.',
+    con: { refund: 1.0, billing: 0.9 } }
+];
+
+/* Query text is what the user typed; con is what the embedding model made
+   of it. gold is the judge's relevance, 0-3. */
+C.arQueries = [
+  { id: 'q1', q: 'how long does a refund take',
+    con: { refund: 1.0, timing: 1.0 },
+    gold: { d1: 3, d9: 1 },
+    lesson: 'Keyword search only sees the word "refund", and every refund doc has it. Meaning is what separates "how long" from "who is eligible" — dense wins this one.' },
+  { id: 'q2', q: 'refund failed with E-4021',
+    con: { refund: 1.0, error: 0.9 },
+    gold: { d3: 3, d1: 1 },
+    lesson: 'E-4021 and E-4055 mean the same thing to an embedding model: "a refund error". Only the literal string tells them apart, and only BM25 reads literal strings.' },
+  { id: 'q3', q: 'set up single sign-on for my team',
+    con: { auth: 1.0, setup: 0.85 },
+    gold: { d5: 3, d6: 2 },
+    lesson: 'The doc says "SSO", the user said "single sign-on". Zero token overlap, so BM25 scores it zero. Dense and late interaction both bridge it.' },
+  { id: 'q4', q: 'what does HTTP 429 mean here',
+    con: { api: 1.0, limits: 1.0 },
+    gold: { d7: 3, d8: 1 },
+    lesson: 'The control case: semantically clear and lexically exact, so every retriever agrees. Most real queries are not this kind.' }
+];
+
+/* Stand-in for a multi-vector encoder: which ideas a single token carries.
+   Late interaction matches query tokens to document tokens through this,
+   which is how "sign-on" reaches a document that only ever says "SSO". */
+C.arTokenCon = {
+  refund: ['refund'], refundable: ['refund', 'policy'],
+  reversal: ['refund', 'error'], charge: ['billing'], payment: ['billing'], balance: ['billing'],
+  partial: ['billing'], billing: ['billing'], dashboard: ['setup'], ticket: ['error'],
+  long: ['timing'], day: ['timing'], hour: ['timing'], hourly: ['timing'], time: ['timing'],
+  minute: ['timing'], take: ['timing'], business: ['timing'], arrives: ['timing'],
+  error: ['error'], failed: ['error'], fail: ['error'], declined: ['error'], stuck: ['error'],
+  'e-4021': ['error', 'gateway'], 'e-4055': ['error', 'issuer'],
+  timed: ['error', 'gateway'], timeout: ['error', 'gateway'], gateway: ['gateway'],
+  sso: ['auth'], 'sign-on': ['auth'], signon: ['auth'], sign: ['auth'], single: ['auth'],
+  saml: ['auth', 'setup'], scim: ['auth', 'provisioning'], provisioning: ['provisioning'],
+  user: ['provisioning'], deprovisioned: ['provisioning'],
+  set: ['setup'], setup: ['setup'], turn: ['setup'], settings: ['setup'], upload: ['setup'],
+  api: ['api'], http: ['api'], request: ['api', 'limits'], '429': ['limits', 'error'],
+  rate: ['limits'], limit: ['limits'], burst: ['limits'], workspace: ['api'],
+  webhook: ['delivery'], deliverie: ['delivery'], delivery: ['delivery'], retry: ['delivery'],
+  backoff: ['delivery'], queue: ['delivery']
+};
+
+C.arStop = ['a','an','the','is','are','was','were','be','to','of','for','on','in','at','it','my','me',
+            'i','you','your','we','our','and','or','do','does','did','how','what','why','when','with',
+            'this','that','here','there','get','got','has','have','can','will','not','no','up','out'];
+
+C.arLanes = [
+  { id: 'dense',  n: 'Dense embeddings', s: 'one vector per chunk · cosine', c: 'var(--violet)',
+    good: 'paraphrase, synonyms, "what I meant"', bad: 'exact IDs, error codes, rare names' },
+  { id: 'sparse', n: 'Sparse embeddings', s: 'BM25 over an inverted index', c: 'var(--cyan)',
+    good: 'error codes, SKUs, names, quoted strings', bad: 'anything worded differently' },
+  { id: 'late',   n: 'Late interaction', s: 'one vector per token · MaxSim', c: 'var(--green)',
+    good: 'partial matches inside long chunks', bad: 'storage — roughly 100x the vectors' }
+];
+
+C.arSteps = [
+  { b: 'Query',    s: 'what they typed' },
+  { b: 'Encode',   s: 'one lane per view' },
+  { b: 'Search',   s: 'top-k per lane' },
+  { b: 'Fuse',     s: 'RRF the rankings' },
+  { b: 'Rerank',   s: 'cross-encoder' },
+  { b: 'Generate', s: 'answer + citations' }
+];
+
+/* ---------- RAG-Fusion: one question, five searches ---------- */
+C.arFusion = {
+  q: 'my refund did not go through',
+  con: { refund: 1.0, error: 0.75 },
+  gold: { d3: 3, d4: 3, d1: 1, d9: 1 },
+  variants: [
+    { q: 'refund gateway timed out error',           con: { refund: 0.9, error: 1.0, timing: 0.3 } },
+    { q: 'card issuer declined the reversal E-4055', con: { refund: 0.95, error: 1.0, billing: 0.2 } },
+    { q: 'refund stuck, do I retry or open a ticket',con: { refund: 0.9, error: 0.95 } },
+    { q: 'the customer says their bank rejected it',  con: { refund: 0.9, error: 1.0, billing: 0.3 } }
+  ],
+
+  note: '"Did not go through" has two completely different causes — a gateway timeout (E-4021) and an issuer decline (E-4055). No single embedding of the original question sits near both. Five cheap searches do what one clever one cannot.'
+};
+
+/* ---------- RAG evaluation ---------- */
+C.arEvalFamilies = [
+  { id: 'ret', n: 'Retrieval', c: 'var(--cyan)',
+    why: 'The ceiling on everything downstream. If the answer never entered the prompt, no model and no wording saves the run.',
+    metrics: [
+      { k: 'context_recall',    n: 'Context recall',    d: 'Of the chunks that actually contain the answer, how many made it into the prompt?' },
+      { k: 'context_precision', n: 'Context precision', d: 'Of the chunks pasted in, how many were needed? Low precision is money and latency burned on noise.' },
+      { k: 'mrr',               n: 'MRR@10',            d: 'How near the top the first useful chunk landed. Rank matters because you truncate.' }
+    ] },
+  { id: 'gen', n: 'Generation', c: 'var(--violet)',
+    why: 'Given the context it was handed, did the model stay inside it?',
+    metrics: [
+      { k: 'faithfulness',     n: 'Faithfulness',     d: 'Every claim in the answer traceable to a retrieved chunk. This is the hallucination metric.' },
+      { k: 'answer_relevancy', n: 'Answer relevancy', d: 'Does the answer address the question asked, not a neighbouring one?' }
+    ] },
+  { id: 'e2e', n: 'End-to-end', c: 'var(--green)',
+    why: 'The only score a user would recognise: was the final answer right, and can they check it?',
+    metrics: [
+      { k: 'answer_correctness', n: 'Answer correctness', d: 'Against a human-written reference answer.' },
+      { k: 'citation_accuracy',  n: 'Citation accuracy',  d: 'The cited chunk really does support the sentence attached to it.' }
+    ] },
+  { id: 'ux', n: 'User experience', c: 'var(--amber)',
+    why: 'Offline scores nobody feels are not a product. Measure what happens after the answer renders.',
+    metrics: [
+      { k: 'latency',    n: 'p95 latency',     d: 'Scored inverted: 1.0 is fast. Four retrievers and a reranker are not free.' },
+      { k: 'thumbs',     n: 'Thumbs-up rate',  d: 'The only label that arrives for free, in volume, from real traffic.' },
+      { k: 'deflection', n: 'Deflection',      d: 'Share of sessions that ended without escalating to a human. The actual business metric.' }
+    ] }
+];
+
+C.arEvalRuns = [
+  { id: 'r1', n: 'Confidently wrong', root: 'gen',
+    vals: { context_recall: .93, context_precision: .78, mrr: .88,
+            faithfulness: .34, answer_relevancy: .91,
+            answer_correctness: .41, citation_accuracy: .29,
+            latency: .82, thumbs: .38, deflection: .44 },
+    verdict: 'Retrieval did its job. The model then answered from memory anyway and stapled a citation on afterwards.',
+    fix: 'Constrain the prompt to the context, let it say "not in the docs", and score faithfulness per claim in CI.' },
+  { id: 'r2', n: 'The chunk was never there', root: 'ret',
+    vals: { context_recall: .21, context_precision: .66, mrr: .30,
+            faithfulness: .89, answer_relevancy: .62,
+            answer_correctness: .27, citation_accuracy: .81,
+            latency: .88, thumbs: .31, deflection: .29 },
+    verdict: 'Faithfulness is high because the model faithfully used the wrong chunks. The failure that looks like a model problem and is not.',
+    fix: 'Fix chunking and add a lexical lane before touching the prompt. A reranker cannot recover what retrieval never returned.' },
+  { id: 'r3', n: 'Everything retrieved, nothing used', root: 'ux',
+    vals: { context_recall: .97, context_precision: .24, mrr: .52,
+            faithfulness: .86, answer_relevancy: .79,
+            answer_correctness: .74, citation_accuracy: .77,
+            latency: .28, thumbs: .55, deflection: .58 },
+    verdict: 'top_k = 40 buys recall with latency and token spend. The answer is usually right and always slow.',
+    fix: 'Rerank down to 3-5 chunks. Recall stays, precision and p95 both recover.' },
+  { id: 'r4', n: 'Great offline, hated online', root: 'ux',
+    vals: { context_recall: .94, context_precision: .81, mrr: .90,
+            faithfulness: .92, answer_relevancy: .88,
+            answer_correctness: .89, citation_accuracy: .90,
+            latency: .71, thumbs: .34, deflection: .26 },
+    verdict: 'Every offline metric passes. Users still escalate — answers are correct, long, and hedge on the one thing the user came for.',
+    fix: 'Offline scores are a regression gate, not a definition of quality. Ship behind a thumbs widget and read the transcripts.' },
+  { id: 'r5', n: 'Healthy', root: null,
+    vals: { context_recall: .93, context_precision: .82, mrr: .91,
+            faithfulness: .94, answer_relevancy: .90,
+            answer_correctness: .88, citation_accuracy: .93,
+            latency: .84, thumbs: .79, deflection: .71 },
+    verdict: 'Nothing is 1.0 and nothing needs to be. This is what a system worth putting in front of people looks like.',
+    fix: 'Freeze it as the regression baseline and alert when any family drops more than 5 points.' }
+];
+
+C.arEvalCode = [
+  { t: 'ragas', code:
+`from ragas import evaluate
+from ragas.metrics import (
+    context_recall, context_precision,
+    faithfulness, answer_relevancy,
+)
+
+# Each row: the question, the contexts you retrieved, the answer you
+# generated, and a human ground_truth. The ground_truth is the
+# expensive part and the only part that makes the rest mean anything.
+report = evaluate(dataset, metrics=[
+    context_recall,      # the retrieval ceiling
+    context_precision,   # noise you paid for
+    faithfulness,        # hallucination
+    answer_relevancy,    # answered a different question
+])
+
+# Gate the build, not a dashboard nobody opens.
+assert report["context_recall"] > 0.85
+assert report["faithfulness"]   > 0.90` },
+  { t: 'retrieval only', code:
+`# Before any LLM-judged metric, answer one question: is the right
+# chunk even in the list? This needs no model and runs in milliseconds.
+
+def recall_at_k(runs, k=5):
+    hit = 0
+    for r in runs:
+        got = {c.id for c in r.retrieved[:k]}
+        if got & set(r.gold_ids):
+            hit += 1
+    return hit / len(runs)
+
+def mrr(runs):
+    total = 0.0
+    for r in runs:
+        for i, c in enumerate(r.retrieved, start=1):
+            if c.id in r.gold_ids:
+                total += 1 / i
+                break
+    return total / len(runs)
+
+# 50 hand-labelled questions beat 5000 unlabelled ones. Write them from
+# real support tickets, not from your own imagination.` },
+  { t: 'online', code:
+`# Offline gates catch regressions. Online tells you if it is any good.
+
+log_event("rag_answer", {
+    "trace_id":   trace_id,
+    "query":      q,
+    "chunk_ids":  [c.id for c in ctx],   # so retrieval is debuggable later
+    "latency_ms": ms,
+    "top_k":      k,
+    "reranked":   True,
+})
+
+# Then attach the outcome the business cares about:
+#   thumbs_up      -> free labels, biased but plentiful
+#   escalated      -> the deflection metric
+#   copied_answer  -> quiet, strong signal of usefulness
+#
+# Sample 2% of traffic into a weekly human review queue. That queue is
+# where your next 50 eval questions come from.` }
 ];

@@ -743,3 +743,49 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .mc-ex{font-family:var(--mono);font-size:11.3px;color:var(--txt-3);background:rgba(0,0,0,.3);
   border-radius:8px;padding:8px 11px;margin-bottom:9px}
 .mem-watch{font-size:12.2px;color:var(--txt-3);border-top:1px solid var(--line);padding-top:9px}
+
+/* ---------- ch7 scoped tools & controlled state ---------- */
+.lgs-pay{margin-top:12px;background:rgba(0,0,0,.28);border:1px solid var(--line);
+  border-radius:12px;padding:12px}
+.lgs-pay-h{display:flex;justify-content:space-between;align-items:baseline;
+  font-size:11.5px;color:var(--txt-3);margin-bottom:9px}
+.lgs-pay-h b{color:var(--txt-2)}
+.lgs-tools{display:flex;flex-wrap:wrap;gap:5px}
+.lgs-tool{font-family:var(--mono);font-size:10px;padding:3px 7px;border-radius:6px;
+  background:rgba(255,255,255,.06);border:1px solid var(--line-2);color:var(--txt-2);
+  transition:opacity .25s,border-color .25s;cursor:help}
+.lgs-tool.danger{border-color:rgba(251,113,133,.55);color:#ffc9d2}
+.lgs-tool.out{opacity:.2;text-decoration:line-through}
+.lgs-pay-bar{margin-top:11px}
+.lgs-pay-bar i{display:block;height:5px;border-radius:99px;background:var(--cyan);
+  transition:width .4s var(--ease);margin-bottom:5px;min-width:2px}
+.lgs-pay-bar span{font-size:10px;color:var(--txt-3)}
+
+.lgs-trace{max-height:390px;overflow-y:auto;display:flex;flex-direction:column;gap:9px;padding-right:4px}
+.lgs-step{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:11px;
+  padding:10px 12px;border-left:2px solid var(--violet);animation:slideIn .3s var(--ease) both}
+.lgs-step.bad{border-left-color:var(--red);background:rgba(251,113,133,.08)}
+.lgs-step.now{border-color:var(--line-2);box-shadow:0 0 0 1px rgba(129,140,248,.28)}
+.lgs-step-h{display:flex;align-items:center;margin-bottom:6px}
+.lgs-n{font-size:10px;color:var(--txt-3);font-family:var(--mono)}
+.lgs-think{font-size:12.5px;color:var(--txt-2);font-style:italic;margin-bottom:6px}
+.lgs-act{font-size:11.5px;color:var(--cyan);background:rgba(232,121,249,.09);
+  border-radius:7px;padding:5px 9px;word-break:break-word}
+.lgs-obs{font-size:11px;color:var(--txt-3);margin-top:5px;padding-left:9px}
+.lgs-warn{margin-top:8px;font-size:12px;line-height:1.6;color:#ffc9d2;
+  background:rgba(251,113,133,.1);border-radius:8px;padding:8px 10px}
+.lgs-verdict{margin-top:12px;font-size:13.5px;color:var(--txt-2);line-height:1.7}
+.lgs-verdict .ok{color:var(--green)}
+.lgs-verdict .no{color:var(--red)}
+
+.lgs-phases{display:flex;flex-direction:column;gap:9px}
+.lgs-phase{background:rgba(0,0,0,.26);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.lgs-phase b{font-family:var(--mono);font-size:12.5px}
+.lgs-phase small{display:block;font-size:11.5px;color:var(--txt-3);margin:2px 0 7px}
+.lgs-writes{display:flex;flex-wrap:wrap;gap:5px}
+.lgs-writes span{font-size:10px;padding:2px 7px;border-radius:6px;
+  background:rgba(52,211,153,.12);color:#bff3e0;border:1px solid rgba(52,211,153,.3)}
+.lgs-dt{width:100%}
+.lgs-dt .lgs-ty{font-size:11px;color:var(--cyan)}
+.lgs-dt tr.lgs-desc td{font-size:11.5px;color:var(--txt-3);padding-top:0;padding-bottom:11px;
+  border-top:none;line-height:1.6}

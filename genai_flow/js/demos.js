@@ -497,7 +497,297 @@ function initSampler() {
 }
 
 /* ============================================================
-   Ch6 — training pipeline
+   Ch6 — making it fast: streaming, KV cache, speculative decoding
+
+   The arithmetic here is the standard prefill/decode model, so it
+   is worth stating plainly:
+
+     prefill_ms = prompt_tokens / prefillRate
+     decode_ms  = output_tokens / decodeRate            (with a KV cache)
+     decode_ms  = the same, PLUS re-processing the whole context on
+                  every single step                     (without one)
+
+   which is where the O(n^2) blow-up comes from. Speculative decoding
+   uses the expected-tokens-per-round result from Leviathan et al. 2023:
+
+     E[tokens per round] = (1 - a^(g+1)) / (1 - a)
+     speedup             = E / (1 + g*c)
+
+   with a = acceptance rate, g = draft block size, c = draft cost.
+   test.js re-derives all of this independently.
+   ============================================================ */
+function speedMath(P, O, opts) {
+  const M = C.speedModel;
+  const stepMs = 1000 / M.decodeRate;
+
+  const fresh = opts.cache
+    ? P * (1 - M.cachedFrac) + P * M.cachedFrac / M.cacheSpeedup
+    : P;
+  const prefillMs = fresh / M.prefillRate * 1000;
+
+  // without a KV cache every step re-reads the whole context it has built so far
+  const recomputeMs = opts.kv ? 0
+    : (O * P + O * (O - 1) / 2) / M.prefillRate * 1000;
+
+  // speculative decoding: expected accepted tokens per verification round,
+  // against a round that costs one target pass plus g cheap draft passes
+  const a = M.accept, g = M.draftBlock, c = M.draftCost;
+  const perRound = (1 - Math.pow(a, g + 1)) / (1 - a);
+  const roundCost = 1 + g * c;
+  const speedup = opts.spec ? perRound / roundCost : 1;
+
+  const decodeMs = (O * stepMs + recomputeMs) / speedup;
+
+  // the first token costs one whole round when speculating, not one step
+  const firstStepMs = (opts.spec ? roundCost * stepMs : stepMs)
+                    + (opts.kv ? 0 : P / M.prefillRate * 1000);
+
+  const totalMs = M.overheadMs + prefillMs + decodeMs;
+  const ttftMs  = M.overheadMs + prefillMs + firstStepMs;
+
+  return {
+    prefillMs: prefillMs, decodeMs: decodeMs, totalMs: totalMs,
+    // no streaming means no first token until the very last one has landed
+    ttftMs: opts.stream ? ttftMs : totalMs,
+    perceivedMs: opts.stream ? ttftMs : totalMs,
+    tps: O / (decodeMs / 1000),
+    speedup: speedup, perRound: perRound, roundCost: roundCost
+  };
+}
+
+/* Cumulative decode time per generated token, with and without a KV cache.
+   Redrawn (and so re-animated) on every slider move — the bend IS the lesson. */
+function costCurve(P, O) {
+  const M = C.speedModel, stepMs = 1000 / M.decodeRate, N = 44, W = 320, H = 88;
+  const at = o => ({
+    kv: o * stepMs,
+    nokv: o * stepMs + (o * P + o * (o - 1) / 2) / M.prefillRate * 1000
+  });
+  const top = at(O).nokv || 1;
+  const path = key => Array.from({ length: N + 1 }, (_, i) => {
+    const o = O * i / N;
+    return (i ? 'L' : 'M') + (i / N * W).toFixed(1) + ' ' + (H - at(o)[key] / top * H).toFixed(1);
+  }).join(' ');
+  const fmt = ms => ms >= 1000 ? (ms / 1000).toFixed(1) + 's' : Math.round(ms) + 'ms';
+  return '<svg viewBox="0 0 ' + W + ' ' + (H + 16) + '" role="img" ' +
+    'aria-label="cumulative decode time per generated token, with and without a KV cache">' +
+    '<line class="cv-axis" x1="0" y1="' + H + '" x2="' + W + '" y2="' + H + '"/>' +
+    '<path class="cv-line cv-nokv" d="' + path('nokv') + '"/>' +
+    '<path class="cv-line cv-kv" d="' + path('kv') + '"/>' +
+    '<text class="cv-lab" x="0" y="' + (H + 13) + '">token 0</text>' +
+    '<text class="cv-lab" x="' + W + '" y="' + (H + 13) + '" text-anchor="end">token ' + O + '</text>' +
+    '</svg><div class="spd-curve-key">' +
+    '<span><i style="background:var(--green)"></i>with KV cache &middot; ' + fmt(at(O).kv) + '</span>' +
+    '<span><i style="background:var(--red)"></i>without &middot; ' + fmt(at(O).nokv) + '</span>' +
+    '</div>';
+}
+
+function initSpeed() {
+  const phases = $('#phase-split');
+  if (phases) phases.innerHTML = C.phases.map(p =>
+    '<div class="phase-card"><div class="phase-ico">' + p.ico + '</div>' +
+    '<h4>' + p.n + ' <span class="pill">' + p.bound + '</span></h4>' +
+    '<p>' + p.t + '</p><p class="phase-feels">' + p.feels + '</p>' +
+    '<p class="phase-lever">' + p.lever + '</p></div>').join('');
+
+  /* ---------- the race: bulk vs streaming ---------- */
+  const bulkBody = $('#race-bulk-body'), streamBody = $('#race-stream-body');
+  if (bulkBody && streamBody) {
+    const PREFILL = 1200, STREAM = 4800;      // ms, slowed down to be watchable
+    const words = C.raceAnswer.split(' ');
+    const secs1 = ms => (ms / 1000).toFixed(1);
+    let raf = null, t0 = 0, awarded = false;
+
+    function reset() {
+      if (raf) cancelAnimationFrame(raf);
+      raf = null;
+      bulkBody.innerHTML = '';
+      streamBody.innerHTML = '';
+      $('#race-bulk-timer').textContent = 'idle';
+      $('#race-stream-timer').textContent = 'idle';
+      $('#race-bulk').classList.remove('done');
+      $('#race-stream').classList.remove('done');
+    }
+
+    function frame(now) {
+      const t = now - t0;
+      const end = PREFILL + STREAM;
+      const done = t >= end;
+
+      if (!done) {
+        bulkBody.innerHTML = '<div class="race-spin"></div>' +
+          '<div class="race-wait">Waiting ' + secs1(t) + 's&hellip;</div>';
+        $('#race-bulk-timer').textContent = 'blank screen for ' + secs1(t) + 's';
+      } else {
+        bulkBody.innerHTML = '<div class="race-text">' + C.raceAnswer + '</div>';
+        $('#race-bulk-timer').innerHTML = 'first token <b class="bad-n">' + secs1(end) +
+          's</b> &middot; done ' + secs1(end) + 's';
+        $('#race-bulk').classList.add('done');
+      }
+
+      if (t < PREFILL) {
+        streamBody.innerHTML = '<div class="race-text dim">connecting&hellip;</div>';
+        $('#race-stream-timer').textContent = 'prefill ' + secs1(t) + 's';
+      } else {
+        const n = Math.min(words.length, Math.ceil((t - PREFILL) / STREAM * words.length));
+        streamBody.innerHTML = '<div class="race-text">' + words.slice(0, n).join(' ') +
+          (n < words.length ? '<span class="caret"></span>' : '') + '</div>';
+        $('#race-stream-timer').innerHTML = 'first token <b class="good-n">' + secs1(PREFILL) +
+          's</b> &middot; ' + (done ? 'done ' + secs1(end) + 's' : 'streaming ' + secs1(t) + 's');
+        if (done) $('#race-stream').classList.add('done');
+      }
+
+      if (!done) raf = requestAnimationFrame(frame);
+      else if (!awarded) { awarded = true; xp(5, '+5 XP — same finish line, very different wait'); }
+    }
+
+    $('#race-go').onclick = () => { reset(); t0 = performance.now(); raf = requestAnimationFrame(frame); };
+    $('#race-reset').onclick = reset;
+    reset();
+  }
+
+  /* ---------- the inference lab ---------- */
+  const stats = $('#spd-stats');
+  if (stats) {
+    const opts = { stream: true, cache: true, kv: true, spec: false };
+    const defs = [
+      ['stream', 'Streaming', 'Send tokens as they are produced instead of holding the whole answer back.'],
+      ['cache', 'Prompt caching', 'Reuse the already-processed prefix of a prompt you have sent before.'],
+      ['kv', 'KV cache', 'Keep past keys and values so a step does not re-read the whole context.'],
+      ['spec', 'Speculative decoding', 'A small draft model proposes ' + C.speedModel.draftBlock +
+        ' tokens; the big one verifies them in a single pass.']
+    ];
+    const tg = $('#spd-toggles');
+    defs.forEach(d => {
+      const t = el('div', 'toggle' + (opts[d[0]] ? ' on' : ''),
+        '<span class="toggle-box">&#10003;</span><span><b>' + d[1] + '</b><small>' + d[2] + '</small></span>');
+      t.onclick = () => { opts[d[0]] = !opts[d[0]]; t.classList.toggle('on', opts[d[0]]); run(); };
+      tg.appendChild(t);
+    });
+
+    const secs = ms => ms >= 1000 ? (ms / 1000).toFixed(ms >= 10000 ? 0 : 1) + 's' : Math.round(ms) + 'ms';
+
+    function run() {
+      const P = +$('#spd-in').value, O = +$('#spd-out').value;
+      $('#spd-in-val').textContent = P.toLocaleString();
+      $('#spd-out-val').textContent = O.toLocaleString();
+      const r = speedMath(P, O, opts);
+      const base = speedMath(P, O, { stream: false, cache: false, kv: true, spec: false });
+
+      const cards = [
+        ['time to first token', secs(r.ttftMs), r.ttftMs < 1000 ? 'good' : r.ttftMs < 4000 ? '' : 'bad'],
+        ['total time', secs(r.totalMs), ''],
+        ['tokens / second', r.tps.toFixed(0), ''],
+        ['staring at nothing', secs(r.perceivedMs), r.perceivedMs < 1000 ? 'good' : 'bad'],
+        ['total vs no tricks', (base.totalMs / r.totalMs).toFixed(2) + '&times;', '']
+      ];
+      stats.innerHTML = cards.map(c =>
+        '<div class="stat"><div class="stat-v ' + c[2] + '">' + c[1] + '</div>' +
+        '<div class="stat-k">' + c[0] + '</div></div>').join('');
+
+      const span = Math.max(r.prefillMs + r.decodeMs, 1);
+      const bar = (lab, ms, cls) =>
+        '<div class="df-bar-row"><div class="df-bar-lab">' + lab + '</div>' +
+        '<div class="df-bar-track"><span class="df-bar ' + cls + '" style="width:' +
+        Math.min(100, ms / span * 100).toFixed(1) + '%"></span></div>' +
+        '<div class="df-bar-val">' + secs(ms) + '</div></div>';
+      $('#spd-bars').innerHTML =
+        bar('prefill', r.prefillMs, '') +
+        bar('decode', r.decodeMs, 'decode') +
+        bar('first token', r.ttftMs, 'ttft');
+      $('#spd-curve').innerHTML = costCurve(P, O);
+
+
+      const notes = [];
+      if (!opts.kv) notes.push('<b class="bad-n">No KV cache.</b> Every step re-processes all ' +
+        (P + O).toLocaleString() + ' tokens it has seen so far. Push the output slider right and watch the ' +
+        'curve bend &mdash; that is the O(n&sup2;) you are paying for. No real serving stack ships without one.');
+      if (!opts.stream) notes.push('<b class="bad-n">Not streaming.</b> Total time is unchanged, but the user ' +
+        'watches a blank screen for all ' + secs(r.totalMs) + ' of it.');
+      if (opts.cache && opts.spec && opts.kv) notes.push('Prompt caching cut the <i>prefill</i>; speculative ' +
+        'decoding cut the <i>decode</i>. They stack because they attack different phases &mdash; which is the ' +
+        'whole reason for splitting the request in two.');
+      if (opts.spec) notes.push('Speculative decoding is running at <b>' + r.speedup.toFixed(2) +
+        '&times;</b> on decode: ' + r.perRound.toFixed(2) + ' tokens per verification round for ' +
+        r.roundCost.toFixed(2) + ' rounds&rsquo; worth of compute. Notice time-to-first-token got slightly ' +
+        '<i>worse</i> &mdash; the first round costs more than a single plain step.');
+      if (opts.cache && P > 8000) notes.push('At ' + P.toLocaleString() + ' prompt tokens the cache is saving ' +
+        'you seconds, but the honest fix is still a shorter prompt.');
+      $('#spd-note').innerHTML = notes.length ? notes.map(n => '<p>' + n + '</p>').join('')
+        : '<p>All three tricks on. This is roughly what a well-configured production endpoint feels like.</p>';
+    }
+
+    $('#spd-in').oninput = run;
+    $('#spd-out').oninput = run;
+    run();
+  }
+
+  /* ---------- speculative decoding, block by block ---------- */
+  const specRun = $('#spec-run');
+  if (specRun) {
+    let at = 0, drafted = 0, accepted = 0, produced = 0;
+
+    function reset() {
+      at = drafted = accepted = produced = 0;
+      specRun.innerHTML = '<div class="spec-empty">The big model has written ' +
+        '<span class="mono">Once upon a time,</span> so far. Draft the next block.</div>';
+      $('#spec-fill').style.width = '0%';
+      $('#spec-score').textContent = '—';
+      $('#spec-note').textContent = '';
+      $('#spec-step').disabled = false;
+      $('#spec-step').textContent = 'Draft the next block';
+    }
+
+    function step() {
+      const r = C.specRounds[at];
+      if (at === 0) specRun.innerHTML = '';
+      const row = el('div', 'spec-row');
+      row.innerHTML = '<div class="spec-n">round ' + (at + 1) + '</div><div class="spec-toks">' +
+        r.draft.map((t, i) => '<span class="spec-tok ' + (i < r.ok ? 'ok' : 'no') + '">' +
+          t.trim() + '</span>').join('') +
+        (r.fix ? '<span class="spec-tok fix">' + r.fix.trim() + '</span>' : '') +
+        '</div><div class="spec-why">' + r.why + '</div>';
+      specRun.appendChild(row);
+
+      drafted += r.draft.length;
+      accepted += r.ok;
+      // a rejected block still yields ok + 1: the verification pass emits the correction for free
+      produced += r.ok + (r.fix ? 1 : 0);
+      at++;
+
+      const rate = accepted / drafted;
+      $('#spec-fill').style.width = (rate * 100).toFixed(0) + '%';
+      $('#spec-fill').style.background = rate > .6 ? 'var(--green)' : rate > .35 ? 'var(--amber)' : 'var(--red)';
+      $('#spec-score').textContent = accepted + '/' + drafted + ' (' + (rate * 100).toFixed(0) + '%)';
+
+      const cost = at * (1 + C.speedModel.draftBlock * C.speedModel.draftCost);
+      $('#spec-note').innerHTML = '<b>' + produced + ' tokens</b> from <b>' + at +
+        '</b> verification pass' + (at > 1 ? 'es' : '') + ' &mdash; ' + (produced / cost).toFixed(2) +
+        '&times; the tokens per unit of compute you would get one at a time. ' +
+        (rate < .4 ? 'At this acceptance rate the drafts are costing more than they save.'
+                   : 'Every rejected token was real compute, thrown away.');
+
+      if (at >= C.specRounds.length) {
+        $('#spec-step').disabled = true;
+        $('#spec-step').textContent = 'Block ' + at + ' of ' + at + ' — done';
+        xp(10, '+10 XP — acceptance rate is the whole ballgame');
+      }
+    }
+
+    $('#spec-step').onclick = step;
+    $('#spec-reset').onclick = reset;
+    reset();
+  }
+
+  const myths = $('#spd-myths');
+  if (myths) myths.innerHTML = C.speedMyths.map(m => '<dt>' + m[0] + '</dt><dd>' + m[1] + '</dd>').join('');
+
+  const take = $('#spd-takeaways');
+  if (take) take.innerHTML = C.speedTakeaways.map(t => '<li>' + t + '</li>').join('');
+}
+
+/* ============================================================
+   Ch7 — training pipeline
    ============================================================ */
 function initTraining() {
   const track = $('#train-track'), detail = $('#train-detail');
@@ -528,7 +818,7 @@ function initTraining() {
 }
 
 /* ============================================================
-   Ch7 — prompt lab
+   Ch8 — prompt lab
    ============================================================ */
 function initLab() {
   const ctrls = $('#lab-controls'), promptBox = $('#lab-prompt'), outBox = $('#lab-output');
@@ -565,7 +855,7 @@ function initLab() {
 }
 
 /* ============================================================
-   Ch8 — context window simulator + lost-in-the-middle chart
+   Ch9 — context window simulator + lost-in-the-middle chart
    ============================================================ */
 function initContext() {
   const bar = $('#ctx-bar'), log = $('#ctx-log'), strat = $('#ctx-strategy');
@@ -629,7 +919,7 @@ function initContext() {
 }
 
 /* ============================================================
-   Ch9 — RAG pipeline
+   Ch10 — RAG pipeline
    ============================================================ */
 function initRag() {
   const qBox = $('#rag-questions'), pipe = $('#rag-pipe'), chunkBox = $('#rag-chunks');
@@ -710,7 +1000,7 @@ function initRag() {
 }
 
 /* ============================================================
-   Ch10 — decision helper + ladder
+   Ch11 — decision helper + ladder
    ============================================================ */
 function initDecider() {
   const root = $('#decider'); if (!root) return;
@@ -768,7 +1058,7 @@ function initDecider() {
 }
 
 /* ============================================================
-   Ch11 — agent loop
+   Ch12 — agent loop
    ============================================================ */
 function initAgent() {
   const tasksBox = $('#agent-tasks'), trace = $('#agent-trace');
@@ -806,7 +1096,7 @@ function initAgent() {
 }
 
 /* ============================================================
-   Ch12 — spot the hallucination
+   Ch13 — spot the hallucination
    ============================================================ */
 function initHalluc() {
   const root = $('#halluc'); if (!root) return;
@@ -834,7 +1124,7 @@ function initHalluc() {
 }
 
 /* ============================================================
-   Ch13 — cost calculator, checklist, architecture
+   Ch14 — cost calculator, checklist, architecture
    ============================================================ */
 function initShip() {
   const calc = $('#calc');
@@ -895,7 +1185,7 @@ function initShip() {
 }
 
 /* ============================================================
-   Ch14 — quiz + glossary
+   Ch17 — quiz + glossary
    ============================================================ */
 function initQuiz() {
   const root = $('#quiz'); if (!root) return;
@@ -948,7 +1238,7 @@ function initQuiz() {
 }
 
 /* ============================================================
-   Ch14 — Mem0: the extract/update pipeline, then retrieval
+   Ch15 — Mem0: the extract/update pipeline, then retrieval
    ============================================================ */
 function applyOp(store, op) {
   if (op.op === 'ADD')    store.push({ mem: op.mem, cat: op.cat, fresh: true });
@@ -1120,7 +1410,7 @@ function tabs(row, target, items) {
 }
 
 /* ============================================================
-   Ch15 — Data Formulator: shelves + prompt -> generated transform
+   Ch16 — Data Formulator: shelves + prompt -> generated transform
    ============================================================ */
 function initDf() {
   const table = $('#df-table');
@@ -1286,10 +1576,467 @@ function initDf() {
   $('#df-code').textContent = 'Fill in a shelf or pick an example ask.';
 }
 
+
+/* ============================================================
+   Ch11 — advanced RAG.
+   One retrieval engine, three demos on top of it. The engine is
+   deliberately real: BM25 is BM25, RRF is RRF. Only the embeddings
+   are hand-written (C.arCorpus[].con), because shipping a 400MB
+   model to teach one idea would be silly.
+   ============================================================ */
+const AR = (function () {
+  const stop = new Set(C.arStop);
+  /* plural-only stemmer — enough to make "refunds" match "refund",
+     which is exactly the class of bug that makes people blame the LLM */
+  const stem = w => (w.length > 3 && !/(ss|us)$/.test(w))
+    ? (/ies$/.test(w) ? w.slice(0, -3) + 'y' : w.replace(/s$/, ''))
+    : w;
+  const tok = s => (String(s).toLowerCase().match(/[a-z0-9][a-z0-9-]*/g) || [])
+    .filter(w => !stop.has(w)).map(stem);
+
+  const docs = C.arCorpus;
+  const dtok = docs.map(d => tok(d.t));
+  const N = docs.length;
+  const avgdl = dtok.reduce((a, t) => a + t.length, 0) / N;
+  const df = {};
+  dtok.forEach(t => new Set(t).forEach(w => { df[w] = (df[w] || 0) + 1; }));
+
+  function cos(a, b) {
+    let dot = 0, na = 0, nb = 0;
+    for (const k in a) { na += a[k] * a[k]; if (b[k]) dot += a[k] * b[k]; }
+    for (const k in b) nb += b[k] * b[k];
+    return (na && nb) ? dot / Math.sqrt(na * nb) : 0;
+  }
+  function bm25(qt, i) {
+    const t = dtok[i], k1 = 1.2, b = 0.75;
+    let s = 0;
+    qt.forEach(w => {
+      const f = t.filter(x => x === w).length;
+      if (!f) return;
+      const idf = Math.log(1 + (N - df[w] + 0.5) / (df[w] + 0.5));
+      s += idf * (f * (k1 + 1)) / (f + k1 * (1 - b + b * t.length / avgdl));
+    });
+    return s;
+  }
+  /* MaxSim: every query token finds its best partner in the document.
+     C.arTokenCon stands in for the per-token vectors. */
+  function tokSim(a, b) {
+    if (a === b) return 1;
+    const ca = C.arTokenCon[a], cb = C.arTokenCon[b];
+    if (!ca || !cb) return 0;
+    const inter = ca.filter(x => cb.indexOf(x) >= 0).length;
+    if (!inter) return 0;
+    const uni = {}; ca.concat(cb).forEach(x => { uni[x] = 1; });
+    return inter / Object.keys(uni).length;
+  }
+  function late(qt, i) {
+    if (!qt.length) return 0;
+    return qt.reduce((a, w) =>
+      a + dtok[i].reduce((m, d) => Math.max(m, tokSim(w, d)), 0), 0) / qt.length;
+  }
+  const rank = scores => scores.map((s, i) => ({ i: i, s: s }))
+    .filter(x => x.s > 0).sort((a, b) => b.s - a.s || a.i - b.i);
+
+  function lanes(q) {
+    const qt = tok(q.q);
+    return {
+      dense:  rank(docs.map(d => cos(q.con, d.con))),
+      sparse: rank(docs.map((d, i) => bm25(qt, i))),
+      late:   rank(docs.map((d, i) => late(qt, i)))
+    };
+  }
+  /* Reciprocal rank fusion. No score normalisation, which is the whole
+     point: BM25 returns 3.1 and cosine returns 0.94 and they are not
+     comparable. Ranks are. */
+  function rrf(lists, k) {
+    const acc = {};
+    lists.forEach((l, li) => l.forEach((x, r) => {
+      const e = acc[x.i] || (acc[x.i] = { i: x.i, s: 0, parts: [] });
+      e.s += 1 / (k + r + 1);
+      e.parts.push({ list: li, rank: r + 1, c: 1 / (k + r + 1) });
+    }));
+    return Object.keys(acc).map(i => acc[i]).sort((a, b) => b.s - a.s || a.i - b.i);
+  }
+  /* Naive alternative: paste the lists together, dedupe, keep first seen.
+     Shown in the demo so the RRF column has something to beat. */
+  function concat(lists) {
+    const seen = {}, out = [];
+    const depth = lists.reduce((m, l) => Math.max(m, l.length), 0);
+    for (let r = 0; r < depth; r++)
+      lists.forEach(l => {
+        if (!l[r] || seen[l[r].i]) return;
+        seen[l[r].i] = 1; out.push({ i: l[r].i, s: 0, parts: [] });
+      });
+    return out;
+  }
+  /* A cross-encoder reads the query and the chunk together and scores the
+     pair. We approximate that with the human judgement — but only over the
+     candidates retrieval already returned. That cap is the lesson. */
+  function rerank(cands, gold) {
+    return cands.map((c, r) => ({ i: c.i, s: c.s, g: gold[docs[c.i].id] || 0, r: r }))
+      .sort((a, b) => b.g - a.g || a.r - b.r);
+  }
+  const goldIds = gold => Object.keys(gold);
+  function recall(list, gold) {
+    const ids = list.map(x => docs[x.i].id);
+    const g = goldIds(gold);
+    return g.filter(id => ids.indexOf(id) >= 0).length / g.length;
+  }
+  function mrr(list, gold) {
+    for (let i = 0; i < list.length; i++)
+      if (gold[docs[list[i].i].id]) return 1 / (i + 1);
+    return 0;
+  }
+  return { tok: tok, docs: docs, lanes: lanes, rrf: rrf, concat: concat,
+           rerank: rerank, recall: recall, mrr: mrr };
+})();
+
+/* renders one ranked list; `max` scales the bars, `gold` marks the winners */
+function arList(list, opts) {
+  const o = opts || {};
+  if (!list.length) return '<div class="hyb-empty">nothing matched — this lane returned zero rows</div>';
+  const max = list.reduce((m, x) => Math.max(m, x.s), 0) || 1;
+  return list.slice(0, o.top || 4).map((x, r) => {
+    const d = AR.docs[x.i];
+    const g = o.gold ? (o.gold[d.id] || 0) : 0;
+    return '<div class="hyb-row' + (g ? ' gold' : '') + '" style="animation-delay:' + (r * 60) + 'ms">' +
+      '<span class="hyb-rank">' + (r + 1) + '</span>' +
+      '<span class="hyb-id">' + d.id + '</span>' +
+      '<span class="hyb-src">' + d.src + '</span>' +
+      (g ? '<span class="hyb-g">relevant · ' + g + '</span>' : '') +
+      '<span class="hyb-bar"><i style="width:' + Math.round(x.s / max * 100) + '%"></i></span>' +
+      '<span class="hyb-s">' + (o.dp === 4 ? x.s.toFixed(4) : x.s.toFixed(2)) + '</span>' +
+      '</div>';
+  }).join('');
+}
+
+/* ---------- Ch11a: hybrid retrieval lab ---------- */
+function initHybrid() {
+  const laneBox = $('#hyb-lanes'); if (!laneBox) return;
+  const on = { dense: true, sparse: true, late: true };
+  let rerankOn = true, qi = 0, timers = [];
+
+  /* pipeline strip */
+  const pipe = $('#hyb-pipe');
+  pipe.innerHTML = C.arSteps.map(s => '<div class="rp"><b>' + s.b + '</b><small>' + s.s + '</small></div>')
+    .join('<div class="arch-sep">&rarr;</div>');
+  const stages = $$('.rp', pipe);
+
+  /* lane cards */
+  laneBox.innerHTML = C.arLanes.map(l =>
+    '<div class="hyb-lane" data-l="' + l.id + '" style="--lane:' + l.c + '">' +
+      '<div class="hyb-lane-head">' +
+        '<span class="toggle-box">&#10003;</span>' +
+        '<div><b>' + l.n + '</b><small>' + l.s + '</small></div>' +
+      '</div>' +
+      '<div class="hyb-lane-body"><div class="hyb-list" id="hyb-list-' + l.id + '"></div></div>' +
+      '<div class="hyb-lane-foot"><span class="pill good">' + l.good + '</span>' +
+      '<span class="pill bad">' + l.bad + '</span></div>' +
+    '</div>').join('');
+  $$('.hyb-lane', laneBox).forEach(card => {
+    card.onclick = e => {
+      if (e.target.closest('.hyb-row')) return;
+      const id = card.dataset.l;
+      if (on[id] && Object.keys(on).filter(k => on[k]).length === 1) return; // never zero lanes
+      on[id] = !on[id];
+      run();
+    };
+  });
+
+  /* query chips */
+  C.arQueries.forEach((q, i) => {
+    const b = el('button', 'chip' + (i === 0 ? ' active' : ''), q.q);
+    b.onclick = () => {
+      $$('.chip', $('#hyb-queries')).forEach(c => c.classList.remove('active'));
+      b.classList.add('active'); qi = i; run();
+    };
+    $('#hyb-queries').appendChild(b);
+  });
+
+  const rrBtn = $('#hyb-rerank');
+  rrBtn.onclick = () => { rerankOn = !rerankOn; run(); };
+
+  function run() {
+    timers.forEach(clearTimeout); timers = [];
+    const q = C.arQueries[qi];
+    const L = AR.lanes(q);
+    const active = C.arLanes.filter(l => on[l.id]);
+    const lists = active.map(l => L[l.id]);
+    const fused = AR.rrf(lists, 60);
+    const cands = fused.slice(0, 5);
+    const final = (rerankOn ? AR.rerank(cands, q.gold) : cands).slice(0, 3);
+
+    $$('.hyb-lane', laneBox).forEach(c => c.classList.toggle('off', !on[c.dataset.l]));
+    rrBtn.classList.toggle('on', rerankOn);
+    stages.forEach(s => s.classList.remove('lit', 'done'));
+    C.arLanes.forEach(l => { $('#hyb-list-' + l.id).innerHTML = ''; });
+    $('#hyb-fused').innerHTML = '';
+    $('#hyb-final').innerHTML = '';
+    $('#hyb-stats').innerHTML = '';
+    $('#hyb-note').innerHTML = '';
+
+    const at = (i, fn) => timers.push(setTimeout(() => {
+      stages.forEach(x => x.classList.remove('lit'));
+      stages[i].classList.add('lit', 'done');
+      fn();
+    }, i * 520));
+
+    at(0, () => {});
+    at(1, () => {});
+    at(2, () => C.arLanes.forEach(l => {
+      $('#hyb-list-' + l.id).innerHTML = on[l.id]
+        ? arList(L[l.id], { gold: q.gold })
+        : '<div class="hyb-empty">lane off</div>';
+    }));
+    at(3, () => { $('#hyb-fused').innerHTML = arList(fused, { gold: q.gold, top: 5, dp: 4 }); });
+    at(4, () => {
+      $('#hyb-final').innerHTML = rerankOn
+        ? final.map((x, r) => {
+            const d = AR.docs[x.i];
+            const g = q.gold[d.id] || 0;
+            return '<div class="hyb-row' + (g ? ' gold' : '') + '" style="animation-delay:' + (r * 70) + 'ms">' +
+              '<span class="hyb-rank">' + (r + 1) + '</span><span class="hyb-id">' + d.id + '</span>' +
+              '<span class="hyb-src">' + d.src + '</span>' +
+              '<span class="hyb-g">judge ' + g + '/3</span>' +
+              '<span class="hyb-moved">' + (x.r === r ? '—' : (x.r > r ? '&uarr;' + (x.r - r) : '&darr;' + (r - x.r))) + '</span>' +
+              '</div>';
+          }).join('')
+        : '<div class="hyb-empty">reranker off — the prompt gets the fused top 3 as-is</div>' +
+          arList(cands.slice(0, 3), { gold: q.gold, top: 3, dp: 4 });
+    });
+    at(5, () => {
+      const rc = AR.recall(cands, q.gold), rm = AR.mrr(final, q.gold);
+      const bestLane = C.arLanes.map(l => ({ n: l.n, m: AR.mrr(L[l.id].slice(0, 3), q.gold) }))
+        .sort((a, b) => b.m - a.m)[0];
+      $('#hyb-stats').innerHTML =
+        stat('recall of candidates', Math.round(rc * 100) + '%') +
+        stat('MRR of the prompt', rm.toFixed(2)) +
+        stat('lanes on', String(active.length)) +
+        stat('chunks in prompt', String(final.length));
+      const missed = Object.keys(q.gold).filter(id =>
+        cands.every(c => AR.docs[c.i].id !== id));
+      $('#hyb-note').innerHTML =
+        '<b>' + q.lesson + '</b>' +
+        (missed.length
+          ? '<div class="hyb-warn">⚠ ' + missed.join(', ') + ' never reached the candidate list. ' +
+            'The reranker cannot see it, so it cannot fix it. <b>Recall is the ceiling.</b></div>'
+          : '<div class="hyb-ok">✓ every relevant chunk reached the reranker. Best single lane here: <b>' +
+            bestLane.n + '</b> — hybrid matched or beat it without you having to know which one in advance.</div>');
+      timers.push(setTimeout(() => stages[5].classList.remove('lit'), 500));
+      xp(3, null);
+    });
+  }
+  function stat(k, v) { return '<div class="stat"><div class="stat-v">' + v + '</div><div class="stat-k">' + k + '</div></div>'; }
+
+  run();
+}
+
+/* ---------- Ch11b: RAG-Fusion — multi-query + RRF ---------- */
+function initRagFusion() {
+  const fan = $('#rrf-fan'); if (!fan) return;
+  const F = C.arFusion;
+  const queries = [{ q: F.q, con: F.con, orig: true }].concat(F.variants);
+  let k = 60, mode = 'rrf', timers = [];
+
+  fan.innerHTML =
+    '<div class="fan-q">' + F.q + '<small>what the user typed</small></div>' +
+    '<div class="fan-gen">LLM rewrites it 4 ways</div>' +
+    '<div class="fan-cols">' + queries.map((q, i) =>
+      '<div class="fan-col" data-i="' + i + '">' +
+        '<div class="fan-col-q">' + (q.orig ? '<span class="fan-tag">original</span>' : '<span class="fan-tag alt">variant ' + i + '</span>') + q.q + '</div>' +
+        '<div class="fan-list" id="rrf-col-' + i + '"></div>' +
+      '</div>').join('') + '</div>';
+
+  const kIn = $('#rrf-k'), kOut = $('#rrf-kv');
+  kIn.oninput = () => { k = +kIn.value; kOut.textContent = k; run(); };
+  $('#rrf-mode').onclick = () => { mode = mode === 'rrf' ? 'concat' : 'rrf'; run(); };
+  $('#rrf-run').onclick = () => run(true);
+
+  function run(animate) {
+    timers.forEach(clearTimeout); timers = [];
+    const lists = queries.map(q => AR.rrf(
+      [AR.lanes(q).dense, AR.lanes(q).sparse, AR.lanes(q).late], 60).slice(0, 5));
+    const fused = mode === 'rrf' ? AR.rrf(lists, k) : AR.concat(lists);
+    const solo  = lists[0];
+
+    $('#rrf-mode').classList.toggle('on', mode === 'rrf');
+    $('#rrf-mode').querySelector('b').textContent =
+      mode === 'rrf' ? 'Reciprocal rank fusion' : 'Just concatenate the lists';
+    kIn.disabled = mode !== 'rrf';
+
+    queries.forEach((q, i) => { $('#rrf-col-' + i).innerHTML = ''; });
+    $('#rrf-table').innerHTML = '';
+    $('#rrf-final').innerHTML = '';
+
+    const paintCols = () => queries.forEach((q, i) => {
+      const put = () => { $('#rrf-col-' + i).innerHTML = lists[i].map((x, r) =>
+        '<div class="fan-hit' + (F.gold[AR.docs[x.i].id] ? ' gold' : '') + '">' +
+        '<span>' + (r + 1) + '</span>' + AR.docs[x.i].id + '</div>').join(''); };
+      if (animate) timers.push(setTimeout(put, i * 260)); else put();
+    });
+    paintCols();
+
+    const rest = () => {
+      /* the arithmetic, spelled out — this is the whole algorithm */
+      if (mode === 'rrf') {
+        const rows = fused.slice(0, 6);
+        $('#rrf-table').innerHTML =
+          '<table class="dt rrf-dt"><thead><tr><th>chunk</th>' +
+          queries.map((q, i) => '<th>' + (i ? 'v' + i : 'orig') + '</th>').join('') +
+          '<th>score</th></tr></thead><tbody>' +
+          rows.map((x, ri) => '<tr style="animation-delay:' + (ri * 70) + 'ms"><td class="mono">' +
+            AR.docs[x.i].id + (F.gold[AR.docs[x.i].id] ? ' <span class="hyb-g">gold</span>' : '') + '</td>' +
+            queries.map((q, li) => {
+              const p = x.parts.filter(pp => pp.list === li)[0];
+              return '<td>' + (p ? '<span class="rrf-r">#' + p.rank + '</span><br><span class="rrf-c">' +
+                p.c.toFixed(4) + '</span>' : '<span class="rrf-miss">—</span>') + '</td>';
+            }).join('') +
+            '<td class="mono rrf-tot">' + x.s.toFixed(4) + '</td></tr>').join('') +
+          '</tbody></table>' +
+          '<div class="rrf-formula">score(d) = &Sigma;<sub>lists</sub> 1 / (k + rank) &nbsp; with k = ' + k +
+          ' &nbsp;·&nbsp; no score normalisation, because BM25 returns 3.1 and cosine returns 0.94 and those numbers mean nothing to each other</div>';
+      } else {
+        $('#rrf-table').innerHTML =
+          '<div class="rrf-formula warn">Concatenating keeps whatever the first list said and gives every later ' +
+          'list zero say. Rank 1 from a bad variant outranks rank 2 from four good ones. That is why fusion needs ' +
+          'the reciprocal-rank sum, not a merge.</div>';
+      }
+
+      const cmp = (title, list) =>
+        '<div class="rrf-col"><div class="lab-pane-title">' + title + '</div>' +
+        list.slice(0, 4).map((x, r) =>
+          '<div class="hyb-row' + (F.gold[AR.docs[x.i].id] ? ' gold' : '') + '" style="animation-delay:' + (r * 70) + 'ms">' +
+          '<span class="hyb-rank">' + (r + 1) + '</span><span class="hyb-id">' + AR.docs[x.i].id + '</span>' +
+          '<span class="hyb-src">' + AR.docs[x.i].src + '</span></div>').join('') + '</div>';
+      /* the question has two root causes; the only score that matters is
+         whether both of them made it into the two chunks the model reads */
+      const causes = Object.keys(F.gold).filter(id => F.gold[id] === 3);
+      const at2 = l => l.slice(0, 2).filter(x => causes.indexOf(AR.docs[x.i].id) >= 0).length;
+      $('#rrf-final').innerHTML =
+        cmp('Original query alone · ' + at2(solo) + '/' + causes.length + ' root causes in the top 2', solo) +
+        cmp((mode === 'rrf' ? 'After RRF' : 'After concatenation') + ' · ' +
+            at2(fused) + '/' + causes.length + ' root causes in the top 2', fused) +
+        '<div class="rrf-note">' + F.note + '</div>';
+      xp(3, null);
+    };
+    if (animate) timers.push(setTimeout(rest, queries.length * 260 + 200)); else rest();
+  }
+
+  kOut.textContent = k;
+  run();
+}
+
+/* ---------- Ch11c: what "good RAG" measures ---------- */
+function initRagEval() {
+  const svg = $('#rev-svg'); if (!svg) return;
+  const NS = 'http://www.w3.org/2000/svg';
+  const R = 78, CX = 110, CY = 110, CIRC = 2 * Math.PI * R;
+  const fams = C.arEvalFamilies;
+  const seg = CIRC / fams.length, gap = 10;
+  let run = C.arEvalRuns[0], picked = null;
+
+  fams.forEach((f, i) => {
+    const rot = i * 90 - 90;
+    const mk = (cls, len, w, col, op) => {
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', CX); c.setAttribute('cy', CY); c.setAttribute('r', R);
+      c.setAttribute('fill', 'none'); c.setAttribute('stroke', col);
+      c.setAttribute('stroke-width', w); c.setAttribute('stroke-linecap', 'round');
+      c.setAttribute('stroke-dasharray', len + ' ' + (CIRC - len));
+      c.setAttribute('transform', 'rotate(' + rot + ' ' + CX + ' ' + CY + ')');
+      if (op != null) c.setAttribute('opacity', op);
+      c.setAttribute('class', cls);
+      svg.appendChild(c); return c;
+    };
+    mk('rev-track', seg - gap, 14, 'rgba(255,255,255,.07)');
+    const fg = mk('rev-arc', 0, 14, f.c);
+    fg.dataset.f = f.id;
+    fg.style.transition = 'stroke-dasharray .7s cubic-bezier(.4,0,.2,1)';
+    const hit = mk('rev-hit', seg - gap, 22, 'transparent');
+    hit.style.cursor = 'pointer';
+    hit.onclick = () => { picked = picked === f.id ? null : f.id; paint(); };
+
+    const a = (rot + (seg - gap) / 2 / CIRC * 360) * Math.PI / 180;
+    const t = document.createElementNS(NS, 'text');
+    t.setAttribute('x', CX + Math.cos(a) * (R + 26));
+    t.setAttribute('y', CY + Math.sin(a) * (R + 26));
+    t.setAttribute('text-anchor', 'middle'); t.setAttribute('class', 'rev-lab');
+    t.textContent = f.n;
+    svg.appendChild(t);
+  });
+  const mid = document.createElementNS(NS, 'text');
+  mid.setAttribute('x', CX); mid.setAttribute('y', CY + 4);
+  mid.setAttribute('text-anchor', 'middle'); mid.setAttribute('class', 'rev-mid');
+  svg.appendChild(mid);
+  const mid2 = document.createElementNS(NS, 'text');
+  mid2.setAttribute('x', CX); mid2.setAttribute('y', CY + 22);
+  mid2.setAttribute('text-anchor', 'middle'); mid2.setAttribute('class', 'rev-mid2');
+  mid2.textContent = 'weakest family';
+  svg.appendChild(mid2);
+
+  C.arEvalRuns.forEach((r, i) => {
+    const b = el('button', 'chip' + (i === 0 ? ' active' : ''), r.n);
+    b.onclick = () => {
+      $$('.chip', $('#rev-runs')).forEach(c => c.classList.remove('active'));
+      b.classList.add('active'); run = r; paint(); xp(2, null);
+    };
+    $('#rev-runs').appendChild(b);
+  });
+
+  const avg = f => f.metrics.reduce((a, m) => a + run.vals[m.k], 0) / f.metrics.length;
+
+  function paint() {
+    const scores = fams.map(f => ({ f: f, v: avg(f) }));
+    const worst = scores.slice().sort((a, b) => a.v - b.v)[0];
+    $$('.rev-arc', svg).forEach((arc, i) => {
+      const v = scores[i].v;
+      arc.setAttribute('stroke-dasharray', (seg - gap) * v + ' ' + (CIRC - (seg - gap) * v));
+      arc.classList.toggle('weak', worst.f.id === fams[i].id && worst.v < 0.6);
+      arc.setAttribute('opacity', picked && picked !== fams[i].id ? .28 : 1);
+    });
+    mid.textContent = worst.f.n;
+    mid.setAttribute('fill', worst.v < 0.6 ? '#fb7185' : '#34d399');
+    mid2.textContent = worst.v < 0.6 ? 'weakest: ' + Math.round(worst.v * 100) + '%' : 'all families ≥ 60%';
+
+    $('#rev-bars').innerHTML = fams.map(f =>
+      '<div class="rev-fam' + (picked && picked !== f.id ? ' dimmed' : '') + '" style="--fc:' + f.c + '">' +
+      '<div class="rev-fam-h"><b>' + f.n + '</b><span>' + Math.round(avg(f) * 100) + '%</span></div>' +
+      f.metrics.map((m, mi) => {
+        const v = run.vals[m.k];
+        return '<div class="rev-bar" title="' + m.d.replace(/"/g, '') + '">' +
+          '<span class="rev-bar-n">' + m.n + '</span>' +
+          '<span class="rev-bar-t"><i style="width:' + (v * 100) + '%;transition-delay:' + (mi * 60) + 'ms' +
+          (v < .5 ? ';background:var(--red)' : '') + '"></i></span>' +
+          '<span class="rev-bar-v">' + v.toFixed(2) + '</span></div>';
+      }).join('') +
+      (picked === f.id
+        ? '<div class="rev-why">' + f.why + '<ul>' +
+          f.metrics.map(m => '<li><b>' + m.n + '</b> — ' + m.d + '</li>').join('') + '</ul></div>'
+        : '') +
+      '</div>').join('');
+
+    /* the lowest ring is where you notice the problem; run.root is where it
+       actually happens. On a hallucinating run those are different families,
+       and confusing them is how teams end up tuning retrieval for a prompt bug. */
+    const rootFam = fams.filter(f => f.id === run.root)[0];
+    $('#rev-verdict').innerHTML =
+      '<div class="rev-v-row"><span class="rev-v-k">weakest ring</span><b>' + worst.f.n +
+        '</b><span class="rev-v-k">root cause</span><b class="' +
+        (rootFam && rootFam.id !== worst.f.id ? 'rev-v-diff' : '') + '">' +
+        (rootFam ? rootFam.n : 'nothing — this one is healthy') + '</b></div>' +
+      '<div class="rev-v-t">' + run.verdict + '</div>' +
+      '<div class="rev-v-f"><b>What to do:</b> ' + run.fix + '</div>';
+  }
+
+  $('#rev-hint').textContent = 'Click a ring segment to read what its metrics actually mean.';
+  paint();
+  tabs($('#rev-code-tabs'), $('#rev-codeblk'), C.arEvalCode);
+}
+
 /* ---------- boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   [initBackground, initGuess, initTokenizer, initEmbeddings, initAttention, initSampler,
-   initTraining, initLab, initContext, initRag, initDecider, initAgent, initHalluc,
-   initShip, initMem0, initDf, initQuiz].forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
+   initSpeed, initTraining, initLab, initContext, initRag, initDecider, initAgent, initHalluc,
+   initShip, initMem0, initDf, initHybrid, initRagFusion, initRagEval, initQuiz].forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 });
 })();

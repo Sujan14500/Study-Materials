@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ML Fundamentals — Machine Learning, Visually</title>
+<meta name="description" content="An interactive, animated course on machine learning fundamentals: fit a line by hand, watch gradient descent diverge, drag a threshold across a confusion matrix, and overfit a curve on purpose.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<canvas id="bg-particles" class="bg-particles" aria-hidden="true"></canvas>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark"><span>📈</span></div>
+    <div>
+      <div class="brand-name">ML Fundamentals</div>
+      <div class="brand-sub">fit, evaluate, don't fool yourself</div>
+    </div>
+  </div>
+
+  <div class="progress-block">
+    <div class="progress-top">
+      <span>Progress</span><span id="progress-label">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="xp-row">
+      <span class="xp-badge" id="xp-badge">0 XP</span>
+      <button class="reset-btn" id="reset-btn" title="Clear saved progress">reset</button>
+    </div>
+  </div>
+
+  <nav class="chapter-nav" id="chapter-nav" aria-label="Chapters"></nav>
+
+  <div class="sidebar-foot">
+    <kbd>&larr;</kbd><kbd>&rarr;</kbd> to navigate
+  </div>
+</aside>
+
+<button class="menu-toggle" id="menu-toggle" aria-label="Toggle chapters">&#9776;</button>
+
+<!-- ============ MAIN ============ -->
+<main class="main" id="main">
+<div class="stage" id="stage">
+
+<!-- ============================================================= -->
+<!-- 0. WELCOME                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="welcome" data-title="Welcome" data-icon="&#10022;" data-group="Start here">
+  <div class="hero">
+    <div class="hero-tag">interactive course · real maths · no server</div>
+    <h1 class="hero-title">How <span class="grad">machine learning</span><br>actually works</h1>
+    <p class="hero-sub">
+      Thirteen chapters. Drag a line until the error stops dropping, then let least squares beat you.
+      Turn the learning rate up until training explodes. Slide a threshold and watch precision and recall
+      trade places. Every number on screen is <b>computed live</b> from the data you can see.
+    </p>
+
+    <div class="hero-anim">
+      <svg viewBox="0 0 640 180" class="flow-svg" id="hero-flow">
+        <defs>
+          <linearGradient id="gradFlow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#7c5cff"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#34d399"/>
+          </linearGradient>
+        </defs>
+        <path id="flow-path" d="M40,90 C170,20 250,160 380,90 S560,40 600,90" fill="none" stroke="url(#gradFlow)" stroke-width="2" stroke-dasharray="6 6" opacity=".45"/>
+        <g id="hero-nodes"></g>
+        <circle r="6" fill="#fff"><animateMotion dur="4s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#22d3ee"><animateMotion dur="4s" begin="1.3s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#7c5cff"><animateMotion dur="4s" begin="2.6s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+      </svg>
+      <div class="hero-flow-labels">
+        <span>data</span><span>split</span><span>fit</span><span>evaluate</span><span>ship</span>
+      </div>
+    </div>
+
+    <div class="hero-cards">
+      <div class="hcard"><div class="hcard-ico">🎛️</div><h4>Fit it yourself</h4><p>Sliders for slope and intercept, live MSE, and a button that solves it exactly.</p></div>
+      <div class="hcard"><div class="hcard-ico">💥</div><h4>Break it on purpose</h4><p>Push the learning rate past stable and watch the loss go to infinity.</p></div>
+      <div class="hcard"><div class="hcard-ico">🩸</div><h4>Spot the leak</h4><p>Four leakage bugs that produce 99% accuracy and a model that fails in production.</p></div>
+    </div>
+
+    <button class="btn btn-lg" data-goto="next">Start the course <span class="arr">&rarr;</span></button>
+    <p class="hero-note">Progress saves in your browser. Close the tab, come back, keep going.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 1. WHAT IS ML                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="what" data-title="What is ML?" data-icon="1" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 1 · Foundations</div>
+    <h2>Learning the rule instead of <span class="grad">writing</span> it</h2>
+    <p class="lead">Traditional software: you write the rule, the computer applies it. Machine learning: you supply examples of input and output, and the computer works out a rule that fits them. That is the entire difference — and it is only worth it when the rule is too complicated, too fuzzy or too fast-changing to write by hand.</p>
+  </header>
+
+  <div class="three-up" id="ml-kinds"></div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🤔 Should this even be ML?</h3><span class="panel-tag">quiz</span></div>
+    <p class="panel-sub">The most valuable ML skill is knowing when not to use it. Five real problems — pick before you look.</p>
+    <div id="rules-ml"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">⚖️</div>
+    <div><b>The honest trade.</b> A rule is exact, instant, auditable and free. A model handles complexity no human could enumerate, but it is approximate, needs data, degrades quietly as the world changes, and is hard to explain. Reach for a model when the rule genuinely cannot be written — not because models are more interesting.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Supervised = examples with answers. Unsupervised = structure without answers. Reinforcement = learning from reward.</li>
+      <li>ML pays off where the rule is unwritable, the data already exists, and mistakes are survivable.</li>
+      <li>If a five-line <span class="mono">if</span> statement is exactly right, ship the <span class="mono">if</span> statement.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 2. DATA & SPLITS                                              -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="data" data-title="Data &amp; splits" data-icon="2" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 2 · Foundations</div>
+    <h2>Split it before you <span class="grad">touch</span> it</h2>
+    <p class="lead">A model's score on data it trained on measures memory, not intelligence. The only honest number comes from data the model has never seen — which is why the split happens first, before scaling, before imputing, before you have even looked at the distributions.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>✂️ Train / validation / test</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Rough proportions — 60/20/20 is a common default, not a law. With a million rows, 98/1/1 is fine.</p>
+    <div id="split-demo"></div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">🩸</div>
+    <div><b>Data leakage is the number one reason a model looks great and then fails.</b> It is information reaching the model that it will not have at prediction time. It never shows up as an error — it shows up as a suspiciously good score. Whenever a result looks too good, look for the leak before you celebrate.</div>
+  </div>
+
+  <div id="leak-cards"></div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Split first. Everything you fit — scalers, imputers, encoders — learns from the training split only.</li>
+      <li>Touch the test set once. Each extra look converts it into a validation set.</li>
+      <li>Time-ordered data splits on time. Grouped data splits on the group.</li>
+      <li>An unexpectedly great score is a bug report, not a result.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 3. LINEAR REGRESSION                                          -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="regression" data-title="Linear regression" data-icon="3" data-group="Learning">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 3 · Learning</div>
+    <h2>Draw the line, <span class="grad">measure</span> the miss</h2>
+    <p class="lead">The simplest useful model: <span class="mono">y = wx + b</span>. Two numbers. Training means finding the pair that makes the total squared error as small as possible — and there is a closed-form answer, which is exactly why this is the right place to learn what "fitting" means.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📉 Fit it by hand</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">24 students. Move the sliders and watch the red residuals — the vertical misses that get squared and averaged into the loss. Get the MSE as low as you can, then press <b>Solve exactly</b>.</p>
+    <div class="reg-wrap">
+      <canvas id="reg-canvas" class="chart" height="330"></canvas>
+      <div class="reg-side">
+        <label class="ctrl">slope <b>w</b> <span class="mono" id="reg-wv"></span>
+          <input type="range" id="reg-w" min="0" max="10" step="0.05" value="2"></label>
+        <label class="ctrl">intercept <b>b</b> <span class="mono" id="reg-bv"></span>
+          <input type="range" id="reg-b" min="20" max="70" step="0.5" value="55"></label>
+        <div class="metric-big"><span>mean squared error</span><b id="reg-mse">—</b></div>
+        <div class="score-wrap"><div class="score-bar"><div class="score-fill" id="reg-bar"></div></div></div>
+        <div class="reg-verdict mono" id="reg-verdict"></div>
+        <pre class="code" id="reg-eq"></pre>
+        <div class="btn-row">
+          <button class="btn" id="reg-solve">Solve exactly</button>
+          <button class="chip" id="reg-res">residuals</button>
+          <button class="btn btn-ghost" id="reg-reset">reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📐 The loss</h3></div>
+      <pre class="code">MSE = (1/n) Σ (yᵢ − (w·xᵢ + b))²</pre>
+      <p class="panel-sub">Squaring does two jobs: it makes misses in both directions count the same, and it punishes one big miss far more than several small ones. That second property is why least squares is sensitive to outliers — and why MAE (absolute error) is the alternative when your data has a few wild points you cannot remove.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🧮 Why a closed form exists</h3></div>
+      <pre class="code">w = Σ(xᵢ − x̄)(yᵢ − ȳ) / Σ(xᵢ − x̄)²
+b = ȳ − w·x̄</pre>
+      <p class="panel-sub">The MSE surface for a linear model is a smooth bowl with exactly one bottom, so calculus can solve it directly. Almost no other model is this kind. For everything else — and for linear models with millions of rows — you descend the surface instead, which is the next chapter.</p>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>A model is parameters plus a loss. Training is search for the parameters that minimise the loss.</li>
+      <li>Residuals are the errors. MSE averages their squares.</li>
+      <li>Linear regression has an exact solution; treat it as your baseline before anything fancier.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 4. GRADIENT DESCENT                                           -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="gradient" data-title="Gradient descent" data-icon="4" data-group="Learning">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 4 · Learning</div>
+    <h2>Walk <span class="grad">downhill</span>, carefully</h2>
+    <p class="lead">Nearly every model you will ever train is fitted by gradient descent: compute which way the loss decreases fastest, take a small step that way, repeat a few thousand times. The only real decision is how big the step is — and getting it wrong is the most common training failure there is.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏔️ Four learning rates, same data</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Same 24 points as the last chapter, same starting line. The dashed green line is the exact least-squares answer, so you can see how close descent gets. Try the last one.</p>
+    <div class="chip-row" id="gd-rates"></div>
+    <div class="gd-wrap">
+      <canvas id="gd-canvas" class="chart" height="300"></canvas>
+      <canvas id="gd-loss" class="chart" height="300"></canvas>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-k">step</span><span class="stat-v" id="gd-step">0</span></div>
+      <div class="stat"><span class="stat-k">loss</span><span class="stat-v" id="gd-mse">—</span></div>
+      <div class="stat"><span class="stat-k">parameters</span><span class="stat-v mono" id="gd-eq">—</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="gd-run">▶ Train</button>
+      <button class="btn btn-ghost" id="gd-step1">one step</button>
+      <button class="btn btn-ghost" id="gd-reset">reset</button>
+    </div>
+    <div class="stepper-say" id="gd-say"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>⚙️ The update rule</h3></div>
+      <pre class="code">for each step:
+    grad = ∂Loss/∂w          # which way is uphill
+    w    = w − lr * grad     # step the other way</pre>
+      <p class="panel-sub">That is it. The gradient points uphill, so you subtract. <span class="mono">lr</span> — the learning rate — scales the step. Everything else in modern optimisation (momentum, Adam, schedules) is refinement on this one line.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📦 Batch, mini-batch, stochastic</h3></div>
+      <ul class="fact-list">
+        <li><b>Batch</b> — use all n rows per step. Smooth, accurate, and impossible above a certain dataset size.</li>
+        <li><b>Stochastic</b> — one row per step. Very noisy, escapes shallow local minima, rarely used raw.</li>
+        <li><b>Mini-batch</b> — 32 to 512 rows. The universal default: enough signal to be stable, small enough to fit in memory and use the GPU well.</li>
+      </ul>
+      <p class="panel-sub">An <b>epoch</b> is one full pass over the data. With 10,000 rows and a batch of 100, one epoch is 100 steps.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">💥</div>
+    <div><b>Loss became NaN.</b> Nine times out of ten the learning rate is too high: each step overshoots the minimum by more than it started from, so the error grows geometrically until it overflows. Divide the learning rate by ten and try again. The other one time, you divided by zero or took the log of a negative number.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Gradient descent needs no closed form, so it trains models that have none.</li>
+      <li>Learning rate too low = never finishes. Too high = diverges. Watch the loss curve, not the clock.</li>
+      <li>A healthy loss curve drops steeply, then flattens. Flat from the start means something is wrong.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 5. CLASSIFICATION                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="classification" data-title="Classification" data-icon="5" data-group="Learning">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 5 · Learning</div>
+    <h2>A line that separates, not <span class="grad">predicts</span></h2>
+    <p class="lead">Regression predicts a number; classification predicts a class. Logistic regression does it by fitting the same linear score, then squashing it through a sigmoid into a probability between 0 and 1. The "decision boundary" is just the place where that probability crosses one half.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Train a boundary from scratch</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">53 users, two features. Press train and watch the boundary rotate into place over 600 gradient steps. Points circled in red are the ones the model still gets wrong — and some of them will never be fixable, because the classes genuinely overlap.</p>
+    <canvas id="clf-canvas" class="chart" height="380"></canvas>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-k">epoch</span><span class="stat-v" id="clf-ep">0</span></div>
+      <div class="stat"><span class="stat-k">accuracy</span><span class="stat-v" id="clf-acc">—</span></div>
+      <div class="stat"><span class="stat-k">errors</span><span class="stat-v" id="clf-wrong">—</span></div>
+      <div class="stat"><span class="stat-k">boundary</span><span class="stat-v mono" id="clf-eq">—</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="clf-run">▶ Train</button>
+      <button class="btn btn-ghost" id="clf-reset">reset</button>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🔗 From score to probability</h3></div>
+      <pre class="code">z = w₁x₁ + w₂x₂ + b        # a linear score
+p = 1 / (1 + e^−z)          # sigmoid → 0..1
+ŷ = 1 if p ≥ 0.5 else 0     # a threshold</pre>
+      <p class="panel-sub">The loss is <b>cross-entropy</b>, not MSE: it punishes confident wrong answers enormously and barely notices confident right ones, which is exactly the incentive you want on probabilities.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🚧 When a line is not enough</h3></div>
+      <ul class="fact-list">
+        <li><b>Add features</b> — <span class="mono">x², x₁x₂</span>. A line in the new space is a curve in the old one.</li>
+        <li><b>Kernel SVM</b> — the same trick, done implicitly and efficiently.</li>
+        <li><b>Trees</b> — carve the space into rectangles instead. No line required.</li>
+        <li><b>Neural networks</b> — learn the useful transformation rather than guessing it.</li>
+      </ul>
+      <p class="panel-sub">Try the linear model first. It tells you how much of the problem was easy.</p>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Logistic regression is linear regression plus a sigmoid and a different loss.</li>
+      <li>The output is a probability. The 0.5 cut-off is a separate choice — and Chapter 6 is about moving it.</li>
+      <li>Overlapping classes mean some errors are irreducible. Chasing 100% is how you overfit.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 6. EVALUATION                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="evaluation" data-title="Evaluation" data-icon="6" data-group="Judging">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 6 · Judging</div>
+    <h2>Accuracy is the <span class="grad">worst</span> metric you know</h2>
+    <p class="lead">A model that predicts "no fraud" for everything is 99.8% accurate on real fraud data and completely worthless. Which metric you choose is a statement about what a mistake costs — and since the two kinds of mistake rarely cost the same, one number is rarely enough.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎚️ Drag the threshold</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">22 held-out customers, each with the model's churn score. Filled dots really did churn; hollow ones did not. Move the threshold and watch every metric move with it.</p>
+    <div id="metrics-demo">
+      <div class="strip-wrap">
+        <div class="score-strip" id="score-strip"></div>
+        <div class="thr-marker" id="thr-marker"></div>
+        <div class="strip-ends"><span>score 0.0 — confident "stays"</span><span>confident "churns" — 1.0</span></div>
+      </div>
+      <label class="ctrl">threshold <span class="mono" id="thr-v">0.50</span>
+        <input type="range" id="thr" min="1" max="99" value="50"></label>
+      <div class="chip-row" id="thr-presets">
+        <button class="chip" data-t="20">catch everything (recall)</button>
+        <button class="chip" data-t="50">balanced</button>
+        <button class="chip" data-t="85">only when sure (precision)</button>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="cm">
+          <div class="cm-title">confusion matrix</div>
+          <div class="cm-grid">
+            <div class="cm-h"></div><div class="cm-h">predicted churn</div><div class="cm-h">predicted stay</div>
+            <div class="cm-h">actually churned</div>
+            <div class="cm-cell tp"><b id="m-tp">0</b><span>true positive</span></div>
+            <div class="cm-cell fn"><b id="m-fn">0</b><span>false negative — missed</span></div>
+            <div class="cm-h">actually stayed</div>
+            <div class="cm-cell fp"><b id="m-fp">0</b><span>false positive — false alarm</span></div>
+            <div class="cm-cell tn"><b id="m-tn">0</b><span>true negative</span></div>
+          </div>
+        </div>
+        <div class="mbars">
+          <div class="mbar"><span>precision</span><div class="score-bar"><div class="score-fill" id="m-prec-bar"></div></div><b id="m-prec">—</b></div>
+          <div class="mbar"><span>recall</span><div class="score-bar"><div class="score-fill cyan" id="m-rec-bar"></div></div><b id="m-rec">—</b></div>
+          <div class="mbar"><span>F1</span><div class="score-bar"><div class="score-fill green" id="m-f1-bar"></div></div><b id="m-f1">—</b></div>
+          <div class="mbar plain"><span>accuracy</span><b id="m-acc">—</b></div>
+          <div class="mbar plain"><span>ROC-AUC (threshold-free)</span><b id="m-auc">—</b></div>
+        </div>
+      </div>
+      <div class="roc-wrap">
+        <canvas id="roc-canvas" class="chart" height="270"></canvas>
+        <div class="roc-note">
+          <h4>Reading the ROC curve</h4>
+          <p>Each point is one threshold. The amber dot is where yours currently sits. Sliding the threshold walks you along the curve — you cannot leave it.</p>
+          <p>The diagonal is random guessing. Area under the curve is the probability that a random churner scores above a random non-churner, which is why <b>AUC does not move when you move the threshold</b>.</p>
+        </div>
+      </div>
+      <div class="stepper-say" id="m-say"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Which metric for which job?</h3><span class="panel-tag">quiz</span></div>
+    <div id="metric-pick"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Read the confusion matrix before any summary number. The two error types are different problems.</li>
+      <li>Precision = of what you flagged, how much was right. Recall = of what was real, how much you caught.</li>
+      <li>The threshold is a business decision, not a modelling one. Pick it from the cost of each mistake.</li>
+      <li>AUC judges the ranking, independent of threshold. Use it to compare models; use precision/recall to ship one.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 7. OVERFITTING                                                -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="overfitting" data-title="Overfitting" data-icon="7" data-group="Judging">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 7 · Judging</div>
+    <h2>The model that memorised the <span class="grad">noise</span></h2>
+    <p class="lead">Give a model enough flexibility and it will fit your training data perfectly, including the random measurement error in it. That fit is worthless — the noise will be different next time. This is the central tension in all of machine learning, and you can watch it happen in one slider.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎚️ Turn the complexity up</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">14 training points (filled) and 30 held-out test points (hollow), sampled from <span class="mono" id="poly-true"></span> plus noise. Each degree is a real least-squares fit computed in your browser.</p>
+    <div class="of-wrap">
+      <canvas id="of-canvas" class="chart" height="320"></canvas>
+      <canvas id="of-curve" class="chart" height="320"></canvas>
+    </div>
+    <label class="ctrl">polynomial degree <span class="mono" id="of-deg-v">3</span>
+      <input type="range" id="of-deg" min="1" max="9" step="1" value="3"></label>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-k">train error</span><span class="stat-v cyan" id="of-tr">—</span></div>
+      <div class="stat"><span class="stat-k">test error</span><span class="stat-v green" id="of-te">—</span></div>
+      <div class="stat"><span class="stat-k">gap</span><span class="stat-v" id="of-gap">—</span></div>
+      <div class="stat"><span class="stat-k">best degree</span><span class="stat-v amber" id="of-best">—</span></div>
+    </div>
+    <div class="of-verdict" id="of-verdict"></div>
+    <div class="stepper-say" id="of-note"></div>
+    <div class="btn-row"><button class="btn" id="of-best-btn">Jump to the sweet spot</button></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🩹 Fixing overfitting</h3></div>
+      <ul class="fact-list">
+        <li><b>More data</b> — the only fix that costs nothing in model quality. Noise averages out; signal does not.</li>
+        <li><b>Simpler model</b> — fewer parameters, shallower trees, lower degree.</li>
+        <li><b>Regularisation</b> — L2 shrinks weights toward zero, L1 drives some to exactly zero and does feature selection for free.</li>
+        <li><b>Early stopping</b> — halt when validation error starts climbing, not when training error stops falling.</li>
+        <li><b>Fewer features</b> — every extra column is another way to fit noise.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🩹 Fixing underfitting</h3></div>
+      <ul class="fact-list">
+        <li><b>A more flexible model</b> — higher degree, deeper trees, more layers.</li>
+        <li><b>Better features</b> — usually the biggest win on tabular data. Ratios, interactions, domain knowledge.</li>
+        <li><b>Less regularisation</b> — you may have clamped it too hard.</li>
+        <li><b>Train longer</b> — check the loss curve actually flattened before blaming the model.</li>
+      </ul>
+      <p class="panel-sub">More data does <b>not</b> fix underfitting. If the model cannot represent the shape, another million rows of that shape will not help.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">📊</div>
+    <div><b>Diagnose from two numbers.</b> Train error high, test error high → underfitting. Train error low, test error high → overfitting. Both low → you are done. Test error <i>lower</i> than train error → your split is broken, or the test set is unusually easy.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Complexity buys fit on training data and eventually sells generalisation to buy it.</li>
+      <li>Train error alone tells you nothing. The gap is the diagnostic.</li>
+      <li>The best model is the one where held-out error bottoms out, not where training error does.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 8. CROSS-VALIDATION                                           -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="cv" data-title="Cross-validation" data-icon="8" data-group="Judging">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 8 · Judging</div>
+    <h2>One split is a <span class="grad">single sample</span></h2>
+    <p class="lead">With 200 rows, a 20% test set is 40 rows — and its score swings by several points depending on which 40 you happened to draw. k-fold rotates the held-out block so every row is tested exactly once, and gives you a mean and a spread instead of one lucky number.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔁 Five folds</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Purple is training, green is held out. Watch the held-out block rotate through the dataset.</p>
+    <div id="cv-demo"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧭 Which flavour when</h3></div>
+    <div class="cvw" id="cv-when"></div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">🔁</div>
+    <div><b>Cross-validation is not a licence to peek.</b> If you tune hyper-parameters against your CV score and then report that same score, it is optimistic — you selected for it. Nested CV, or a final untouched test set, is what keeps the reported number honest.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>k-fold gives a mean <i>and</i> a standard deviation. The spread tells you whether a 1% difference is real.</li>
+      <li>The fold structure must respect the data's structure: stratify on class, group on entity, order on time.</li>
+      <li>Everything you fit goes inside the fold — scalers included, or you have leaked again.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 9. TREES & ENSEMBLES                                          -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="trees" data-title="Trees &amp; ensembles" data-icon="9" data-group="Models">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 9 · Models</div>
+    <h2>Twenty questions, chosen <span class="grad">greedily</span></h2>
+    <p class="lead">A decision tree asks a yes/no question about one feature, splits the data, and repeats. The only clever part is choosing the question — and it does that by brute force: try every threshold, keep the one that separates the classes best. Boosted versions of this are still the best thing on tabular data.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪓 Find the best split</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">20 customers, one feature: age. Green dots churned, purple stayed. The curve is the real Gini gain at every possible threshold — press <b>search</b> to watch the tree try them all.</p>
+    <canvas id="tree-canvas" class="chart" height="320"></canvas>
+    <label class="ctrl">split at age <span class="mono" id="tree-thr-v">30</span>
+      <input type="range" id="tree-thr" min="21" max="58" step="1" value="30"></label>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-k">parent Gini</span><span class="stat-v" id="tree-parent">—</span></div>
+      <div class="stat"><span class="stat-k">gain from this split</span><span class="stat-v amber" id="tree-gain">—</span></div>
+      <div class="stat"><span class="stat-k">best threshold</span><span class="stat-v green" id="tree-best">—</span></div>
+    </div>
+    <div class="tree-kids">
+      <div class="tree-kid left" id="tree-l"></div>
+      <div class="tree-kid right" id="tree-r"></div>
+    </div>
+    <div class="stepper-say" id="tree-verdict"></div>
+    <div class="btn-row"><button class="btn" id="tree-auto">▶ Search every threshold</button></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📏 Gini impurity</h3></div>
+    <pre class="code">Gini(S) = 1 − Σ pᵢ²
+
+all one class  → 1 − 1² = 0.00   (pure)
+50 / 50        → 1 − .5² − .5² = 0.50  (worst)
+
+gain = Gini(parent) − weighted average Gini(children)</pre>
+    <p class="panel-sub">It is the probability of mislabelling a random sample if you guessed using that group's own class proportions. Zero means the group is pure. Entropy is the near-identical alternative; the choice between them almost never changes the tree.</p>
+  </div>
+
+  <div class="three-up" id="ensembles"></div>
+
+  <div class="callout">
+    <div class="callout-ico">🌲</div>
+    <div><b>On tabular data, start with gradient boosting.</b> XGBoost, LightGBM or CatBoost on sensible features will beat a neural network on most spreadsheet-shaped problems, train in seconds, and need almost no scaling or encoding work. Deep learning wins on images, audio, text and other unstructured data — which is Deep Learning Fundamentals, next door.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>A tree splits greedily on whichever threshold most reduces impurity.</li>
+      <li>One tree is readable and high-variance. Averaging many decorrelated trees fixes the variance.</li>
+      <li>Bagging (forest) reduces variance; boosting reduces bias by correcting previous errors in sequence.</li>
+      <li>Trees need no scaling and handle mixed feature types without ceremony.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 10. CLUSTERING                                                -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="clustering" data-title="Clustering" data-icon="10" data-group="Models">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 10 · Models</div>
+    <h2>Structure with <span class="grad">no answers</span> to check against</h2>
+    <p class="lead">Unsupervised learning gets inputs and no labels. k-means is the one everybody starts with: pick k centres, assign every point to the nearest one, move each centre to the mean of its points, repeat until nothing moves. Two lines of description, and you can watch every iteration.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 k-means, step by step</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">The centres start in deliberately bad positions so the first few moves are worth watching. Step it manually to see the two phases separately.</p>
+    <canvas id="km-canvas" class="chart" height="380"></canvas>
+    <label class="ctrl">k (number of clusters) <span class="mono" id="km-kv">3</span>
+      <input type="range" id="km-k" min="2" max="6" step="1" value="3"></label>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-k">iteration</span><span class="stat-v" id="km-iter">0</span></div>
+      <div class="stat"><span class="stat-k">inertia (lower is tighter)</span><span class="stat-v" id="km-inertia">—</span></div>
+    </div>
+    <div class="stepper-say" id="km-phase"></div>
+    <div class="btn-row">
+      <button class="btn" id="km-run">▶ Run</button>
+      <button class="btn btn-ghost" id="km-step">one phase</button>
+      <button class="btn btn-ghost" id="km-reset">reset</button>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🤨 What k-means cannot do</h3></div>
+      <ul class="fact-list">
+        <li><b>Tell you k.</b> Try several, plot inertia, look for the elbow — and then use judgement, because the elbow is often not obvious.</li>
+        <li><b>Find non-round clusters.</b> It assumes roughly spherical, roughly equal-sized blobs. Use DBSCAN for shapes.</li>
+        <li><b>Guarantee the best answer.</b> It converges to a local optimum that depends on the starting centres. Run it several times (<span class="mono">n_init</span>).</li>
+        <li><b>Handle unscaled features.</b> It is pure distance — see Chapter 11.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🧪 Judging a clustering</h3></div>
+      <p class="panel-sub">There is no accuracy, because there is no ground truth. What you have instead:</p>
+      <ul class="fact-list">
+        <li><b>Inertia</b> — within-cluster spread. Always falls as k rises, so it cannot pick k alone.</li>
+        <li><b>Silhouette score</b> — how much closer a point is to its own cluster than the next one. Ranges −1 to 1.</li>
+        <li><b>Does it mean anything?</b> The real test. If the segments do not suggest different actions, the clustering is decoration.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Assign, move, repeat. It always converges, and not always to the same place.</li>
+      <li>Choosing k is your job, and the data will not settle it for you.</li>
+      <li>Scale your features first or the widest-ranging column becomes the only one that counts.</li>
+      <li>A clustering is useful when it changes what you do, not when inertia is low.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 11. FEATURES & SCALING                                        -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="features" data-title="Features &amp; scaling" data-icon="11" data-group="Practice">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 11 · Practice</div>
+    <h2>Where the wins actually <span class="grad">are</span></h2>
+    <p class="lead">On tabular problems, a better feature beats a better algorithm almost every time. This chapter is the unglamorous part of the job that decides whether the project works: getting columns into a form the model can use, and onto a scale where none of them shouts over the others.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⚖️ Standardise it</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Three features, five customers. Look at the raw bars — income is the only one you can see. Then standardise.</p>
+    <div id="scale-demo"></div>
+    <div class="callout mini"><div class="callout-ico">📐</div><div id="scale-why-text"></div></div>
+    <div class="needs" id="scale-needs"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔧 Turning columns into features</h3></div>
+    <div class="two-up" id="feature-cards"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📊 Standardise or normalise?</h3></div>
+      <pre class="code">StandardScaler:  z = (x − mean) / std
+   → mean 0, std 1, unbounded
+   → the default. Handles outliers better.
+
+MinMaxScaler:    x' = (x − min) / (max − min)
+   → squashed into 0..1
+   → use when you need a bounded range
+   → one outlier crushes everything else</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🔒 Do it inside a pipeline</h3></div>
+      <pre class="code">from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+
+pipe = make_pipeline(StandardScaler(),
+                     LogisticRegression())
+pipe.fit(X_train, y_train)     # fits on train only
+pipe.score(X_test, y_test)     # transforms test correctly</pre>
+      <p class="panel-sub">A pipeline makes the leakage bug from Chapter 2 structurally impossible: cross-validation refits the scaler inside every fold automatically. This is the single highest-value habit in the chapter.</p>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Distance-based and gradient-based models need scaling. Tree-based models do not care.</li>
+      <li>Fit the scaler on train, transform everything. Put it in a pipeline so you cannot forget.</li>
+      <li>One-hot unordered categories; never label-encode them for a linear model.</li>
+      <li>Ratios, dates broken into components, and a missing-value flag are the cheapest wins available.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 12. THE WORKFLOW                                              -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="workflow" data-title="The workflow" data-icon="12" data-group="Practice">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 12 · Practice</div>
+    <h2>Nine steps, and the <span class="grad">trap</span> in each</h2>
+    <p class="lead">Real projects fail in predictable places, and almost never at the modelling step. Here is the order that works, with the specific mistake that lies in wait at every stage.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧭 The loop</h3><span class="panel-tag">animated</span></div>
+    <div id="workflow"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📏 Baselines worth beating</h3></div>
+      <pre class="code">regression:      predict the mean
+                 predict last week's value
+classification:  predict the majority class
+                 predict the base rate
+time series:     predict yesterday (naive forecast)
+recommendation:  most popular item</pre>
+      <p class="panel-sub">Write the baseline number down before you train anything. It is the only context in which your model's score means anything at all.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🚀 After it ships</h3></div>
+      <ul class="fact-list">
+        <li><b>Log inputs and predictions.</b> Without this you cannot debug or retrain, ever.</li>
+        <li><b>Watch for drift.</b> Feature distributions move; so does the relationship you fitted.</li>
+        <li><b>Monitor the outcome, not just the model.</b> The metric that matters is the business one.</li>
+        <li><b>Plan the retrain.</b> Decide the cadence and trigger before it degrades, not after.</li>
+        <li><b>Keep the baseline live.</b> If the model ever loses to it, you want to know that day.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🎓</div>
+    <div><b>The whole discipline in one sentence:</b> fit something to data, then work extremely hard to find out whether you fooled yourself. Everything in Chapters 2, 6, 7 and 8 exists for the second half of that sentence.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Frame, split, baseline, simple model, better features — in that order.</li>
+      <li>Tuning is the last 5% of the win and the first 80% of the time spent. Budget accordingly.</li>
+      <li>Every stage has a way to fool yourself. Knowing which one is most of the skill.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 13. QUIZ                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Finish line">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 13 · Finish line</div>
+    <h2>Prove it to <span class="grad">yourself</span></h2>
+    <p class="lead">Fifteen questions covering everything above. No time limit, instant explanations, and you can retake it.</p>
+  </header>
+
+  <div class="panel">
+    <div id="quiz" class="quiz"></div>
+  </div>
+
+  <div class="panel glossary-panel">
+    <div class="panel-head"><h3>📖 Glossary</h3></div>
+    <input type="search" id="gloss-search" class="input-line" placeholder="filter terms…">
+    <div class="glossary" id="glossary"></div>
+  </div>
+</section>
+
+</div><!-- /stage -->
+
+<div class="pager" id="pager">
+  <button class="btn btn-ghost" data-goto="prev">&larr; Back</button>
+  <div class="pager-dots" id="pager-dots"></div>
+  <button class="btn" data-goto="next">Next &rarr;</button>
+</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/mathkit.js"></script>
+<script src="js/content.js"></script>
+<script src="js/demos.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

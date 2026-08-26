@@ -16,9 +16,9 @@ C.runningExample = {
   blurb: 'You open it, it shows you restaurants, you search for "biryani", you pay, and if the order goes wrong you message support. Four screens — and each one is a different AI system design problem. We will build all four across this course.',
   screens: [
     { ico: '🏠', n: 'The home feed', p: 'Which restaurants to show you, in which order.', ch: 'Chapters 6–7 — ranking and latency' },
-    { ico: '🔍', n: 'Search', p: 'You type "biryani", it finds the right restaurants.', ch: 'Chapter 7 — retrieval' },
-    { ico: '💳', n: 'Payment', p: 'Is this card being used by its real owner?', ch: 'Chapter 14 — fraud detection' },
-    { ico: '💬', n: 'Support chat', p: '"Where is my order?" answered without a human.', ch: 'Chapters 12–13 — LLM systems' }
+    { ico: '🔍', n: 'Search', p: 'You type "biryani", it finds the right restaurants.', ch: 'Chapters 7 & 13 — retrieval' },
+    { ico: '💳', n: 'Payment', p: 'Is this card being used by its real owner?', ch: 'Chapter 15 — fraud detection' },
+    { ico: '💬', n: 'Support chat', p: '"Where is my order?" answered without a human.', ch: 'Chapters 12–14 — LLM systems' }
   ]
 };
 
@@ -30,7 +30,7 @@ C.runningExample = {
    read these, you still learn something.
    ============================================================ */
 C.plain = {
-  vocab:      ['Before anything else, the words.', 'Every field has a private vocabulary, and AI system design has a dense one. None of these ideas are hard — but if nobody tells you what "p99" or "QPS" means, every sentence after it is noise. Ten minutes here makes the other fourteen chapters readable.'],
+  vocab:      ['Before anything else, the words.', 'Every field has a private vocabulary, and AI system design has a dense one. None of these ideas are hard — but if nobody tells you what "p99" or "QPS" means, every sentence after it is noise. Ten minutes here makes the other sixteen chapters readable.'],
   framework:  ['Ask four questions before you design anything.', 'What counts as a good answer? How many people will use it? How fast must it reply? What data do we already have? Every later decision falls out of those four, which is why guessing at a model first goes wrong so reliably.'],
   metrics:    ['Whatever you measure is what you will get — including the stupid version of it.', 'Tell the system "get more clicks" and it learns clickbait. Not because it is broken; because it did exactly what you asked. So you pick a number carefully, and you pick a second number that catches the cheating.'],
   labels:     ['A model learns from examples, and someone had to produce those examples.', 'Usually it is your users, by clicking things. That is free and enormous — and biased, because people click what was shown first, not what was best. Where your examples came from shapes what your model believes.'],
@@ -42,10 +42,13 @@ C.plain = {
   eval:       ['Testing on old data is cheap and lies to you. Testing on real users is slow and tells the truth.', 'So you use a ladder: cheap tests catch obvious problems, and only the few changes that survive get put in front of real people. And you must decide how long to run that test before you start, not while you are watching it.'],
   loops:      ['A recommender only learns about things it showed you.', 'Anything it never shows gets no clicks, so it looks bad, so it never gets shown. The loop closes and the app slowly narrows to the same few items. Nothing breaks, no alarm goes off — it just quietly gets more boring.'],
   ragscale:   ['If the system fetches the wrong document, the answer cannot be right.', 'People blame the AI for "making things up" when usually the search step simply never found the correct paragraph. Fix the finding before you touch the wording.'],
+  annindex:   ['Searching ten million things by meaning, without looking at ten million things.', 'You group everything into neighbourhoods first — that is what the k-means clustering in the picture is doing. Then a search only opens the few neighbourhoods nearest the question and ignores the rest. It is faster because it looks at less, and it is occasionally wrong for exactly the same reason.'],
   llmserving: ['Big AI models are charged by the word, in and out.', 'So the money goes on sending things you did not need to send. Route the easy questions to a small cheap model, keep answers short, and remember anything you already answered.'],
   designs:    ['Four real systems, walked through end to end.', 'The same nine steps applied to a feed, a search box, fraud detection and a support chatbot. They look like completely different products and the skeleton underneath is identical — which is the thing actually worth learning.'],
   operate:    ['Normal software keeps working. AI software rots.', 'The world changes, people change, fraudsters adapt, and the system quietly gets worse without ever throwing an error. So "how will we notice, and what do we do then" is part of the design, not a follow-up ticket.'],
-  quiz:       ['Twelve questions, and an explanation after every one.', 'Nothing here is new — every question is about something you already pushed a slider on. Getting one wrong is useful information rather than a problem: the explanation tells you which chapter to go back to, and you can retake it as many times as you like.']
+  patterns:   ['Fifteen problems that come up so often that somebody gave each one a name.', 'None of them are clever. They are the shapes code keeps landing in: one shared thing everyone borrows, one simple door into a messy subsystem, a line of handlers passing work along until one of them deals with it. Learning the names means a design conversation takes a sentence instead of a whiteboard.'],
+  redis:      ['One extra box that holds a little data in memory, so the slow parts get asked far less often.', 'It is a shared scratchpad every server can reach in well under a millisecond. Four jobs cover almost everything people use it for: remember an answer you already worked out, keep a running scoreboard, make sure only one worker picks up a job, and find the things nearest to you.'],
+  quiz:       ['Fourteen questions, and an explanation after every one.', 'Nothing here is new — every question is about something you already pushed a slider on. Getting one wrong is useful information rather than a problem: the explanation tells you which chapter to go back to, and you can retake it as many times as you like.']
 };
 
 /* ============================================================
@@ -401,6 +404,88 @@ C.ragScaleNotes = [
   ['Chunking beats model choice', 'Teams reach for a bigger model when their real problem is a fact split across two chunks. Fix retrieval first — it is cheaper and it is usually the actual bug.']
 ];
 
+/* ============================================================
+   Ch13: vector indexes — how ANN search actually works
+
+   The chapter's claim: an index is a promise to look at less.
+   Every family below buys speed by refusing to compare the query
+   against most of the corpus, and each one loses recall in its
+   own characteristic way. bytes/qps/recall are for a 768-d float
+   corpus and are order-of-magnitude, not benchmarks.
+   ============================================================ */
+C.ivfPhases = [
+  ['1 · train', 'Run k-means over a sample of the vectors. The centroids you get <i>are</i> the index — they carve the space into <b>nlist</b> cells, and that is the only thing the index really knows.'],
+  ['2 · add', 'Every vector is assigned to its nearest centroid and appended to that centroid\'s list. This is why it is called an <i>inverted file</i>: centroid → list of vector ids, exactly like a term → list of document ids.'],
+  ['3 · search', 'Compare the query to <b>nlist</b> centroids (cheap), keep the closest <b>nprobe</b> of them, and brute-force only those lists. Everything in the other cells is never looked at — which is the speedup, and also the entire source of lost recall.']
+];
+
+C.annFamilies = [
+  { k: 'flat', ico: '🧱', n: 'Flat', tag: 'exact',
+    one: 'No index. Compare the query to every vector and sort.',
+    bytes: 3072, recall: 100, qps: 1,
+    win: 'Exact by definition, zero tuning, no build step, inserts are instantly searchable and deletes are real deletes.',
+    cost: 'Work grows linearly with the corpus, forever. 100k vectors is nothing; 50M is a hardware conversation.',
+    when: 'Under ~100k vectors — and always as the ground truth you measure the other three against.' },
+  { k: 'ivf', ico: '🗺️', n: 'IVF-Flat', tag: 'clustered',
+    one: 'k-means the corpus into nlist cells; search the nprobe cells nearest the query.',
+    bytes: 3084, recall: 93, qps: 40,
+    win: 'One knob (nprobe) trades recall for latency <i>per query</i>, at runtime, with no rebuild. Fast to build, and the full vectors are still there for reranking.',
+    cost: 'A true neighbour sitting just across a cell boundary is invisible unless you probe its cell. Clusters drift as the corpus grows, so recall quietly decays until you retrain.',
+    when: 'Millions of vectors, batch or nightly rebuilds, and you want a recall dial you can turn per request.' },
+  { k: 'ivfpq', ico: '🗜️', n: 'IVF-PQ', tag: 'compressed',
+    one: 'IVF, but each vector is stored as a handful of codebook ids instead of floats.',
+    bytes: 100, recall: 82, qps: 120,
+    win: '10–60× less memory, which is usually the difference between one node and thirty. Distances are computed on the codes with lookup tables, so it is small <i>and</i> fast.',
+    cost: 'The stored vector is now an approximation of an approximation. Recall drops noticeably unless you rerank the top few hundred against the real vectors.',
+    when: 'Hundreds of millions of vectors, or any time RAM — not latency — is the thing you cannot afford.' },
+  { k: 'hnsw', ico: '🕸️', n: 'HNSW', tag: 'graph',
+    one: 'A layered proximity graph. Hop greedily toward the query, coarse layers first.',
+    bytes: 3328, recall: 97, qps: 90,
+    win: 'The best recall-per-millisecond of the four, and it takes incremental inserts without a rebuild. This is what most managed vector databases run by default.',
+    cost: 'Memory for the graph links on top of the vectors, slow builds, and deletes are tombstones that degrade the graph until you rebuild it.',
+    when: 'Low-latency online search where recall matters and you can pay for RAM. The default choice, and the expensive one.' }
+];
+
+C.annDrill = [
+  { s: '40,000 support articles for one tenant. Answers must be exactly right, and editors change the corpus all day.',
+    o: ['flat', 'hnsw', 'ivf'], a: 'flat',
+    why: 'At 40k vectors a brute-force scan is a few milliseconds — an index buys you nothing and costs you a rebuild pipeline, a staleness window and an approximation. HNSW is the reflex answer and the wrong one: you would take a recall loss and an ops burden to speed up something that was already fast.' },
+  { s: '1.2 billion image embeddings. 64 GB of RAM per node, and 95% recall after reranking is fine.',
+    o: ['ivfpq', 'hnsw', 'ivf'], a: 'ivfpq',
+    why: 'Do the arithmetic before the architecture: 1.2B × 3 KB is 3.6 TB of raw vectors. Only compression makes this affordable — PQ at ~100 bytes per vector brings it to ~120 GB. Then rerank the top few hundred against full-precision vectors to buy the recall back.' },
+  { s: '8M chunks, p99 must stay under 20ms, recall must be at least 95%, memory is not the constraint, writes trickle in all day.',
+    o: ['hnsw', 'ivfpq', 'flat'], a: 'hnsw',
+    why: 'High recall at low latency with incremental inserts is the exact shape HNSW is best at, and 8M × ~3.3 KB ≈ 26 GB fits on one machine. IVF-PQ would hit the latency target but not the recall target without a rerank stage you do not otherwise need.' },
+  { s: '40M vectors rebuilt nightly by a batch job. Cost matters, 92% recall is acceptable, and the ranker needs the full vectors afterwards.',
+    o: ['ivf', 'hnsw', 'ivfpq'], a: 'ivf',
+    why: 'A nightly rebuild removes HNSW\'s main advantage (incremental inserts) and leaves its main costs (slow builds, extra memory). IVF-Flat builds in minutes, keeps the exact vectors for reranking, and hands you nprobe as a per-query recall dial.' }
+];
+
+C.annNotes = [
+  ['Recall is measured against exact search, not truth', 'Run flat search over a golden set of a few thousand queries, store the exact top-k, and report your index\'s overlap with it. Without that number you are tuning nprobe by vibes, and "search got worse" becomes unfalsifiable.'],
+  ['The index is a cache of the corpus', 'It is derived data: rebuildable, disposable, never the source of truth. Keep vectors and ids in durable storage, and treat losing an index node as a slow hour rather than an incident.'],
+  ['Filters are where ANN quietly breaks', 'Post-filtering searches k=100 and then throws most of them away, so a narrow filter returns three results — or none. Pre-filtering is exact but can degrade into a full scan. Real systems filter during traversal, and you need to know which one yours does.'],
+  ['Deletes are tombstones', 'Nothing is removed from a graph or a posting list on delete; it is marked and skipped. Recall and latency both decay with the tombstone ratio, so trigger rebuilds off that ratio rather than off the calendar.'],
+  ['Memory is the bill', 'bytes-per-vector × vectors × replicas — and the replicas are the part people forget. That one multiplication decides between IVF-PQ and HNSW far more often than any recall benchmark does.'],
+  ['Metric mismatches fail silently', 'Cosine, L2 and inner product disagree unless vectors are normalised. Index one way, query the other, and you get plausible wrong neighbours with no error anywhere. Normalise at write time and pin the metric in config.']
+];
+
+/* PQ: a 768-d float32 vector is 3072 bytes. Split it into m sub-vectors, replace each
+   with the id of its nearest codebook centroid, and the whole vector becomes m × bits
+   bits. The recall model here is a stand-in for the real curve: the loss grows with how
+   many dimensions a single code has to stand for. */
+C.pqKnobs = [
+  { k: 'dims', name: 'embedding dimensions', min: 128, max: 1536, step: 128, val: 768, unit: 'd' },
+  { k: 'm', name: 'sub-vectors (m)', min: 4, max: 96, step: 4, val: 48, unit: '' },
+  { k: 'bits', name: 'bits per code', min: 4, max: 8, step: 4, val: 8, unit: ' bits' }
+];
+
+C.hnswSteps = [
+  ['Layer 2 — the motorway', 'The top layer holds a handful of nodes with very long links. A few greedy hops here cross most of the space, which is why the search never has to start from a random place.'],
+  ['Layer 1 — the A-roads', 'Keep the best node found and re-enter the layer below at that same point. Each layer down has more nodes and shorter links than the one above it.'],
+  ['Layer 0 — every vector', 'The bottom layer contains everything. Hop greedily between close neighbours until no neighbour is nearer to the query. That local minimum is your answer — and occasionally it is the wrong one, which is precisely the recall you traded away.']
+];
+
 /* ---------- Ch12: LLM serving and cost ---------- */
 /* quality: on genuinely hard requests. easyQuality: on the routine ones a router
    should be sending here. The gap between those two columns is the whole argument
@@ -422,7 +507,58 @@ C.servingLevers = [
   ['KV cache is your memory ceiling', 'Self-hosting: the KV cache grows with batch size × sequence length and it, not the weights, is usually what limits concurrency. Long contexts are expensive in memory, not just in tokens.'],
   ['Quantization', '8-bit or 4-bit weights cut memory and raise throughput for a small quality cost. Measure that cost on your golden set — the average is fine, the tail is where it shows.'],
   ['Stream everything user-facing', 'Time-to-first-token is the perceived latency. Streaming turns a 3-second wait into a 200ms one without making anything faster.'],
-  ['Move work off the request path', 'Summaries, embeddings, enrichment and classification of yesterday\'s data belong in a batch job. Only what the user is waiting for should be synchronous.']
+  ['Move work off the request path', 'Summaries, embeddings, enrichment and classification of yesterday\'s data belong in a batch job. Only what the user is waiting for should be synchronous.'],
+  ['Speculative decoding', 'A small draft model proposes several tokens and the big one verifies the block in a single pass, keeping the longest correct prefix. Output is provably identical — you are buying latency with extra compute. Worth it when p95 latency is the complaint; a net loss on a server that is already saturated, because rejected drafts are wasted work.'],
+  ['Split prefill from decode', 'They are different bottlenecks — prefill is compute-bound, decode is memory-bandwidth-bound — so they respond to different fixes and, at scale, often belong on different hardware. Every lever above attacks one or the other; knowing which saves you from optimising the phase that was never the problem.']
+];
+
+/* ---------- Ch13: the KV cache ceiling ----------
+   Defaults describe one 80GB accelerator serving an 8B-class model at bf16 with
+   grouped-query attention. Your numbers will differ; the ratio is the lesson.  */
+C.kvDefaults = [
+  ['gpu', 'accelerator memory (GB)', 80],
+  ['w', 'model weights (GB)', 16],
+  ['kv', 'KV cache per token (KB)', 128],
+  ['ctx', 'context tokens per request', 8000]
+];
+/* activations, fragmentation, the runtime itself — never assume you get 100% */
+C.kvOverhead = 0.10;
+
+/* ---------- Ch13: prefill vs decode ----------
+   The standard two-phase inference model. Speculative decoding uses the
+   expected-tokens-per-round result from Leviathan et al. 2023:
+     E = (1 - a^(g+1)) / (1 - a),  speedup = E / (1 + g*c)                     */
+C.decodeModel = {
+  promptTokens: 6000,  // system prompt + retrieved context + history
+  outputTokens: 500,
+  prefillRate: 9000,   // prompt tokens per second, one parallel pass
+  decodeRate: 42,      // generated tokens per second, one pass each
+  overheadMs: 140,     // network, queue, routing
+  cachedFrac: 0.80,    // share of the prompt that is a stable, cacheable prefix
+  cacheSpeedup: 10,    // cached prefix tokens cost about a tenth as much to replay
+  cacheDiscount: 0.10, // and are billed at roughly a tenth of the input rate
+  draftBlock: 4,       // gamma
+  draftCost: 0.15,     // one draft token as a fraction of one target pass
+  accept: 0.70         // alpha
+};
+
+C.decodeLevers = [
+  { k: 'stream', n: 'Streaming', phase: 'neither',
+    on: 'Tokens go out as they are produced. Time-to-first-token becomes the number the user feels.',
+    off: 'The answer is held back until the last token lands. The user watches a blank screen for the whole request.' },
+  { k: 'cache', n: 'Prompt caching', phase: 'prefill',
+    on: 'The stable prefix is replayed from cache instead of re-processed — cheaper prefill, cheaper input tokens.',
+    off: 'Every request re-processes the full prompt from scratch and pays full input rate for it.' },
+  { k: 'spec', n: 'Speculative decoding', phase: 'decode',
+    on: 'A draft model proposes a block of tokens; the big model verifies them in one pass. Same output, fewer passes.',
+    off: 'One forward pass per token, strictly sequential.' }
+];
+
+C.decodeLessons = [
+  ['Streaming is a perception fix, not a throughput fix', 'Total time and total cost are identical either way. It is still the first thing to ship, because it converts an 8-second blank screen into a 0.8-second one for the price of a flag.'],
+  ['Prompt caching cannot speed up generation', 'It only touches prefill. If your complaint is "the answer comes out slowly", caching will not help and you should be looking at output length, model size or speculative decoding.'],
+  ['Speculative decoding is a latency-for-compute trade', 'It makes a single request faster while doing more total work. On a saturated, fully-batched server it can lower overall throughput — the opposite of what you wanted. Reach for it when p95 latency is the problem, not when the GPU bill is.'],
+  ['The KV cache is a capacity problem, not a speed problem', 'It is not something you enable. It is memory you spend per concurrent request, and it — not the weights — is what decides how many users one accelerator holds.']
 ];
 
 /* ---------- Ch13: canonical designs ---------- */
@@ -538,6 +674,19 @@ C.worked = {
     ],
     punch: 'Notice the pattern: <b>each stage handles about 20× fewer items and spends about 20× more on each one.</b> That is the entire reason funnels exist. And the catch: if stage 1 drops your favourite restaurant, no later stage can bring it back — so stage 1 is judged on "did it keep the good ones", never on "was it clever".'
   },
+  annindex: {
+    title: 'Do it once by hand',
+    lead: 'Snackr has 10,000,000 menu-item embeddings and 40ms to find the 10 nearest. Flat search means 10,000,000 comparisons per query. IVF means far fewer — here is exactly how few.',
+    steps: [
+      ['Pick nlist', 'The usual starting point is about √N clusters: √10,000,000 ≈ 3,162, so round to <b>nlist = 4,096</b>'],
+      ['Average list length', '10,000,000 ÷ 4,096 ≈ <b>2,441 vectors per cell</b>'],
+      ['Step 1 of a query', 'Compare the query to all 4,096 centroids to find the nearest cells. That is 4,096 comparisons — the fixed cost of the index.'],
+      ['Step 2 of a query', 'With <b>nprobe = 16</b>, scan 16 cells: 16 × 2,441 ≈ <b>39,000 vectors</b>'],
+      ['Total compared', '4,096 + 39,000 ≈ 43,000 out of 10,000,000 = <b>0.43% of the corpus</b>'],
+      ['Speedup', '10,000,000 ÷ 43,000 ≈ <b>230× less work</b>, for a recall of roughly 90–95%']
+    ],
+    punch: 'Two knobs, two different jobs. <b>nlist</b> is chosen at build time and sets the fixed centroid cost — too few and each cell is huge, too many and you spend the whole query scanning centroids. <b>nprobe</b> is chosen per query, at runtime: it is the one dial that lets one caller ask for cheap-and-approximate and another ask for slow-and-thorough <i>against the same index</i>. And the missing 5–10%? Those are neighbours that landed in a cell you did not open.'
+  },
   capacity: {
     title: 'Do it once by hand',
     lead: 'How many servers does Snackr need? Four multiplications, no magic.',
@@ -580,6 +729,10 @@ C.worked = {
 
 /* ---------- Ch15: quiz ---------- */
 C.quiz = [
+  { q: 'Your IVF index returns 88% recall@10. Where did the missing 12% go?', o: ['The embedding model is underfit', 'True neighbours sat in cells the query never probed', 'The corpus is too small', 'The distance metric is wrong'], a: 1,
+    e: 'IVF only compares against the nprobe cells nearest the query. A neighbour just across a cell boundary is never looked at. Raise nprobe and the recall comes back, at a proportional cost in scanned vectors — that is the whole trade.' },
+  { q: 'You have 1.2B vectors of 768 float32 dimensions and 64 GB of RAM per node. What decides the index?', o: ['Recall benchmarks', 'bytes-per-vector × vectors × replicas — the raw vectors are 3.6 TB, so they must be compressed', 'Query latency', 'The embedding model vendor'], a: 1,
+    e: 'Memory is the binding constraint long before recall is. PQ at ~100 bytes per vector turns 3.6 TB into ~120 GB, and a rerank pass over the top few hundred against exact vectors buys the recall back.' },
   { q: 'What should you establish before anything else in an AI system design?', o: ['Which model architecture to use', 'What is being optimised, at what scale, under what latency budget', 'Which vector database to use', 'How many GPUs are available'], a: 1,
     e: 'Metric, scale, latency and data. Every later decision is a consequence of those four, and picking a model before you have them is how designs go wrong in the first five minutes.' },
   { q: 'Fraud is 0.2% of transactions. Which metric is useless?', o: ['Precision at fixed recall', 'Accuracy', 'PR-AUC', 'Dollar loss prevented'], a: 1,
@@ -625,6 +778,11 @@ C.glossary = [
   ['Ranking', 'Stage 2: score the candidates with full features and a real model.'],
   ['Re-ranking', 'Stage 3: an expensive model, diversity constraints and business rules over the final few dozen.'],
   ['ANN', 'Approximate nearest neighbour search. Trades exactness for speed at large scale.'],
+  ['IVF', 'Inverted file index. k-means partitions the vectors into nlist cells; a query scans only the nprobe cells whose centroid is nearest. Centroid → list of vector ids, exactly like term → list of doc ids.'],
+  ['nlist / nprobe', 'nlist: how many clusters the index was built with (build time). nprobe: how many of them a given query opens (run time). nprobe is the recall-versus-latency dial.'],
+  ['HNSW', 'Hierarchical navigable small world. A layered proximity graph searched greedily from coarse layers down to the layer holding every vector. Best recall per millisecond, most memory.'],
+  ['Product quantization (PQ)', 'Split each vector into m sub-vectors and store the id of the nearest codebook centroid for each. 3 KB becomes ~50 bytes, at a recall cost you claw back by reranking on the full vectors.'],
+  ['Rerank on exact vectors', 'Retrieve a few hundred candidates from a compressed index, then re-score just those against the full-precision vectors. Cheap, and it recovers most of what quantization lost.'],
   ['Hybrid search', 'Vector similarity plus keyword (BM25). Beats either alone, especially on exact tokens.'],
   ['Cross-encoder', 'A model scoring a (query, document) pair jointly. Far more accurate and far slower than embeddings — hence stage 3 only.'],
   ['recall@k', 'The share of relevant items appearing in the top k retrieved. The ceiling on a two-stage system.'],
@@ -645,7 +803,275 @@ C.glossary = [
   ['Exploration', 'Deliberately serving uncertain or random items to collect unbiased training data.'],
   ['Model cascade', 'Route to a cheap model first, escalate the hard cases to an expensive one.'],
   ['Continuous batching', 'Dynamically batching LLM requests in the serving layer. The biggest self-hosting throughput lever.'],
-  ['KV cache', 'Cached attention keys and values during generation. Usually what limits concurrency, more than model weights.'],
-  ['Prompt caching', 'Reusing the processed prefix of a repeated prompt. Requires a stable prefix — volatile content goes last.'],
+  ['Prefill', 'The phase that processes your whole prompt in one parallel pass. Compute-bound; what prompt caching attacks.'],
+  ['Decode', 'The phase that generates the answer, one forward pass per token. Memory-bandwidth-bound; what speculative decoding and batching attack.'],
+  ['KV cache', 'Cached attention keys and values during generation. Makes decode O(n) instead of O(n²), and its size — batch × sequence length — is usually what limits concurrency, more than model weights.'],
+  ['Prompt caching', 'Reusing the processed prefix of a repeated prompt. Cuts prefill latency and input cost; does nothing for generation speed. Requires a stable prefix — volatile content goes last.'],
+  ['Speculative decoding', 'A draft model proposes a block of tokens that the target model verifies in one pass. Identical output, fewer passes, more total compute. The acceptance rate decides whether it pays.'],
+  ['Acceptance rate', 'Share of speculatively drafted tokens the target model agrees with. Below roughly 40% the wasted draft compute outweighs the passes saved.'],
+  ['Streaming', 'Sending tokens to the client as they are generated. Changes perceived latency only — same tokens, same total time, same bill.'],
   ['Golden set', 'A fixed set of real inputs with verified outputs, replayed on every change.']
 ];
+
+/* ============================================================
+   Ch16: the fifteen design patterns
+
+   Code-level, not system-level — but every one of them shows up
+   inside the systems the earlier chapters designed, so each card
+   points at the chapter where you already used it.
+   ============================================================ */
+C.patternCats = {
+  creational:  { name: 'Creational', ico: '🏭', blurb: 'How things get made.' },
+  structural:  { name: 'Structural', ico: '🧱', blurb: 'How things are composed.' },
+  behavioural: { name: 'Behavioural', ico: '🔁', blurb: 'How things talk and decide.' }
+};
+
+C.patterns = [
+  { k: 'singleton', num: 1, n: 'Singleton', cat: 'creational',
+    one: 'Ensures only one instance exists.',
+    problem: 'Something expensive or genuinely shared — a loaded model, a connection pool, a tokenizer — must be created once and reused, not rebuilt per request.',
+    ai: 'Snackr\'s ranker is 2 GB and takes six seconds to load. At 400 requests a second you load it once per worker at startup and every request borrows the same handle.',
+    code: 'from functools import lru_cache\n\n@lru_cache(maxsize=1)          # the whole pattern, in one decorator\ndef ranker():\n    return load_model("ranker-v7.onnx")',
+    trap: '"One instance" means one per process, not one per cluster. It is global mutable state, so never hang request data on it, and expect tests to surprise you when they run in a different order.' },
+
+  { k: 'factory', num: 2, n: 'Factory Method', cat: 'creational',
+    one: 'Creates objects without naming their exact class.',
+    problem: 'The caller knows what it needs, not which implementation is configured today.',
+    ai: 'Config says embeddings: "local" in development and "hosted" in production. One function returns the right client, and no calling code mentions either vendor.',
+    code: 'EMBEDDERS = {"hosted": HostedEmbedder, "local": E5Embedder}\n\ndef make_embedder(name, **kw):\n    return EMBEDDERS[name](**kw)     # a dict lookup IS the factory',
+    trap: 'A dict of constructors is usually the entire pattern. An abstract-factory class hierarchy for two products is ceremony you maintain forever and read never.' },
+
+  { k: 'builder', num: 3, n: 'Builder', cat: 'creational',
+    one: 'Builds a complex object step by step.',
+    problem: 'Many optional parts, an order that matters, and half-built states that must not escape.',
+    ai: 'A retrieval prompt: fixed rules, then retrieved documents, then history trimmed to a token budget, then the question. The order is the cache prefix, so it is not cosmetic.',
+    code: 'msg = (Prompt()\n       .system(RULES)            # stable prefix first — prompt caching needs it\n       .docs(retrieved)\n       .history(turns, max_tokens=2000)\n       .ask(question)\n       .build())',
+    trap: 'Four fields and no invalid intermediate state? A dataclass with defaults beats a builder. Reach for this only when ordering or validation is real.' },
+
+  { k: 'adapter', num: 4, n: 'Adapter', cat: 'structural',
+    one: 'Bridges two interfaces that were never meant to meet.',
+    problem: 'Two libraries do the same job with different shapes, and you refuse to spread "if vendor == …" through the codebase.',
+    ai: 'Every reranking vendor returns a different JSON. Each adapter maps it to one shape — a list of (index, score) — so swapping vendors becomes a config change.',
+    code: 'class VendorRerank:            # returns {"data":[{"index":0,"relevance_score":.8}]}\n    def rerank(self, q, docs):    # our interface: -> [(index, score)]\n        r = self.api.rerank(query=q, documents=docs)\n        return [(d["index"], d["relevance_score"]) for d in r["data"]]',
+    trap: 'An adapter that leaks vendor-only options has stopped adapting. Expose the intersection every backend supports; push the rest into the constructor.' },
+
+  { k: 'decorator', num: 5, n: 'Decorator', cat: 'structural',
+    one: 'Adds behaviour around an object without changing it.',
+    problem: 'Retries, timeouts, caching, redaction and token counting all want to wrap the same call, and none of them belong inside it.',
+    ai: 'One generate() plus four wrappers is how a model call becomes production-ready without the model code knowing that any of it happened.',
+    code: '@retry(3, on=RateLimited)   # outermost: this retries cache hits too — usually wrong\n@cached(ttl=3600)\n@timed("llm.generate")\ndef generate(prompt): ...',
+    trap: 'Order changes behaviour. Cache outside retry and you retry hits; cache inside retry and failures are never cached. Stack five and nobody can read the stack trace or account for the latency.' },
+
+  { k: 'facade', num: 6, n: 'Facade', cat: 'structural',
+    one: 'One simple door into a complicated subsystem.',
+    problem: 'Callers should not have to orchestrate six services correctly to ask one question.',
+    ai: 'answer(q) hides retrieve → rerank → build prompt → generate → guardrail → cite. Product code calls one function while the pipeline underneath it changes weekly.',
+    code: 'def answer(q, k=8, model="small"):\n    docs = rerank(q, retrieve(q, k * 4))[:k]\n    out  = generate(build_prompt(q, docs), model=model)\n    return guard(out, docs)       # one door — knobs still reachable',
+    trap: 'A facade that hides every knob gets copy-pasted the first time someone needs k=50. Hide the wiring, keep the parameters.' },
+
+  { k: 'proxy', num: 7, n: 'Proxy', cat: 'structural',
+    one: 'A stand-in that controls access to the real thing.',
+    problem: 'You need caching, rate limiting, auth or a circuit breaker in front of an object, with the same interface, so nothing downstream notices.',
+    ai: 'The cache in front of the ranker is a proxy — and chapter 9\'s arithmetic says a 40% hit rate removes well over a third of the fleet. This pattern pays rent.',
+    code: 'class CachedRanker:\n    def __init__(self, real, cache): self.real, self.cache = real, cache\n    def rank(self, q):\n        key = f"v7:{normalise(q)}"          # version the key with the model\n        return self.cache.get_or_set(key, lambda: self.real.rank(q), ttl=300)',
+    trap: 'A proxy serving stale results after a deploy is indistinguishable from a bug. Put the model version in the key and stale entries retire themselves.' },
+
+  { k: 'composite', num: 8, n: 'Composite', cat: 'structural',
+    one: 'Treat one thing and a group of things the same way.',
+    problem: 'A tree where leaves and branches answer the same calls, so callers stop caring which one they are holding.',
+    ai: 'A document is sections is chunks, and all three answer .tokens(). Same trick for agents: a sub-agent is just another tool, so the planner never learns which of its tools is a whole agent.',
+    code: 'class Chunk:\n    def tokens(self): return len(self.ids)\n\nclass Section:                            # same interface, different insides\n    def tokens(self): return sum(c.tokens() for c in self.children)',
+    trap: 'Recursion with no depth limit. An agent that can call agents eventually calls itself, in a loop, at real money per turn. Cap depth and total spend at the top.' },
+
+  { k: 'observer', num: 9, n: 'Observer', cat: 'behavioural',
+    one: 'One change, many interested parties, no coupling.',
+    problem: 'Something happened, and the list of things that care about it keeps growing.',
+    ai: 'Every prediction fans out to the metrics dashboard, the drift monitor, the training log and the feature store. Chapter 5\'s "log the vector you served" is an observer sitting on the serving path.',
+    code: 'def on_prediction(ev):\n    bus.publish("prediction", ev)   # fire and forget\n\n# subscribers: metrics · drift · training-log · feature-store',
+    trap: 'Synchronous observers put every subscriber\'s tail latency on your serving path, and one slow consumer takes the request down with it. Publish to a queue and let them be slow on their own time.' },
+
+  { k: 'strategy', num: 10, n: 'Strategy', cat: 'behavioural',
+    one: 'Swap the algorithm at runtime, keep the interface.',
+    problem: 'Several interchangeable ways to do one job, chosen by config, by experiment, or per request.',
+    ai: 'Chapter 6\'s model ladder as code: rules, tree and language model all behind score(x). It is also what an experiment flips — the framework picks a strategy per user.',
+    code: 'STRATEGIES = {"keyword": bm25_search, "dense": vector_search, "hybrid": fuse}\n\ndef retrieve(q, strategy=cfg.retrieval):\n    return STRATEGIES[strategy](q)   # the experiment just changes the string',
+    trap: 'Strategies must return the same shape and honour the same latency contract. Two "strategies" with different output schemas is one experiment comparing two different products.' },
+
+  { k: 'command', num: 11, n: 'Command', cat: 'behavioural',
+    one: 'Wrap a request as an object you can queue, log, retry and undo.',
+    problem: 'What to do, and the doing of it, need to be separated in time.',
+    ai: 'A tool call from a language model is already a Command — a name and arguments. That is exactly why it can be reviewed by a human, queued, retried and replayed from a log.',
+    code: '@dataclass(frozen=True)\nclass Refund:\n    order_id: str\n    amount: int\n    key: str        # idempotency key: the line between retry and double refund\n    def run(self, api): api.refund(self.order_id, self.amount, idem=self.key)',
+    trap: 'A retryable command that is not idempotent refunds twice. If it touches money, state or a third party, it carries a key.' },
+
+  { k: 'iterator', num: 12, n: 'Iterator', cat: 'behavioural',
+    one: 'Walk a collection without exposing how it is stored.',
+    problem: 'The caller wants items one at a time; the source may be a list, a paged API, a database cursor or a token stream.',
+    ai: 'Streaming tokens to the user is an iterator, and it is the reason time to first token is a metric at all. Paging an index and batching a training set are the same idea over different storage.',
+    code: 'def stream(prompt):\n    for chunk in client.stream(prompt):   # a generator is the stdlib iterator\n        yield chunk.text',
+    trap: 'A generator holding a database cursor or an HTTP connection open for a whole response is a connection leak waiting for a traffic spike. Bound it, or materialise a page at a time.' },
+
+  { k: 'state', num: 13, n: 'State', cat: 'behavioural',
+    one: 'Behaviour changes with the object\'s current state.',
+    problem: 'The same input means different things depending on where you are in a lifecycle, and a chain of ifs over a status field stops being readable at about the fourth branch.',
+    ai: 'The agent loop: planning → acting → waiting for a human → done → failed. What the next model output is allowed to do depends entirely on which of those you are in.',
+    code: 'LEGAL = {"planning": {"acting", "failed"},\n         "acting":   {"planning", "waiting", "done", "failed"},\n         "waiting":  {"acting", "failed"}}\n\ndef go(cur, nxt):\n    assert nxt in LEGAL[cur], f"illegal transition {cur} -> {nxt}"',
+    trap: 'When a model picks the transition, the legal set must be enforced in code. Ask it to name the next state and sooner or later it invents one you never wrote a handler for.' },
+
+  { k: 'template', num: 14, n: 'Template Method', cat: 'behavioural',
+    one: 'A fixed skeleton; the steps are filled in per case.',
+    problem: 'Ten variants that must all happen in the same order, with two or three steps genuinely different.',
+    ai: 'Every training pipeline: load → split → featurise → fit → evaluate → register. The order is fixed for a reason — featurise before you split and you have leaked the future into your metric.',
+    code: 'class TrainingJob:\n    def run(self):                      # the skeleton, not overridable\n        d = self.load(); tr, te = self.split(d)\n        m = self.fit(self.featurise(tr))\n        self.register(m, self.evaluate(m, te))\n    def fit(self, X): raise NotImplementedError   # the hole subclasses fill',
+    trap: 'By the third level of subclassing nobody can tell which class actually runs. Pass functions in instead — that is Strategy, and it is flatter.' },
+
+  { k: 'chain', num: 15, n: 'Chain of Responsibility', cat: 'behavioural',
+    one: 'Hand the request down a line until someone handles it.',
+    problem: 'Several handlers might deal with this, in a known order, and adding one should not touch the others.',
+    ai: 'Chapter 14\'s cascade is a chain: small model, then large model, then a human. So is the guardrail stack — length, personal data, moderation, grounding — each link passing it on or stopping it.',
+    code: 'def handle(req, chain):\n    for link in chain:\n        out = link(req)\n        if out is not None:\n            log.info("handled by %s", link.__name__)  # always log the link\n            return out\n    return escalate(req)              # the last link is never optional',
+    trap: 'Every link costs latency, and a link that silently swallows a request is unfindable unless you log which one handled it. Chains must also end somewhere explicit — usually a human.' }
+];
+
+/* six situations, all lifted from earlier chapters */
+C.patternDrill = [
+  { s: 'Snackr support tries a small model first, escalates the hard questions to a big one, and hands the last few percent to a human agent.',
+    o: ['chain', 'strategy', 'decorator', 'proxy'], a: 'chain',
+    why: 'Ordered handlers, each of which either deals with the request or passes it along. Strategy would pick one handler up front; a chain tries them in turn — which is exactly what a cascade does.' },
+  { s: 'Every prediction must reach the metrics dashboard, the drift monitor and the training log — and product wants a fourth consumer next month.',
+    o: ['observer', 'facade', 'command', 'template'], a: 'observer',
+    why: 'The publisher must not grow a line of code per consumer. Publish the event and let consumers subscribe — asynchronously, or their latency quietly becomes yours.' },
+  { s: 'The ranking model is 2 GB and takes six seconds to load. You serve 400 requests a second.',
+    o: ['singleton', 'builder', 'proxy', 'iterator'], a: 'singleton',
+    why: 'Load once per worker process and share the handle. In Python that is a module-level object or lru_cache(maxsize=1) — and remember it is one per process, not one per cluster.' },
+  { s: 'The model replies with a tool call — a name and arguments. You must queue it, show it to a reviewer, log it, and retry it safely.',
+    o: ['command', 'state', 'factory', 'adapter'], a: 'command',
+    why: 'Separating "what to do" from "doing it" is the whole point, and it is why a tool call can be reviewed, queued and replayed. Give it an idempotency key or the retry is a second refund.' },
+  { s: 'You want to compare keyword, dense and hybrid retrieval on live traffic without the serving code knowing which one is running.',
+    o: ['strategy', 'chain', 'composite', 'decorator'], a: 'strategy',
+    why: 'Interchangeable algorithms behind one interface, selected at runtime. Keep the return shape and the latency contract identical, or you are comparing two products rather than two retrievers.' },
+  { s: 'Three reranking vendors, three different JSON shapes, and you want swapping them to be a one-line config change.',
+    o: ['adapter', 'facade', 'builder', 'singleton'], a: 'adapter',
+    why: 'Adapter converts one interface into the one you already have. A facade would simplify a whole subsystem; here there is a single call per vendor, just shaped differently each time.' }
+];
+
+/* where the course already used them, before anyone said "pattern" */
+C.patternsHere = [
+  ['Strategy · chapter 6', 'The model ladder: rules, tree and language model behind one score(x). Choosing a rung is choosing a strategy.'],
+  ['Chain of Responsibility · chapter 14', 'The model cascade — small model, big model, human. Each link handles the request or passes it on.'],
+  ['Proxy · chapter 9', 'The cache in front of the ranker. Same interface, and the single biggest lever on fleet size.'],
+  ['Observer · chapter 5', 'Logging the exact feature vector you served, to everyone who needs it, off the serving path.'],
+  ['Facade · chapter 12', 'One answer() call hiding retrieve, rerank, prompt, generate and guard.'],
+  ['Iterator · chapter 8', 'Token streaming — and the reason time to first token is a metric at all.'],
+  ['Template Method · chapter 15', 'The same nine stages, in the same order, for a feed, a search box, fraud and a support bot.'],
+  ['Builder · chapter 12', 'Prompt assembly with the stable prefix first, because caching depends on the order.']
+];
+
+C.patternRules = [
+  ['Name the problem, not the pattern', 'A pattern is a name for a shape you already needed. If you cannot state the problem in one sentence without using the pattern\'s name, you do not have that problem yet.'],
+  ['One implementation is not an interface', 'An abstract base class with a single subclass is a dict lookup in a costume. Write the second implementation first; the abstraction is obvious then and guesswork now.'],
+  ['The standard library is half of this list', 'lru_cache is a Singleton and a Proxy, a generator is an Iterator, a decorator is Decorator, a dataclass replaces most Builders. Look there before writing a class.'],
+  ['Patterns cost milliseconds', 'Every wrapper, link and observer is another frame on the serving path. Chapter 8 hands you a budget; a five-deep decorator stack spends a surprising amount of it.'],
+  ['Mostly they are vocabulary', 'The real payoff is saying "put a proxy in front of it" in a design review and having six people picture the same thing. That is worth more than any of the code above.']
+];
+
+/* ============================================================
+   Ch17: Redis — the four use cases that come up in every interview
+
+   Redis is one box holding a little data in memory. What makes it
+   worth a chapter is that four of its data types answer four
+   different system-design problems, and the trap on each one is
+   what separates "I have used Redis" from "I have operated it".
+   ============================================================ */
+C.redisUses = [
+  { k: 'cache', num: 1, n: 'Cache', ico: '🗄️', head: 'fast reads', type: 'String / Hash',
+    one: 'A hot copy of a slow read, with an expiry date on it.',
+    problem: 'Reads outnumber writes by an order of magnitude and the answer barely changes between them, so the database is being asked the same question thousands of times a second.',
+    ai: 'Snackr\'s restaurant page — menu, hours, rating — changes a few times a day and is read constantly. Chapter 9 already priced this: a 40% hit rate removes well over a third of the fleet, which makes it the single biggest lever in that calculator.',
+    code: 'v = r.get(key)\nif v is None:                       # miss: pay for the slow read once\n    v = db.restaurant(rid)\n    r.set(key, dumps(v), ex=300 + randint(0, 60))   # jittered TTL\nreturn loads(v)',
+    trap: 'Every copy of a hot key expiring in the same second sends the whole fleet at the database at once — a cache stampede. Jitter the TTL, and let one request rebuild the value while the others serve the stale copy. Version the key with the schema, or a deploy serves yesterday\'s shape.' },
+
+  { k: 'zset', num: 2, n: 'Sorted Set', ico: '🏆', head: 'leaderboards', type: 'ZSET',
+    one: 'A set where every member carries a score, permanently kept in score order.',
+    problem: 'You want the top N by a number that changes constantly, and re-sorting a table on every read — or on every write — is not affordable.',
+    ai: 'Snackr\'s "most ordered this hour". Each order bumps one member; the read is a range from the top. The ordering is maintained on write, so the read is a slice, not a sort.',
+    code: 'r.zincrby("top:hour:19", 1, rid)         # O(log n) per order\nr.zrevrange("top:hour:19", 0, 9, withscores=True)   # O(log n + 10)\nr.zrevrank("top:hour:19", my_rid)        # "you are #42"',
+    trap: 'A sorted set never forgets. Bucket the key by hour or day and expire the old buckets, or it grows until it is the reason for your memory alert. And ZRANGEBYSCORE over a huge span costs what it returns — pagination is not optional.' },
+
+  { k: 'lock', num: 3, n: 'Lock', ico: '🔒', head: 'one worker at a time', type: 'SET NX PX',
+    one: 'Mutual exclusion across machines, agreed on by one shared server.',
+    problem: 'Several workers can pick up the same job, and doing it twice is not harmless — a double refund, a second courier, two identical emails.',
+    ai: 'Snackr runs three schedulers for redundancy. Exactly one of them may assign a courier to order 88, and the other two must find out cheaply that they lost.',
+    code: 'tok = uuid4().hex\nif r.set("lock:order:88", tok, nx=True, px=5000):   # NX = only if absent\n    try: assign_courier(88)\n    finally: r.eval(RELEASE_LUA, 1, "lock:order:88", tok)  # delete only if still mine',
+    trap: 'A bare DEL releases whoever holds the lock now — which, after your lease expired, is somebody else. Compare the token and delete atomically, in Lua. And accept what the lock actually is: a lease with a timeout, not a mutex. If the work outlives the TTL, two workers run it, so the work still has to be idempotent.' },
+
+  { k: 'geo', num: 4, n: 'Geo Hash', ico: '📍', head: 'nearby search', type: 'GEO (a ZSET underneath)',
+    one: 'Two coordinates squashed into one sortable number, so "near each other" becomes "close in that number".',
+    problem: 'Find everything within N km of a point, fast, without measuring the distance to every row you own.',
+    ai: 'Snackr needs the couriers within 3 km of a restaurant, sorted by distance, before the confirmation screen renders. Every courier ping is one GEOADD; the query is one GEOSEARCH.',
+    code: 'r.geoadd("couriers", (lon, lat, courier_id))          # on every ping\nr.geosearch("couriers", longitude=lon, latitude=lat,\n            radius=3, unit="km", sort="ASC", count=10)',
+    trap: 'The interleaved number is a grid, so two points either side of a cell boundary are physically close and numerically far. Redis searches the neighbouring cells for you; a hand-rolled prefix match does not, and quietly misses the courier across the street. Also: GEO is a sorted set, and sorted sets do not expire members — stale couriers linger until you remove them.' }
+];
+
+/* four situations, one per use case — the interview version of this chapter */
+C.redisDrill = [
+  { s: 'Snackr\'s restaurant page is read forty thousand times a minute and edited about twice a day. The database is at 80% CPU and it is nearly all the same query.',
+    o: ['cache', 'zset', 'lock', 'geo'], a: 'cache',
+    why: 'Read-heavy, rarely written, and identical between reads — the textbook shape for a cache. Reach for a sorted set only if the answer is a ranking; here the answer is one document, so a string with a jittered TTL does it.' },
+  { s: 'Product wants a live "top 10 restaurants this hour" board, updated on every order, and each restaurant should be able to see its own rank.',
+    o: ['zset', 'cache', 'geo', 'lock'], a: 'zset',
+    why: 'A ranking that changes on every write is what a sorted set is for: the order is maintained as you write, so the read is a slice instead of a sort. Caching a computed top-10 would go stale in seconds and still needs the sort somewhere.' },
+  { s: 'Three schedulers run in parallel for redundancy. Each order must be assigned exactly one courier, and assigning two is a real cost.',
+    o: ['lock', 'cache', 'zset', 'geo'], a: 'lock',
+    why: 'SET NX gives you the one-winner decision in a single round trip. Remember what you bought: a lease with an expiry, not a mutex — so the assignment itself still needs an idempotency key for the case where the lease expires mid-work.' },
+  { s: 'The confirmation screen must show couriers within 3 km, nearest first, in under twenty milliseconds — and every courier reports its position every few seconds.',
+    o: ['geo', 'zset', 'cache', 'lock'], a: 'geo',
+    why: 'Proximity search over constantly moving points: the write is one GEOADD per ping and the read is one radius query, no scan. A plain sorted set cannot rank by two dimensions at once, and a cache would be stale before it was written.' }
+];
+
+/* the rest of the toolbox, one line each — you will meet these next to the four above */
+C.redisTypes = [
+  ['String', 'Bytes with a TTL. Caching, counters (INCR is atomic), and rate limiting with INCR plus EXPIRE.'],
+  ['Hash', 'A small map under one key. A session or a profile where you update one field without rewriting the whole blob.'],
+  ['List', 'A deque. Cheap queue with LPUSH and BRPOP — no acknowledgements, so a crashed worker loses the job.'],
+  ['Set', 'Unordered, unique. Membership tests, tags, and "who has already seen this" with SADD and SISMEMBER.'],
+  ['Sorted Set', 'A set plus a score, kept in order. Leaderboards, delay queues (score = due time), sliding-window rate limits.'],
+  ['Stream', 'An append-only log with consumer groups and acknowledgements. The List you actually want for jobs that must not vanish.'],
+  ['HyperLogLog', 'Approximate unique counts in 12 KB, about 0.8% error. Unique visitors, when exact is not worth the memory.'],
+  ['Bitmap', 'One bit per user id. Daily actives, feature flags, "did this user do X today" — a million users in 128 KB.'],
+  ['Pub/Sub', 'Fire-and-forget broadcast. No history, no delivery guarantee — if a subscriber is offline the message is simply gone.']
+];
+
+C.redisRules = [
+  ['It is memory, so plan for it vanishing', 'Persistence exists — snapshots and an append-only file — but neither is a durability promise you would put money behind. Anything you cannot recompute belongs in the database; Redis holds the copy.'],
+  ['Choose an eviction policy on purpose', 'A cache should run allkeys-lru and shed cold keys. A lock or a queue must not — set noeviction there, or the box quietly deletes the thing you were relying on being present.'],
+  ['One thread runs your commands', 'Which is why it is fast and predictable, and why KEYS, a huge ZRANGE or a slow Lua script blocks every other client on that box. Use SCAN, bound your ranges, keep scripts short.'],
+  ['Round trips dominate, not Redis', 'A command takes microseconds; the network takes a millisecond. Ten sequential calls is ten milliseconds of nothing. Pipeline them, or do the whole sequence in one Lua script.'],
+  ['A hot key beats your cluster', 'Sharding spreads keys, not traffic to one key. The single most-read key lands on one node, and that node is now your ceiling — replicate it, or put a short-lived in-process copy in front of it.']
+];
+
+/* ============================================================
+   Ch16: one small animated diagram per pattern.
+
+   Seven layouts cover all fifteen — the shape is the lesson, so
+   Observer fans out, Decorator nests and State goes round.
+   Everything animates in SVG itself (SMIL), so there are no
+   timers running behind fifteen cards.
+   ============================================================ */
+C.patternDia = {
+  singleton: { kind: 'fan',  dir: 'in',  hub: 'Instance', spokes: ['Client 1', 'Client 2', 'Client 3'] },
+  factory:   { kind: 'flow', nodes: ['create()', 'Factory', 'Product'] },
+  builder:   { kind: 'steps', items: ['.base()', '.walls()', '.roof()', '.build()'] },
+  adapter:   { kind: 'flow', nodes: ['Square', 'Adapter', 'Round'] },
+  decorator: { kind: 'nest', layers: ['retry', 'cache', 'generate()'] },
+  facade:    { kind: 'fan',  dir: 'out', hub: 'Facade', spokes: ['Retrieve', 'Generate', 'Guard'] },
+  proxy:     { kind: 'flow', nodes: ['Client', 'Proxy', 'Real object'] },
+  composite: { kind: 'nest', layers: ['Document', 'Section', 'Chunk'] },
+  observer:  { kind: 'fan',  dir: 'out', hub: 'Subject', spokes: ['Metrics', 'Drift', 'Training log'] },
+  strategy:  { kind: 'switch', input: 'query', opts: ['keyword', 'dense', 'hybrid'], active: 2, output: 'results' },
+  command:   { kind: 'flow', nodes: ['Invoker', 'Command', 'Receiver'] },
+  iterator:  { kind: 'cells', vals: ['8', '3', '5', '1', '9', '4'], label: 'next()' },
+  state:     { kind: 'cycle', states: ['Idle', 'Act', 'Wait', 'Done'] },
+  template:  { kind: 'steps', items: ['load()', 'split()', 'fit()', 'register()'], override: 2 },
+  chain:     { kind: 'flow', nodes: ['Small', 'Large', 'Human'] }
+};

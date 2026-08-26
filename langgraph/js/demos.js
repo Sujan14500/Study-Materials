@@ -848,10 +848,135 @@ function initQuiz() {
   renderG('');
 }
 
+
+/* ============================================================
+   Ch7 — scoped tools and controlled state.
+   The same scripted run, replayed through two graphs: one where
+   every tool is bound to every node, one where the phase decides.
+   ============================================================ */
+function initScoped() {
+  const svg = $('#lgs-svg'); if (!svg) return;
+  let scoped = true, at = -1;
+
+  const steps = () => C.lgsRun.filter(s => scoped ? !s.wide : true);
+  const phaseOf = i => { const s = steps()[i]; return s ? s.ph : 'agent'; };
+
+  /* what is actually in the request this step */
+  const boundTools = ph => scoped
+    ? C.lgsTools.filter(t => t.ph === ph)
+    : C.lgsTools;
+
+  function state() {
+    const st = { messages: 0, findings: {}, patch: null, test_result: null, pr: null };
+    const changed = [];
+    steps().slice(0, at + 1).forEach((s, i) => {
+      st.messages += 2;                       // one AI turn, one ToolMessage
+      Object.keys(s.w || {}).forEach(k => { st[k] = s.w[k]; });
+    });
+    const cur = steps()[at];
+    if (cur) changed.push('messages', ...Object.keys(cur.w || {}));
+    return { st: st, changed: changed };
+  }
+
+  function paint() {
+    const list = steps();
+    const cur = list[at];
+    const ph = cur ? cur.ph : null;
+
+    drawGraph(svg, C.lgsNodes, C.lgsEdges,
+      at < 0 ? 'START' : (cur ? cur.ph : 'END'),
+      cur ? ['agent', cur.ph] : null);
+
+    /* ---- the request payload, itemised ---- */
+    const tools = boundTools(ph || 'research');
+    const toolTk = tools.reduce((a, t) => a + t.tk, 0);
+    const msgTk = C.lgsPayload.base + Math.max(0, (at + 1) * 2) * C.lgsPayload.perMessage;
+    $('#lgs-payload').innerHTML =
+      '<div class="lgs-pay-h"><span>' + (scoped
+        ? 'bound at <b>' + (ph || 'research') + '</b>'
+        : 'bound at <b>every</b> node') + '</span><span class="mono">' +
+        tools.length + ' tools · ' + toolTk + ' tok</span></div>' +
+      '<div class="lgs-tools">' + C.lgsTools.map(t => {
+        const on = tools.indexOf(t) >= 0;
+        return '<span class="lgs-tool' + (on ? '' : ' out') + (t.danger ? ' danger' : '') +
+          '" title="' + t.d + '">' + t.n + '</span>';
+      }).join('') + '</div>' +
+      '<div class="lgs-pay-bar">' +
+        '<i style="width:' + (toolTk / (toolTk + msgTk) * 100) + '%"></i>' +
+        '<span class="mono">' + toolTk + ' schemas + ' + msgTk + ' transcript = ' +
+        (toolTk + msgTk) + ' tokens, this step</span>' +
+      '</div>';
+
+    /* ---- trace ---- */
+    $('#lgs-trace').innerHTML = list.slice(0, at + 1).map((s, i) =>
+      '<div class="lgs-step' + (s.bad ? ' bad' : '') + (i === at ? ' now' : '') + '">' +
+        '<div class="lgs-step-h"><span class="node-tag">' + s.ph + '</span>' +
+          '<span class="lgs-n">step ' + (i + 1) + '</span></div>' +
+        (s.think ? '<div class="lgs-think">' + esc(s.think) + '</div>' : '') +
+        '<div class="lgs-act mono">' + esc(s.act) + '</div>' +
+        '<div class="lgs-obs mono">' + esc(s.obs) + '</div>' +
+        (s.note ? '<div class="lgs-warn">' + s.note + '</div>' : '') +
+      '</div>').join('') ||
+      '<div class="ms-empty">Press <b>step</b> to run the graph. Switch the toggle first to see the same task under an unscoped graph.</div>';
+    $('#lgs-trace').scrollTop = 1e6;
+
+    /* ---- state ---- */
+    const s = state();
+    $('#lgs-state').innerHTML = stateBlock(s.st, s.changed);
+
+    const done = at >= list.length - 1;
+    $('#lgs-step').textContent = done ? '✓ finished' : (at < 0 ? '▶ step' : '▶ step ' + (at + 2));
+    $('#lgs-step').disabled = done;
+    $('#lgs-verdict').innerHTML = !done ? '' : (scoped
+      ? '<b class="ok">' + list.length + ' steps, 0 production side effects.</b> Every tool call the model made was one the node it was standing in could legally produce.'
+      : '<b class="no">' + list.length + ' steps, 2 production side effects.</b> Same model, same task, same prompt — the only difference is that every tool was reachable from every node. Nothing was "jailbroken"; the graph simply allowed it.');
+  }
+
+  $('#lgs-step').onclick = () => { at = Math.min(steps().length - 1, at + 1); paint(); xp(2); };
+  $('#lgs-reset').onclick = () => { at = -1; paint(); };
+  $('#lgs-scope').onclick = () => {
+    scoped = !scoped;
+    $('#lgs-scope').classList.toggle('on', scoped);
+    $('#lgs-scope').querySelector('b').textContent =
+      scoped ? 'Tools scoped per node' : 'Every tool bound to every node';
+    at = -1; paint(); xp(2);
+  };
+
+  /* ---- the state contract table, which does not change as you step ---- */
+  $('#lgs-schema').innerHTML =
+    '<table class="dt lgs-dt"><thead><tr><th>key</th><th>type &amp; reducer</th><th>written by</th></tr></thead><tbody>' +
+    C.lgsSchema.map(r => '<tr><td class="mono">' + r.k + '</td><td class="mono lgs-ty">' + esc(r.t) +
+      '</td><td><span class="node-tag">' + r.w + '</span></td></tr>' +
+      '<tr class="lgs-desc"><td colspan="3">' + r.d + '</td></tr>').join('') +
+    '</tbody></table>';
+
+  $('#lgs-phases').innerHTML = C.lgsPhases.map(p =>
+    '<div class="lgs-phase"><b>' + p.n + '</b><small>' + p.d + '</small>' +
+    '<div class="lgs-writes">' + p.writes.map(w => '<span class="mono">' + w + '</span>').join('') + '</div></div>').join('');
+
+  const row = $('#lgs-code-tabs'), blk = $('#lgs-code');
+  C.lgsCode.forEach((it, i) => {
+    const b = el('button', 'chip' + (i === 0 ? ' active' : ''), it.t);
+    b.onclick = () => {
+      $$('.chip', row).forEach(c => c.classList.remove('active'));
+      b.classList.add('active'); blk.textContent = it.code;
+    };
+    row.appendChild(b);
+  });
+  blk.textContent = C.lgsCode[0].code;
+
+  $('#lgs-notes').innerHTML = C.lgsNotes.map(n =>
+    '<div class="gterm"><b>' + n[0] + '</b><span>' + n[1] + '</span></div>').join('');
+
+  paint();
+  window.addEventListener('chapterchange', e => { if (e.detail === 'scoped') paint(); });
+}
+
 /* ---------- boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   [initBackground, initShape, initState, initBuilder, initRouter, initCycle, initReact,
-   initPersist, initHitl, initTimeTravel, initStream, initMulti, initMemory, initShip, initQuiz]
+   initScoped, initPersist, initHitl, initTimeTravel, initStream, initMulti, initMemory,
+   initShip, initQuiz]
     .forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 });
 })();

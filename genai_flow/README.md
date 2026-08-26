@@ -1,7 +1,7 @@
 # GenAI Flow
 
 An interactive, animated course that takes someone from "what even is a token" to
-"I could ship a RAG-backed agent". Sixteen chapters, every concept attached to
+"I could ship a RAG-backed agent". Eighteen chapters, every concept attached to
 something you can click, drag or break.
 
 ## Run it
@@ -24,17 +24,19 @@ open index.html           # macOS
 | 3 | Embeddings | A 2D meaning map with nearest-neighbour search and runnable vector arithmetic |
 | 4 | Attention | Hover any word, watch what it attends to |
 | 5 | Generation | A sampler with temperature and top-p — step it, or watch it run |
-| 6 | Training | Pretraining → SFT → preference tuning, click through each stage |
-| 7 | Prompt engineering | Prompt lab: toggle ingredients, watch answer quality move |
-| 8 | Context & memory | Fill a context window until it overflows and the model forgets your name |
-| 9 | RAG | The full pipeline animated, with real retrieval scoring over a tiny knowledge base |
-| 10 | Prompt vs RAG vs fine-tune | Three questions, one reasoned recommendation |
-| 11 | Agents & tools | Step through think → act → observe loops |
-| 12 | Evaluation & risk | Spot the hallucination |
-| 13 | Ship it | Cost/latency calculator and a production checklist that saves |
-| 14 | Mem0: agent memory | Step a conversation through extract → reconcile and watch ADD/UPDATE/DELETE/NOOP fire, then search the store |
-| 15 | Data Formulator | Fill in encoding shelves, ask for a field the data doesn't have, read the pandas/SQL it generates |
-| 16 | Final quiz | 15 questions with explanations, plus a glossary |
+| 6 | Making it fast | Race bulk against streaming, then flip streaming / prompt cache / KV cache / speculative decoding and watch which number each one actually moves |
+| 7 | Training | Pretraining → SFT → preference tuning, click through each stage |
+| 8 | Prompt engineering | Prompt lab: toggle ingredients, watch answer quality move |
+| 9 | Context & memory | Fill a context window until it overflows and the model forgets your name |
+| 10 | RAG | The full pipeline animated, with real retrieval scoring over a tiny knowledge base |
+| 11 | Advanced RAG | Switch the dense / sparse / late-interaction lanes on and off over one knowledge base, fan one question into five and fuse them with RRF, then break a RAG system four different ways and watch which metric family collapses |
+| 12 | Prompt vs RAG vs fine-tune | Three questions, one reasoned recommendation |
+| 13 | Agents & tools | Step through think → act → observe loops |
+| 14 | Evaluation & risk | Spot the hallucination |
+| 15 | Ship it | Cost/latency calculator and a production checklist that saves |
+| 16 | Mem0: agent memory | Step a conversation through extract → reconcile and watch ADD/UPDATE/DELETE/NOOP fire, then search the store |
+| 17 | Data Formulator | Fill in encoding shelves, ask for a field the data doesn't have, read the pandas/SQL it generates |
+| 18 | Final quiz | 19 questions with explanations, plus a glossary |
 
 Progress, XP and the checklist persist in `localStorage`.
 
@@ -61,6 +63,13 @@ question can retrieve something, that the Mem0 run only UPDATEs/DELETEs memories
 exist at that point, that every Data Formulator number ties back to `sales.csv`, and that
 every `#id` the demos reach for is actually created somewhere.
 
+It also re-derives chapter 6’s inference maths independently and asserts the claims the
+chapter makes: streaming moves time-to-first-token and *nothing* else, prompt caching moves
+prefill and leaves tokens-per-second untouched, decode is linear in output length with a KV
+cache and superlinear without one, and speculative decoding is a win at the configured
+acceptance rate and a **loss** at zero. If a future edit breaks one of those, the chapter is
+teaching something false and the test says so.
+
 ## Notes on accuracy
 
 - The tokenizer is a heuristic approximation of BPE, not a real one — it demonstrates
@@ -70,6 +79,10 @@ every `#id` the demos reach for is actually created somewhere.
 - Attention weights and next-token probabilities are illustrative, chosen to show the
   phenomenon the chapter is teaching.
 - The cost calculator takes your own $/million-token rates, because real prices change.
+- Chapter 6’s prefill/decode constants (tokens per second, cache speedup, draft acceptance rate)
+  are plausible mid-size-model figures, not measurements — yours will differ. The *arithmetic*
+  around them is the real model, including the standard speculative-decoding expectation
+  `E = (1 - a^(g+1)) / (1 - a)`, so every trade-off points the right way even if your constants do not match.
 - The Mem0 chapter replays a scripted run of the real extract/reconcile pipeline. A live
   run costs two LLM calls per turn and will word its memories differently; the operations
   and the decision logic are the real thing. Similarity scores are illustrative.

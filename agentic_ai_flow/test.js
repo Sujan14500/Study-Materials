@@ -92,6 +92,155 @@ assert(C.mcpFrames.some(f => f.dir === 'err'), 'no error frame — the failure p
 C.mcpPrimitives.forEach(p => assert(p.h && p.who && p.c, 'mcpPrimitives entries need a name, an owner and code'));
 assert(C.mcpCode.length >= 5, 'the MCP chapter should carry the full worked example set');
 
+// prompt caching in an agent loop: re-derived from the same model initShip uses.
+// The claim the chapter makes is that a loop is the best-shaped workload for it,
+// so the saving has to be large — and it must not touch the output side at all.
+{
+  const bill = (n, tin, tout, disc) => {
+    let full = 0, billed = 0;
+    for (let k = 0; k < n; k++) {
+      const stepIn = tin + k * (tout + 200);
+      const cached = k === 0 ? tin * 0.8 : tin + (k - 1) * (tout + 200);
+      full += stepIn;
+      billed += (stepIn - cached) + cached * disc;
+    }
+    return { full, billed };
+  };
+  const r = bill(7, 1500, 250, 0.1);
+  assert(r.billed < r.full / 3,
+    `caching a 7-step loop should cut billed input to well under a third: ${Math.round(r.billed)} of ${r.full}`);
+  // no cache discount means no saving — the model must not be flattering itself
+  const none = bill(7, 1500, 250, 1);
+  assert(Math.abs(none.billed - none.full) < 1e-9, 'a 100% billing rate must be identical to no caching');
+  // and the saving must grow with trajectory length, since the prefix grows with it
+  const short = bill(2, 1500, 250, 0.1), long = bill(14, 1500, 250, 0.1);
+  assert(1 - long.billed / long.full > 1 - short.billed / short.full,
+    'longer trajectories must benefit more from caching, not less');
+}
+
+
+// ---- ch4: the naive-loop chapter makes claims with numbers on them.
+// The simulation is re-derived here, independently of demos.js, because a
+// chapter that says "7x cheaper" has to still be true after someone edits
+// C.nlModel.
+{
+  const M = C.nlModel;
+  const lcg = seed => { let s = (seed * 1103515245 + 12345) >>> 0;
+    return () => { s = (s * 1103515245 + 12345) >>> 0; return s / 4294967296; }; };
+  function sim(g, seed) {
+    const rnd = lcg(seed);
+    const cap = g.budget ? M.budgetSteps : M.hardCap;
+    let ctx = M.ctx0, tokens = 0, prog = 0, step = 0;
+    while (step < cap) {
+      step++;
+      tokens += ctx;
+      const hp = Math.min(M.hpMax, ctx * M.hpPerToken);
+      const p = Math.min(0.95, Math.max(0.05,
+        M.p0 - hp - (g.scope ? M.tcScoped : M.tcAll) - (g.state ? 0 : M.statePenalty)));
+      const ok = rnd() < p;
+      prog = ok ? prog + 1 : Math.max(0, prog - 1);
+      ctx += M.obsTokens + (ok ? 0 : M.wrongTokens);
+      if (g.compact) ctx = Math.min(ctx, M.ctxCap);
+      if (g.verify) { if (prog >= M.need) return { o: 'done', tokens }; }
+      else if (rnd() < M.pDeclare) return { o: prog >= M.need ? 'done' : 'shipped', tokens };
+    }
+    return { o: g.budget ? 'escalated' : 'runaway', tokens };
+  }
+  const agg = g => {
+    const t = { done: 0, shipped: 0, escalated: 0, runaway: 0 };
+    let tokens = 0;
+    for (let s = 1; s <= 400; s++) { const r = sim(g, s); t[r.o]++; tokens += r.tokens; }
+    return { t, tokens: tokens / 400, perDone: t.done ? tokens / t.done : Infinity };
+  };
+  const guards = on => ({ verify: on, scope: on, compact: on, state: on, budget: on });
+
+  // the guard ids in the content must be exactly the levers the model reads,
+  // or a toggle in the UI does nothing and nobody notices
+  const levers = ['verify', 'scope', 'compact', 'state', 'budget'].sort().join(',');
+  assert(C.nlGuards.map(g => g.id).sort().join(',') === levers,
+    'C.nlGuards no longer matches the guards the simulation implements');
+
+  const naive = agg(guards(0)), all = agg(guards(1));
+
+  // claim 1: the naive loop mostly ships wrong answers with a "done" on them
+  assert(naive.t.shipped / 400 > 0.6,
+    `the naive loop only ships bugs on ${(naive.t.shipped / 4).toFixed(0)}% of runs — the chapter's premise is gone`);
+
+  // claim 2: all five guards actually finish the task most of the time
+  assert(all.t.done / 400 > 0.7,
+    `with every guard on only ${(all.t.done / 4).toFixed(0)}% of runs finish`);
+  assert(all.t.shipped === 0, 'a verified loop must never silently ship an unfinished task');
+
+  // claim 3: the headline. Cost per FINISHED task, which is the only cost that
+  // means anything, falls by a lot. Average cost per run does not — and the
+  // chapter says so out loud, so check that stays true too.
+  assert(naive.perDone / all.perDone > 3,
+    `guards only improve tokens-per-finished-task by ${(naive.perDone / all.perDone).toFixed(1)}x`);
+  assert(naive.tokens < all.tokens,
+    'the naive loop is no longer cheaper per run, so the "cheap because it gives up" point no longer lands');
+
+  // claim 4: the callout under the demo — verification with no budget converts
+  // silent failure into expensive failure. It must be worse per finished task
+  // than turning everything on.
+  {
+    const only = agg({ verify: 1, scope: 0, compact: 0, state: 0, budget: 0 });
+    assert(only.t.shipped === 0, 'verification alone must at least stop the silent ships');
+    assert(only.t.runaway > 0, 'verification with no budget must produce runaways — that is the callout');
+    assert(only.perDone > all.perDone * 2,
+      'verification-only is no longer dramatically more expensive per finished task');
+  }
+
+  // the flowchart has to be a real graph, or the animation walks off the edge
+  const nodeIds = new Set(C.nlNodes.map(n => n.id));
+  C.nlEdges.forEach(e => {
+    assert(nodeIds.has(e.a) && nodeIds.has(e.b), `nlEdges: ${e.a}->${e.b} references a node that does not exist`);
+  });
+  ['gen', 'check', 'fix', 'grow', 'hall', 'worse', 'declare', 'ship'].forEach(id =>
+    assert(nodeIds.has(id), `the run animation lights #${id}, which C.nlNodes does not define`));
+  Object.keys(C.nlOutcomes).forEach(k =>
+    assert(C.nlOutcomes[k].n && C.nlOutcomes[k].c, `outcome ${k} is missing a label or colour`));
+}
+
+// ---- ch4b: tool scoping. Two monotonic claims, both easy to break by editing
+// C.tsModel, both load-bearing for the panel's copy.
+{
+  const M = C.tsModel;
+  const acc = k => Math.max(M.floor, Math.min(0.99, M.baseAcc - M.decay * Math.log2(Math.max(1, k) / 4)));
+
+  for (let k = 4; k < 20; k++)
+    assert(acc(k + 1) <= acc(k), `tool accuracy is not monotonically falling at ${k} tools`);
+
+  // scoping has to be worth doing at the sizes the slider actually reaches
+  const phases = {};
+  C.tsTools.forEach(t => { phases[t.ph] = (phases[t.ph] || 0) + 1; });
+  C.tsPhases.forEach(p => assert(phases[p.id] >= 3,
+    `phase "${p.id}" has ${phases[p.id] || 0} tools — the scoped demo needs at least 3`));
+
+  // every phase must be populated at the slider's minimum, or scoping shows an
+  // empty tool list and the accuracy maths divides by nothing
+  const MIN = 11;
+  C.tsPhases.forEach(p => assert(C.tsTools.slice(0, MIN).some(t => t.ph === p.id),
+    `phase "${p.id}" has no tool inside the first ${MIN}, which is the slider minimum`));
+
+  const scopedRun = Math.pow(acc(C.tsTools.slice(0, 20).filter(t => t.ph === 'act').length), M.steps);
+  const wideRun = Math.pow(acc(20), M.steps);
+  assert(scopedRun > wideRun * 2,
+    `scoping only improves the clean-run rate from ${(wideRun * 100).toFixed(0)}% to ${(scopedRun * 100).toFixed(0)}% — not worth a panel`);
+
+  // the demo warns that dangerous tools sit on the menu during a code task;
+  // they have to actually be in the list for that warning to be honest
+  const names = new Set(C.tsTools.map(t => t.n));
+  ['refund_charge', 'deploy_prod'].forEach(n =>
+    assert(names.has(n), `the scoping copy names ${n}, which is not in C.tsTools`));
+}
+
+// every C.* key the demos read must exist, or a panel renders empty and nobody notices
+{
+  const demosSrc = fs.readFileSync('js/demos.js', 'utf8');
+  const keys = new Set([...demosSrc.matchAll(/\bC\.([A-Za-z0-9_]+)/g)].map(m => m[1]));
+  keys.forEach(k => assert(C[k] !== undefined, `demos.js reads C.${k}, which content.js does not define`));
+}
+
 // every id the demos reach for must exist somewhere, or a chapter is quietly dead
 const demos = fs.readFileSync('js/demos.js', 'utf8');
 const html = fs.readFileSync('index.html', 'utf8');

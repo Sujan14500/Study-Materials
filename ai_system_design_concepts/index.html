@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI System Design Flow — Design ML and LLM Systems That Survive Production</title>
-<meta name="description" content="An interactive course on AI/ML system design: metrics, labels, features and skew, the model ladder, retrieval funnels, latency budgets, capacity, A/B testing, feedback loops, RAG at scale, LLM serving, and four canonical designs.">
+<meta name="description" content="An interactive course on AI/ML system design: metrics, labels, features and skew, the model ladder, retrieval funnels, latency budgets, capacity, A/B testing, feedback loops, RAG at scale, vector indexes (IVF, HNSW, PQ), LLM serving, and four canonical designs.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -110,7 +110,7 @@
     <div class="resgrid" id="running-example"></div>
     <div class="callout" style="margin-top:18px">
       <div class="callout-ico">🎯</div>
-      <div>These four look like completely different products. By Chapter 14 you will see they are the same nine steps with different nouns — and that skeleton is the thing actually worth carrying away.</div>
+      <div>These four look like completely different products. By Chapter 15 you will see they are the same nine steps with different nouns — and that skeleton is the thing actually worth carrying away.</div>
     </div>
   </div>
 
@@ -579,11 +579,133 @@ ASOF JOIN user_features f
 </section>
 
 <!-- ============================================================= -->
-<!-- 12. LLM SERVING                                               -->
+<!-- 13. VECTOR INDEXES                                            -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="llmserving" data-title="LLM serving &amp; cost" data-icon="13" data-group="LLM systems">
+<section class="chapter" data-id="annindex" data-title="Vector indexes" data-icon="13" data-group="LLM systems">
   <header class="ch-head">
     <div class="ch-kicker">Chapter 13 · LLM systems</div>
+    <h2>Nobody searches all <span class="grad">ten million</span> vectors</h2>
+    <p class="lead">
+      The last chapter assumed the right chunk comes back. This is the machinery that makes that
+      affordable. Every vector index is the same idea in different clothes: <b>group the vectors up
+      front so a query can ignore almost all of them</b>. Group them with k-means and you have IVF;
+      wire them into a graph and you have HNSW. The speed and the wrongness come from the same
+      decision — the vectors you deliberately refuse to look at.
+    </p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 IVF, built in front of you</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">
+      Every <b>×</b> is one embedding, drawn in 2-D because 768 dimensions do not fit on a screen.
+      Run k-means to build the index, then drag the query around and watch how much of the corpus the
+      search refuses to touch — and what that refusal costs you in recall. Every number below is
+      measured against a brute-force search over these same points.
+    </p>
+    <div class="ivf-wrap">
+      <div class="ivf-stage">
+        <canvas id="ivf-canvas" width="760" height="470"></canvas>
+        <div class="ivf-badge" id="ivf-badge">unindexed · flat search touches every vector</div>
+      </div>
+      <div class="ivf-side">
+        <div class="btn-row" style="margin-top:0">
+          <button class="btn" id="ivf-run">▶ Run k-means</button>
+          <button class="btn btn-ghost" id="ivf-search">🔎 Search</button>
+          <button class="btn btn-ghost" id="ivf-new">⟳ New corpus</button>
+        </div>
+        <div class="ctrl">
+          <label for="ivf-nlist">nlist · cells in the index <span class="mono" id="ivf-nlist-v">10</span></label>
+          <input type="range" id="ivf-nlist" min="2" max="24" step="1" value="10">
+        </div>
+        <div class="ctrl">
+          <label for="ivf-nprobe">nprobe · cells this query opens <span class="mono" id="ivf-nprobe-v">1</span></label>
+          <input type="range" id="ivf-nprobe" min="1" max="10" step="1" value="1">
+        </div>
+        <div id="ivf-out"></div>
+        <div class="ivf-hint">Drag anywhere on the map to move the query. Green rings are the true top-10; lines are what this index actually returned.</div>
+      </div>
+    </div>
+    <div class="tnote" id="ivf-advice"></div>
+    <div class="three-up" id="ivf-phases" style="margin-top:20px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📈 nprobe is the dial</h3><span class="panel-tag">live</span></div>
+    <div data-worked="annindex"></div>
+    <p class="panel-sub">
+      The index you just built, swept across every possible nprobe and averaged over 24 random queries.
+      Recall climbs steeply and then flattens; work climbs in a straight line and never stops. Where the
+      green line goes flat is your operating point — everything to the right of it is latency you are
+      spending on nothing.
+    </p>
+    <canvas id="ivf-curve" width="760" height="240" class="ivf-curve"></canvas>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧭 The four families</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Same job, four bargains. Watch the three bars: no family wins all of them, and which bar you cannot compromise on is what actually picks your index.</p>
+    <div class="lab-grid" id="ann-cards"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Pick the index</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Four situations. Each one is decided by a constraint — corpus size, RAM, latency, write pattern — and not by which index is best in general.</p>
+    <div id="ann-drill"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🗜️ Product quantization, watched</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">
+      PQ chops each vector into <b>m</b> sub-vectors and replaces each one with the id of its nearest
+      codebook centroid. The vector stops being a list of floats and becomes a handful of small integers.
+      This is the only technique here that changes which <i>hardware</i> you need.
+    </p>
+    <div class="pq-wrap">
+      <div class="sampler-controls one-col" id="pq-knobs"></div>
+      <div class="pq-viz">
+        <div class="pq-label">one embedding, float32 — split into m sub-vectors</div>
+        <div class="pq-strip" id="pq-strip"></div>
+        <div class="pq-arrow">↓ &nbsp;each sub-vector → nearest centroid in its own codebook &nbsp;↓</div>
+        <div class="pq-label">what actually gets stored</div>
+        <div class="pq-codes" id="pq-codes"></div>
+      </div>
+    </div>
+    <div id="pq-out" style="margin-top:18px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🕸️ HNSW: coarse hops first</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">
+      The other way to look at less. Instead of cells, a layered graph: the top layer has a few nodes
+      with very long links, and each layer below has more nodes and shorter ones. The search hops
+      greedily toward the query on each layer, then drops a level and continues from where it stopped.
+    </p>
+    <svg id="hnsw-svg" viewBox="0 0 760 400" class="hnsw-svg" aria-label="A three-layer HNSW graph being searched"></svg>
+    <div class="btn-row" style="margin-top:6px"><button class="btn" id="hnsw-run">▶ Search the graph</button></div>
+    <div class="tnote" id="hnsw-cap"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📌 Six things about vector indexes in production</h3></div>
+    <div class="glossary" id="ann-notes"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🧭</div>
+    <div><b>Pick the index with a multiplication, not a benchmark.</b> bytes-per-vector × vectors × replicas
+    tells you whether you are choosing between HNSW and IVF-Flat at all, or whether compression was decided
+    for you before the conversation started. Then, and only then, tune recall — with nprobe if you built IVF,
+    with efSearch if you built HNSW, and always against exact search over a golden set, because "the results
+    got worse" is not a number anyone can act on.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 12. LLM SERVING                                               -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="llmserving" data-title="LLM serving &amp; cost" data-icon="14" data-group="LLM systems">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 14 · LLM systems</div>
     <h2>Where the money and the <span class="grad">milliseconds</span> go</h2>
     <p class="lead">LLM systems have an unusual cost curve: per-request, variable, and dominated by tokens you often did not need to send. The three levers that matter are routing traffic to the cheapest model that can handle it, caching aggressively, and keeping the prompt small.</p>
   </header>
@@ -609,7 +731,30 @@ ASOF JOIN user_features f
   </div>
 
   <div class="panel">
-    <div class="panel-head"><h3>🔧 Six levers</h3></div>
+    <div class="panel-head"><h3>🧠 The KV cache ceiling</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Self-hosting sizing question everyone gets wrong the first time: how many users can one GPU serve at once? People reach for the weights. The weights are a fixed cost you pay once. What scales with every concurrent request — and what actually runs you out of memory — is the <b>KV cache</b>: the attention keys and values for every token in flight. Drag the context length up and watch the ceiling fall.</p>
+    <div class="calc" id="kvcalc"></div>
+    <div class="kv-bars" id="kv-bars"></div>
+    <p class="panel-sub" id="kv-note" style="margin-top:14px"></p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⏱️ Where a request's time actually goes</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">A request is two jobs with different bottlenecks. <b>Prefill</b> pushes the whole prompt through in one parallel pass. <b>Decode</b> emits one token per forward pass and cannot be parallelised. Each lever below attacks exactly one of them — click to see which number moves, and which stubbornly does not.</p>
+    <div class="chip-row" id="lever-chips"></div>
+    <div class="kv-bars" id="lever-bars"></div>
+    <div class="stat-row" id="lever-stats" style="margin-top:14px"></div>
+    <p class="panel-sub" id="lever-note" style="margin-top:14px"></p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🚫 What each lever does not do</h3></div>
+    <p class="panel-sub">The expensive mistake is reaching for the wrong one of these, then spending a sprint being surprised that nothing moved.</p>
+    <div class="glossary" id="decode-lessons"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔧 Eight levers</h3></div>
     <div class="glossary" id="serving-levers"></div>
   </div>
 
@@ -641,9 +786,9 @@ ASOF JOIN user_features f
 <!-- ============================================================= -->
 <!-- 13. CANONICAL DESIGNS                                         -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="designs" data-title="Canonical designs" data-icon="14" data-group="Putting it together">
+<section class="chapter" data-id="designs" data-title="Canonical designs" data-icon="15" data-group="Putting it together">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 14 · Putting it together</div>
+    <div class="ch-kicker">Chapter 15 · Putting it together</div>
     <h2>Four systems, <span class="grad">end to end</span></h2>
     <p class="lead">The same nine steps applied to four very different problems. Read the gotcha on every stage — those are the parts that are obvious in hindsight and expensive in advance.</p>
   </header>
@@ -670,9 +815,9 @@ ASOF JOIN user_features f
 <!-- ============================================================= -->
 <!-- 14. OPERATE IT                                                -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="operate" data-title="Operate it" data-icon="15" data-group="Putting it together">
+<section class="chapter" data-id="operate" data-title="Operate it" data-icon="16" data-group="Putting it together">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 15 · Putting it together</div>
+    <div class="ch-kicker">Chapter 16 · Putting it together</div>
     <h2>Launch is the <span class="grad">start</span> of the work</h2>
     <p class="lead">Traditional software mostly keeps working. An AI system degrades on its own: the world moves, the data drifts, adversaries adapt, and its own outputs contaminate its next training set. The operating plan is part of the design, not a follow-up ticket.</p>
   </header>
@@ -707,13 +852,94 @@ ASOF JOIN user_features f
 </section>
 
 <!-- ============================================================= -->
-<!-- 15. QUIZ                                                      -->
+<!-- 16. DESIGN PATTERNS                                           -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="patterns" data-title="Design patterns" data-icon="17" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 17 · Putting it together</div>
+    <h2>Fifteen shapes your code <span class="grad">keeps landing in</span></h2>
+    <p class="lead">Everything so far was system-level. This is the layer below it: the fifteen classic patterns, each one a name for a problem that recurs so often it was worth naming. You have already built eight of them in this course without being told what they were called — a cache in front of a model is a <b>Proxy</b>, the model cascade is a <b>Chain of Responsibility</b>, the model ladder is <b>Strategy</b>. The names are the point: they turn a whiteboard into a sentence.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧩 The fifteen</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Filter by family, then open a card for the problem it solves, where it shows up in an AI system, the code in about five lines, and the trap that comes with it. Every trap is a real incident someone has had.</p>
+    <div class="chip-row" id="pattern-cats"></div>
+    <div class="lab-grid" id="pattern-cards"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Name the pattern</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Six situations, all of them from earlier chapters. One defensible answer each — and the explanation says why the near-miss is a near-miss, because that is where the understanding is.</p>
+    <div id="pattern-drill"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📍 Eight you already used</h3></div>
+      <p class="panel-sub">Nothing here is new. Each of these was a chapter before it was a pattern:</p>
+      <div class="glossary" id="pattern-here"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five rules</h3></div>
+      <div class="glossary" id="pattern-rules"></div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">🪤</div>
+    <div><b>The failure mode of this chapter is using them.</b> A pattern applied to a problem you do not have is pure cost: an interface with one implementation, a factory that returns the only class it has ever returned, a builder for four fields. The list above is a <i>recognition</i> tool — when a shape appears twice on its own, you get to name it and everyone knows what you mean. Writing the pattern first, and the problem second, is how codebases become mazes.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 17. REDIS                                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="redis" data-title="Redis" data-icon="18" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 18 · Putting it together</div>
+    <h2>One box, in memory, <span class="grad">four jobs</span></h2>
+    <p class="lead">Redis turns up in every design in chapter 15 and in almost every interview, and it is nearly always doing one of four things. Not four products — four data types, each one the answer to a different problem: a <b>string</b> in front of a slow read, a <b>sorted set</b> holding a ranking, one <b>SET NX</b> deciding which worker wins, and a <b>geo</b> index answering "what is near me". Knowing which is which, and what each one breaks, is the whole chapter.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧠 The four use cases</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Open a card for the problem it solves, where it shows up in Snackr, the commands in about four lines, and the trap. The trap is the part interviewers are actually listening for.</p>
+    <div class="lab-grid" id="redis-cards"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Name the use case</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Four situations, one defensible answer each. The explanation says why the near-miss misses, because in an interview that is the follow-up question.</p>
+    <div id="redis-drill"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧰 The rest of the toolbox</h3></div>
+      <p class="panel-sub">Nine data types, one line each. Most of a Redis design is picking the right row here.</p>
+      <div class="glossary" id="redis-types"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five operating rules</h3></div>
+      <div class="glossary" id="redis-rules"></div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">🪤</div>
+    <div><b>Redis is a copy, not a source of truth.</b> It is one process holding your data in memory, and the honest design assumption is that the whole thing can disappear between two requests. Every use above survives that: a cold cache is slow, not wrong; a lost leaderboard rebuilds from orders; a lost lock is a lease that expired; a lost geo index refills on the next round of pings. The moment something in Redis cannot be recomputed from the database, you have quietly promoted a cache to a database — and it is a database with no schema, no transactions worth the name, and an eviction policy that deletes your data on purpose.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 18. QUIZ                                                      -->
 <!-- ============================================================= -->
 <section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Putting it together">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 16 · Finish line</div>
+    <div class="ch-kicker">Chapter 19 · Finish line</div>
     <h2>Prove it to <span class="grad">yourself</span></h2>
-    <p class="lead">Twelve questions across everything above. No time limit, instant explanations, retake it as often as you like.</p>
+    <p class="lead">Fourteen questions across everything above. No time limit, instant explanations, retake it as often as you like.</p>
   </header>
 
   <div class="panel">

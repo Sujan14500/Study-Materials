@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DL Fundamentals — Deep Learning, Visually</title>
+<meta name="description" content="An interactive, animated course on deep learning fundamentals: train a real network on XOR in your browser, step through a forward and backward pass number by number, and watch gradients vanish with depth.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<canvas id="bg-particles" class="bg-particles" aria-hidden="true"></canvas>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark"><span>🧠</span></div>
+    <div>
+      <div class="brand-name">DL Fundamentals</div>
+      <div class="brand-sub">weights, gradients, depth</div>
+    </div>
+  </div>
+
+  <div class="progress-block">
+    <div class="progress-top">
+      <span>Progress</span><span id="progress-label">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="xp-row">
+      <span class="xp-badge" id="xp-badge">0 XP</span>
+      <button class="reset-btn" id="reset-btn" title="Clear saved progress">reset</button>
+    </div>
+  </div>
+
+  <nav class="chapter-nav" id="chapter-nav" aria-label="Chapters"></nav>
+
+  <div class="sidebar-foot">
+    <kbd>&larr;</kbd><kbd>&rarr;</kbd> to navigate
+  </div>
+</aside>
+
+<button class="menu-toggle" id="menu-toggle" aria-label="Toggle chapters">&#9776;</button>
+
+<!-- ============ MAIN ============ -->
+<main class="main" id="main">
+<div class="stage" id="stage">
+
+<!-- ============================================================= -->
+<!-- 0. WELCOME                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="welcome" data-title="Welcome" data-icon="&#10022;" data-group="Start here">
+  <div class="hero">
+    <div class="hero-tag">interactive course · real networks · no server</div>
+    <h1 class="hero-title">How <span class="grad">deep learning</span><br>actually works</h1>
+    <p class="hero-sub">
+      Thirteen chapters. Train a real network on XOR and watch it fail without a hidden layer.
+      Step through a forward pass and a backward pass <b>number by number</b>. Slide a kernel
+      across an image. Every network here is built, initialised and trained
+      <b>live in your browser</b> — no framework, no recording, about 200 lines of maths.
+    </p>
+
+    <div class="hero-anim">
+      <svg viewBox="0 0 640 180" class="flow-svg" id="hero-flow">
+        <defs>
+          <linearGradient id="gradFlow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#7c5cff"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#34d399"/>
+          </linearGradient>
+        </defs>
+        <path id="flow-path" d="M40,90 C170,20 250,160 380,90 S560,40 600,90" fill="none" stroke="url(#gradFlow)" stroke-width="2" stroke-dasharray="6 6" opacity=".45"/>
+        <g id="hero-nodes"></g>
+        <circle r="6" fill="#fff"><animateMotion dur="4s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#22d3ee"><animateMotion dur="4s" begin="1.3s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#7c5cff"><animateMotion dur="4s" begin="2.6s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+      </svg>
+      <div class="hero-flow-labels">
+        <span>inputs</span><span>weights</span><span>activation</span><span>loss</span><span>gradients</span>
+      </div>
+    </div>
+
+    <div class="hero-cards">
+      <div class="hcard"><div class="hcard-ico">🧮</div><h4>See every number</h4><p>A two-layer net stepped through forward and backward, with the actual arithmetic.</p></div>
+      <div class="hcard"><div class="hcard-ico">▶</div><h4>Train it live</h4><p>Real backpropagation, running in the page. Change the architecture and watch it matter.</p></div>
+      <div class="hcard"><div class="hcard-ico">📉</div><h4>Watch it break</h4><p>Gradients vanishing through eight sigmoid layers, on a log scale.</p></div>
+    </div>
+
+    <button class="btn btn-lg" data-goto="next">Start the course <span class="arr">&rarr;</span></button>
+    <p class="hero-note">Progress saves in your browser. Close the tab, come back, keep going.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 1. THE NEURON                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="neuron" data-title="The neuron" data-icon="1" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 1 · Foundations</div>
+    <h2>A weighted sum, and a <span class="grad">decision</span></h2>
+    <p class="lead">Before layers, before backpropagation, before any of the mystique: one neuron multiplies its inputs by weights, adds a bias, and pushes the result through a non-linear function. That is the whole unit. A model with 400 billion parameters is this, arranged carefully, 400 billion times.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎛️ Turn the knobs</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Two inputs, two weights, one bias. The white line is where the weighted sum crosses zero — the decision boundary. Notice what the bias does: it slides the line without rotating it.</p>
+    <div class="neuron-wrap">
+      <canvas id="neuron-canvas" class="chart" height="330"></canvas>
+      <div class="neuron-side">
+        <div class="chip-row" id="neuron-presets"></div>
+        <label class="ctrl">weight w₁ <span class="mono" id="n-w1v">1.00</span>
+          <input type="range" id="n-w1" min="-3" max="3" step="0.1" value="1"></label>
+        <label class="ctrl">weight w₂ <span class="mono" id="n-w2v">1.00</span>
+          <input type="range" id="n-w2" min="-3" max="3" step="0.1" value="1"></label>
+        <label class="ctrl">bias b <span class="mono" id="n-bv">-1.50</span>
+          <input type="range" id="n-b" min="-3" max="3" step="0.1" value="-1.5"></label>
+        <div class="chip-row" id="neuron-act">
+          <button class="chip active" data-a="sigmoid">sigmoid</button>
+          <button class="chip" data-a="tanh">tanh</button>
+          <button class="chip" data-a="relu">ReLU</button>
+        </div>
+      </div>
+    </div>
+    <div id="neuron-table"></div>
+    <div class="stepper-say" id="neuron-note"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧮 In one line</h3></div>
+      <pre class="code">output = activation(w₁x₁ + w₂x₂ + ... + b)
+
+# for a whole layer at once:
+a = activation(W @ x + b)</pre>
+      <p class="panel-sub">That matrix multiply is the entire computational workload of a neural network. GPUs exist in this field for exactly one reason: they do this operation, in parallel, extremely fast.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🎚️ What each part does</h3></div>
+      <ul class="fact-list">
+        <li><b>Weights</b> — how much each input matters, and in which direction. Learned.</li>
+        <li><b>Bias</b> — the threshold. It shifts the boundary without changing its angle. Learned.</li>
+        <li><b>Activation</b> — the non-linearity. Chosen by you, not learned, and Chapter 2 is entirely about why it matters.</li>
+      </ul>
+      <p class="panel-sub">A weight of zero is the network saying "this input is irrelevant". Training discovers those by itself, which is a large part of why feature selection matters less here than in classical ML.</p>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>A neuron is <span class="mono">activation(w·x + b)</span>. Nothing more.</li>
+      <li>Its decision boundary is a straight line (a hyperplane in higher dimensions).</li>
+      <li>Weights rotate that line; the bias slides it.</li>
+      <li>One neuron can express AND, OR and NAND — but not XOR, which is Chapter 3.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 2. ACTIVATIONS                                                -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="activations" data-title="Activations" data-icon="2" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 2 · Foundations</div>
+    <h2>The bend that makes depth <span class="grad">worth having</span></h2>
+    <p class="lead">Without a non-linear activation, stacking layers is pointless — a hundred linear layers compute exactly what one linear layer computes. The activation function is not a tuning detail. It is the reason deep networks can represent anything a shallow one cannot.</p>
+  </header>
+
+  <div class="callout warn">
+    <div class="callout-ico">⚠️</div>
+    <div id="linear-collapse"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📈 Plot them</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Toggle the curves, then switch to derivatives — the second view is the one that explains why the field abandoned sigmoid for hidden layers.</p>
+    <div class="chip-row" id="act-toggles"></div>
+    <div class="btn-row"><button class="chip" id="act-deriv">show derivatives</button></div>
+    <canvas id="act-canvas" class="chart" height="330"></canvas>
+    <div class="stepper-say" id="act-caption"></div>
+  </div>
+
+  <div class="three-up" id="act-cards"></div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧭 Choosing one</h3></div>
+    <ul class="fact-list">
+      <li><b>Hidden layers</b> → ReLU. If units are dying, Leaky ReLU or GELU.</li>
+      <li><b>Binary output</b> → sigmoid, paired with binary cross-entropy.</li>
+      <li><b>Multi-class output</b> → softmax, paired with categorical cross-entropy.</li>
+      <li><b>Regression output</b> → nothing at all. A bounded activation would cap your predictions.</li>
+      <li><b>Transformers</b> → GELU inside the feed-forward blocks. This is a convention that stuck, not a law.</li>
+    </ul>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>No non-linearity means no depth — the stack collapses algebraically to one layer.</li>
+      <li>The <i>derivative</i> is what backpropagation multiplies by, so a small derivative is a small gradient.</li>
+      <li>Sigmoid's derivative maxes out at 0.25; ReLU's is exactly 1 where active. That is the whole story.</li>
+      <li>The output activation is decided by the task; the hidden activation is decided by training dynamics.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 3. XOR                                                        -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="xor" data-title="XOR" data-icon="3" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 3 · Foundations</div>
+    <h2>The four points that stalled a <span class="grad">whole field</span></h2>
+    <p class="lead">In 1969 Minsky and Papert pointed out that a single-layer network cannot compute XOR. It is true, it is easy to see, and it contributed to a funding winter that lasted more than a decade. The fix — a hidden layer — was already known; what was missing was a practical way to train one. Here is both halves, running live.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧠 Train it yourself</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Pick an architecture and press train. This is real backpropagation — weights initialised, gradients computed, updates applied, in your browser. Start with <b>no hidden layer</b> and watch it refuse.</p>
+    <div class="chip-row" id="xor-archs"></div>
+    <div class="gd-wrap">
+      <canvas id="xor-canvas" class="chart" height="310"></canvas>
+      <canvas id="xor-loss" class="chart" height="310"></canvas>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-k">architecture</span><span class="stat-v mono" id="xor-shape">—</span></div>
+      <div class="stat"><span class="stat-k">epoch</span><span class="stat-v" id="xor-epoch">0</span></div>
+      <div class="stat"><span class="stat-k">loss</span><span class="stat-v cyan" id="xor-loss-v">—</span></div>
+      <div class="stat"><span class="stat-k">accuracy</span><span class="stat-v green" id="xor-acc">—</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="xor-run">▶ Train</button>
+      <button class="btn btn-ghost" id="xor-reset">new random init</button>
+    </div>
+    <div id="xor-truth"></div>
+    <div class="stepper-say" id="xor-note"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>❌ Why one neuron cannot</h3></div>
+      <pre class="code">x₁  x₂ | XOR
+ 0   0 |  0
+ 0   1 |  1
+ 1   0 |  1
+ 1   1 |  0</pre>
+      <p class="panel-sub">Plot those four points. The two 1s sit on one diagonal, the two 0s on the other. A single neuron draws one straight line, and no straight line puts one diagonal on each side. It is not a training problem — it is a representational impossibility.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>✅ Why two layers can</h3></div>
+      <p class="panel-sub">The hidden layer applies a transformation. In its output coordinates, the four points are no longer arranged in that awkward diagonal pattern — and in the new arrangement a straight line does separate them. The output neuron then draws that line.</p>
+      <p class="panel-sub">This is what depth buys, stated generally: each layer re-describes the input in coordinates where the next layer's job is easier. A deep network is a stack of increasingly convenient descriptions.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">📐</div>
+    <div><b>The universal approximation theorem</b> says a network with one hidden layer can approximate any continuous function to any accuracy, given enough units. True, and less useful than it sounds: "enough units" can be astronomically many, and the theorem says nothing about whether gradient descent will <i>find</i> those weights. In practice, depth is far more efficient than width — which is the empirical fact the whole field is built on.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>A single layer can only separate what a straight line can separate.</li>
+      <li>A hidden layer transforms the space until the problem becomes linearly separable.</li>
+      <li>Initialisation matters: the same architecture can converge or stall depending on where it starts.</li>
+      <li>Capacity is not the only issue — trainability is a separate and equally real one.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 4. FORWARD PASS                                               -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="forward" data-title="Forward pass" data-icon="4" data-group="Mechanics">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 4 · Mechanics</div>
+    <h2>Every number, all the way <span class="grad">through</span></h2>
+    <p class="lead">A network with two inputs, two hidden units and one output. Small enough that the whole computation fits on screen, and structurally identical to one with a billion parameters. Press play and watch a single example travel from input to loss.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>▶ The forward pass</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Green edges are positive weights, red are negative, and thickness is magnitude. The number inside each node is its current activation.</p>
+    <div id="walk-demo">
+      <svg id="walk-svg" class="netsvg"></svg>
+      <div class="walk-body">
+        <div class="walk-text">
+          <div class="wf-step" id="walk-step"></div>
+          <h3 id="walk-title"></h3>
+          <p id="walk-desc"></p>
+        </div>
+        <pre class="code walk-math" id="walk-math"></pre>
+      </div>
+      <div class="stepper-ctrl">
+        <button class="btn" id="walk-play">▶ Run the forward pass</button>
+        <button class="btn btn-ghost" id="walk-prev">‹ Back</button>
+        <button class="btn btn-ghost" id="walk-next">Next ›</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧱 It is matrix multiplication</h3></div>
+      <pre class="code">z = W @ x + b          # one layer
+a = activation(z)
+
+# a 3-layer network is just:
+a1 = relu(W1 @ x  + b1)
+a2 = relu(W2 @ a1 + b2)
+y  = sigmoid(W3 @ a2 + b3)</pre>
+      <p class="panel-sub">A "deep" network is that pattern repeated. The depth is the number of times you apply it; the width is how tall each W is.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>💾 Why activations are kept</h3></div>
+      <p class="panel-sub">The forward pass stores every layer's output, because the backward pass needs them to compute gradients. This is why training uses far more memory than inference, and why batch size is limited by your GPU rather than by your patience.</p>
+      <p class="panel-sub">It is also why <span class="mono">torch.no_grad()</span> exists: when you are only predicting, none of that needs keeping.</p>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Forward pass = repeated <span class="mono">multiply, add bias, activate</span>.</li>
+      <li>Every intermediate activation is cached for the backward pass.</li>
+      <li>The final loss is one number, and that number is what gets differentiated.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 5. BACKPROPAGATION                                            -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="backprop" data-title="Backpropagation" data-icon="5" data-group="Mechanics">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 5 · Mechanics</div>
+    <h2>Assigning <span class="grad">blame</span>, layer by layer</h2>
+    <p class="lead">Backpropagation answers one question for every weight in the network: if I nudged you slightly, how much would the loss change? It is the chain rule from calculus, applied to a graph, with results cached so nothing is computed twice. Same network as the last chapter — now running backwards.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>◀ The backward pass</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">These are the real gradients for the real weights you just watched go forwards.</p>
+    <div id="bp-demo">
+      <svg id="bp-svg" class="netsvg"></svg>
+      <div class="walk-body">
+        <div class="walk-text">
+          <div class="wf-step" id="bp-step"></div>
+          <h3 id="bp-title"></h3>
+          <p id="bp-desc"></p>
+          <div class="mags" id="bp-mags"></div>
+        </div>
+        <pre class="code walk-math" id="bp-math"></pre>
+      </div>
+      <div class="stepper-ctrl">
+        <button class="btn" id="bp-play">▶ Run the backward pass</button>
+        <button class="btn btn-ghost" id="bp-prev">‹ Back</button>
+        <button class="btn btn-ghost" id="bp-next">Next ›</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">⛓️</div>
+    <div id="chain-rule"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🔗 The chain rule, concretely</h3></div>
+      <pre class="code">L depends on ŷ
+ŷ depends on z₂
+z₂ depends on h
+h  depends on z₁
+z₁ depends on w₁
+
+∂L/∂w₁ = ∂L/∂ŷ · ∂ŷ/∂z₂ · ∂z₂/∂h · ∂h/∂z₁ · ∂z₁/∂w₁</pre>
+      <p class="panel-sub">Multiply the local derivatives along the path. Backpropagation computes these right to left and reuses every partial result — which is why the whole gradient costs about as much as one forward pass instead of one pass per weight.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>⚠️ And why depth is fragile</h3></div>
+      <p class="panel-sub">Look at that product. Every extra layer adds another factor. If those factors are consistently below 1, the gradient shrinks exponentially with depth and the early layers stop learning. If they are consistently above 1, it explodes and training blows up.</p>
+      <p class="panel-sub">Almost every architectural innovation of the last decade — ReLU, careful initialisation, batch norm, residual connections — is a way of keeping that product near 1. Chapter 8 measures it.</p>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Backpropagation is the chain rule with caching. It is exact, not approximate.</li>
+      <li>Sigmoid output with cross-entropy loss gives the clean delta <span class="mono">ŷ − y</span>.</li>
+      <li>A weight's gradient is its incoming error times the activation that flowed through it.</li>
+      <li>The repeated multiplication over depth is the source of both vanishing and exploding gradients.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 6. TRAINING                                                   -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="training" data-title="Training" data-icon="6" data-group="Mechanics">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 6 · Mechanics</div>
+    <h2>The loop, and the one knob that <span class="grad">breaks it</span></h2>
+    <p class="lead">Forward, loss, backward, update — repeat. That is the entire training loop, and you have now seen every piece of it. What is left is the practical part: how big each step should be, how many examples to use per step, and how to read the curve that tells you it is going wrong.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🌙 A boundary a line cannot draw</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Sixty points in two interleaving crescents. Start with <b>no hidden layer</b> to see the ceiling, then add one and watch the boundary bend.</p>
+    <div class="chip-row" id="moons-archs"></div>
+    <div class="gd-wrap">
+      <canvas id="moons-canvas" class="chart" height="330"></canvas>
+      <canvas id="moons-loss" class="chart" height="330"></canvas>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><span class="stat-k">epoch</span><span class="stat-v" id="moons-epoch">0</span></div>
+      <div class="stat"><span class="stat-k">loss</span><span class="stat-v cyan" id="moons-loss-v">—</span></div>
+      <div class="stat"><span class="stat-k">accuracy</span><span class="stat-v green" id="moons-acc">—</span></div>
+      <div class="stat"><span class="stat-k">parameters</span><span class="stat-v amber" id="moons-params">—</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="moons-run">▶ Train</button>
+      <button class="btn btn-ghost" id="moons-reset">new random init</button>
+    </div>
+    <div class="stepper-say" id="moons-note"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎚️ Four learning rates, one network</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The same architecture and the same starting weights, trained four times at four step sizes. All four curves are computed when you press the button.</p>
+    <canvas id="lr-canvas" class="chart" height="300"></canvas>
+    <div class="lrlegend" id="lr-legend"></div>
+    <div class="btn-row"><button class="btn" id="lr-go">▶ Re-run all four</button></div>
+    <div class="lrnotes" id="lr-note"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📦 Batch size</h3></div>
+      <ul class="fact-list">
+        <li><b>Full batch</b> — every example per step. Smooth, and impossible past a certain dataset size.</li>
+        <li><b>Mini-batch (32–512)</b> — the universal default. Enough signal to be stable, small enough to fit in GPU memory.</li>
+        <li><b>Batch of 1</b> — very noisy. The noise is occasionally useful for escaping bad regions, but nobody trains this way on purpose.</li>
+      </ul>
+      <p class="panel-sub">Bigger batches let you use a bigger learning rate — a common rule of thumb is to scale the rate with the batch size.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>⚙️ Optimisers beyond plain SGD</h3></div>
+      <ul class="fact-list">
+        <li><b>Momentum</b> — accumulate a velocity so you roll through small bumps instead of stopping in them.</li>
+        <li><b>Adam / AdamW</b> — a per-parameter learning rate, adapted from the recent gradient history. The default you should start with.</li>
+        <li><b>Schedules</b> — warm up, then decay. Large steps early, careful steps late.</li>
+      </ul>
+      <p class="panel-sub">All of them are refinements of <span class="mono">w ← w − lr · grad</span>. None of them rescues a learning rate that is wrong by two orders of magnitude.</p>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Forward → loss → backward → update. Everything else is detail.</li>
+      <li>The learning rate is the first thing to tune and the first thing to suspect.</li>
+      <li>A healthy loss curve drops steeply then flattens. Bouncing means the steps are too big.</li>
+      <li>Plot training and validation loss together, from the first run.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 7. REGULARISATION                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="regularisation" data-title="Regularisation" data-icon="7" data-group="Making it work">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 7 · Making it work</div>
+    <h2>Stopping it from <span class="grad">memorising</span></h2>
+    <p class="lead">A network with millions of parameters and thousands of examples can simply memorise the training set — reaching near-zero training loss while learning nothing that generalises. Regularisation is the collection of techniques that make memorising harder than learning.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎲 Dropout, per pass</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Twenty-four hidden units. Each training pass zeroes a different random subset — then press <b>inference</b> to see what happens at prediction time.</p>
+    <div class="dropout-grid" id="dropout-grid"></div>
+    <label class="ctrl">dropout rate <span class="mono" id="dropout-rate-v">0.50</span>
+      <input type="range" id="dropout-rate" min="0" max="90" step="5" value="50"></label>
+    <div class="btn-row">
+      <button class="btn" id="dropout-go">▶ Training passes</button>
+      <button class="btn btn-ghost" id="dropout-eval">inference</button>
+    </div>
+    <div class="stepper-say" id="dropout-count"></div>
+  </div>
+
+  <div class="three-up" id="reg-cards"></div>
+
+  <div class="callout warn">
+    <div class="callout-ico">🔌</div>
+    <div><b>The single most common deep learning bug:</b> forgetting <span class="mono">model.eval()</span> before evaluating. Dropout stays active and batch norm keeps updating its statistics, so your validation numbers come out mysteriously worse and inconsistent between runs. Its partner, <span class="mono">model.train()</span>, must go back on before the next epoch.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Diagnose from the gap between training and validation loss, not from either alone.</li>
+      <li>Early stopping is free and needs no tuning. Start there.</li>
+      <li>Dropout is training-only. Weight decay applies always.</li>
+      <li>More real data beats every technique on the list, and augmentation is the closest substitute.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 8. GRADIENTS & INITIALISATION                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="gradients" data-title="Vanishing gradients" data-icon="8" data-group="Making it work">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 8 · Making it work</div>
+    <h2>Why deep networks were <span class="grad">untrainable</span></h2>
+    <p class="lead">Deep networks were understood in principle for decades before anyone could train one. The obstacle was arithmetic: backpropagation multiplies a derivative at every layer, and multiplying numbers below one, ten times over, gives you almost nothing. Here is that happening, measured.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📉 Gradient magnitude by depth</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Three identical networks differing only in hidden activation. The vertical axis is logarithmic — each gridline is ten times smaller than the one above it. Push the depth slider up.</p>
+    <canvas id="flow-canvas" class="chart" height="330"></canvas>
+    <label class="ctrl">depth (layers) <span class="mono" id="flow-depth-v">8</span>
+      <input type="range" id="flow-depth" min="2" max="14" step="1" value="8"></label>
+    <div class="lrlegend" id="flow-legend"></div>
+    <div class="stepper-say" id="flow-note"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎲 Where the weights start</h3></div>
+    <p class="panel-sub">Initialisation is not a formality. It decides whether the first gradient is useful or useless.</p>
+    <div class="two-up" id="init-cards"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🛠️ What actually fixed it</h3></div>
+      <ul class="fact-list">
+        <li><b>ReLU</b> — gradient of exactly 1 where active, so nothing shrinks on the way back.</li>
+        <li><b>Careful initialisation</b> — Xavier and He keep activation variance stable across layers.</li>
+        <li><b>Batch / layer normalisation</b> — renormalise at each layer so the signal cannot drift.</li>
+        <li><b>Residual connections</b> — <span class="mono">y = f(x) + x</span> gives the gradient a path with no multiplication at all. This is what made 100+ layer networks trainable, and it is in every transformer.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>💥 The opposite failure</h3></div>
+      <p class="panel-sub">Exploding gradients: the same product, with factors above 1. The loss trains normally and then jumps to NaN in a single step. It is most common in RNNs, where the same weights are applied at every timestep.</p>
+      <pre class="code">torch.nn.utils.clip_grad_norm_(
+    model.parameters(), max_norm=1.0)</pre>
+      <p class="panel-sub">Clipping caps the size of the update without changing its direction. Cheap insurance, and standard practice in sequence models.</p>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Backpropagation multiplies a derivative per layer, so depth compounds whatever that factor is.</li>
+      <li>Below 1 it vanishes and early layers freeze; above 1 it explodes and training dies.</li>
+      <li>ReLU, good initialisation, normalisation and residual connections all exist to keep it near 1.</li>
+      <li>Never initialise to zero — every unit in a layer would stay identical forever.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 9. CONVOLUTION                                                -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="conv" data-title="Convolution" data-icon="9" data-group="Architectures">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 9 · Architectures</div>
+    <h2>The same small filter, <span class="grad">everywhere</span></h2>
+    <p class="lead">A dense layer treats every pixel as unrelated to its neighbours, which for an image is obviously wrong and enormously wasteful. A convolutional layer slides one small learned kernel across the whole image instead. Two ideas — locality and parameter sharing — and they cut the parameter count by orders of magnitude.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔍 Slide a kernel</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">A hand-drawn 7. Pick a kernel, then press slide and watch the 3×3 window move — the arithmetic for the current window is printed underneath.</p>
+    <div id="conv-demo">
+      <div class="chip-row" id="conv-kernels"></div>
+      <div class="conv-wrap">
+        <div class="conv-col"><div class="conv-h">input</div><div id="conv-in"></div></div>
+        <div class="conv-col narrow"><div class="conv-h">kernel</div><div id="conv-kernel"></div><div class="conv-op">✳</div></div>
+        <div class="conv-col"><div class="conv-h">feature map</div><div id="conv-out"></div></div>
+      </div>
+      <div class="conv-sizes" id="conv-sizes"></div>
+      <pre class="code conv-math" id="conv-math">Press slide, or hover the grid.</pre>
+      <div class="btn-row">
+        <button class="btn" id="conv-go">▶ Slide the kernel</button>
+        <button class="btn btn-ghost" id="conv-pool">apply ReLU + max pool</button>
+      </div>
+      <div class="conv-wrap pooled">
+        <div class="conv-col"><div class="conv-h">after ReLU + 2×2 max pool</div><div id="conv-pooled"></div></div>
+      </div>
+      <div class="stepper-say" id="conv-pool-note">Pooling has not run yet.</div>
+      <div class="stepper-say" id="conv-why"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧮 Why it is so much cheaper</h3></div>
+    <div class="paramcmp" id="param-compare"></div>
+    <div class="two-up" id="conv-why-cards"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏗️ A CNN, stacked</h3></div>
+    <div class="stack" id="cnn-stack"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🔬</div>
+    <div><b>Nobody designs those kernels.</b> The edge detectors above are classical hand-built filters, shown because they make the mechanism visible. In a trained CNN the kernels are parameters like any other — and when researchers visualise the first layer of a network trained on photographs, they find edge and colour-blob detectors that look remarkably like these. The network rediscovers them because they are genuinely the useful thing to compute first.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Convolution = slide a small learned kernel, output a feature map of where that pattern occurs.</li>
+      <li>Parameter sharing and locality are priors about images, built into the architecture.</li>
+      <li>Pooling downsamples with no parameters and buys a little shift tolerance.</li>
+      <li>Stacked layers build a hierarchy: edges → corners → textures → parts → objects.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 10. SEQUENCES                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="sequences" data-title="Sequences" data-icon="10" data-group="Architectures">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 10 · Architectures</div>
+    <h2>When order <span class="grad">matters</span></h2>
+    <p class="lead">Images have spatial structure and convolution exploits it. Text, audio, and time series have sequential structure — and the story of how architectures learned to exploit that runs from recurrence, through gates, to attention. Four steps, each fixing the previous one's limit.</p>
+  </header>
+
+  <div class="seq-grid" id="seq-cards"></div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🔁 The recurrent idea</h3></div>
+      <pre class="code">h = zeros(hidden_size)
+for token in sequence:
+    h = tanh(W_h @ h + W_x @ token + b)
+    out.append(V @ h)</pre>
+      <p class="panel-sub">The same weights at every step, with the hidden state carrying everything remembered so far. Elegant — and note that <span class="mono">W_h</span> gets applied once per token, so a 100-token sequence multiplies the gradient by that matrix 100 times. That is the vanishing gradient problem from Chapter 8, in its most acute form.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>⚡ The attention idea</h3></div>
+      <pre class="code">scores  = Q @ K.T / sqrt(d)
+weights = softmax(scores)
+output  = weights @ V</pre>
+      <p class="panel-sub">No loop. Every position computes a relevance score against every other position, and takes a weighted average of their values. Any two tokens are one operation apart no matter how far apart they sit — and the whole thing is a couple of matrix multiplies, which is exactly what a GPU wants.</p>
+      <p class="panel-sub">The cost is the <span class="mono">n × n</span> score matrix, quadratic in sequence length. That is why context windows are both a headline feature and an active research problem.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🔗</div>
+    <div id="attention-note"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>RNNs carry state through time and forget over long spans.</li>
+      <li>LSTMs and GRUs add gates and a protected cell state, extending memory considerably.</li>
+      <li>Transformers drop recurrence entirely: parallel, direct connections between all positions.</li>
+      <li>Attention's cost is quadratic in sequence length, which shapes everything about modern LLM design.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 11. PRACTICE                                                  -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="practice" data-title="In practice" data-icon="11" data-group="Making it work">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 11 · Making it work</div>
+    <h2>What to check when it <span class="grad">doesn't work</span></h2>
+    <p class="lead">Training runs fail in a small number of recognisable ways, and almost all of them are diagnosable from the loss curve plus two or three checks. Here is the table worth keeping, and the framework code that corresponds to everything you have just built by hand.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🩺 Symptom → first suspect</h3></div>
+    <div id="debug-table"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>✅ Habits that prevent most of it</h3></div>
+    <ul class="fact-list" id="sanity-rules"></ul>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔥 The same thing, in PyTorch</h3></div>
+    <pre class="code" id="framework-code"></pre>
+    <div class="stepper-say" id="framework-note"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🎯 Do you even need to train one?</h3></div>
+      <ul class="fact-list">
+        <li><b>Tabular data</b> — start with gradient boosting. It usually wins, and it trains in seconds.</li>
+        <li><b>Images, audio, text</b> — start with a <b>pretrained</b> model and fine-tune. Training from scratch needs data you probably do not have.</li>
+        <li><b>Very little data</b> — freeze the backbone and train only the final layer. Sometimes a few hundred examples is enough.</li>
+        <li><b>Language tasks</b> — try prompting an existing model before you consider training anything.</li>
+      </ul>
+      <p class="panel-sub">Training from random initialisation is the rarest of these in practice, and the most expensive.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>➡️ Where to go next</h3></div>
+      <ul class="fact-list">
+        <li><b>ML Fundamentals</b> (next door) — splits, leakage, evaluation and the workflow. Everything here assumes it.</li>
+        <li><b>GenAI Flow</b> (next door) — tokens, embeddings, attention, RAG and agents, picking up exactly where Chapter 10 stops.</li>
+        <li><b>Build something small end to end.</b> One dataset, one baseline, one model, one honest evaluation. That is worth more than three more courses.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>NaN loss → lower the learning rate. It is the right first guess almost every time.</li>
+      <li>Prove the model can overfit ten examples before you debug anything else.</li>
+      <li><span class="mono">loss.backward()</span> is Chapter 5; <span class="mono">opt.step()</span> is Chapter 6. You now know what they do.</li>
+      <li>Pretrained and fine-tuned beats from-scratch for nearly every real problem.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 12. QUIZ                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Finish line">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 12 · Finish line</div>
+    <h2>Prove it to <span class="grad">yourself</span></h2>
+    <p class="lead">Fifteen questions covering everything above. No time limit, instant explanations, and you can retake it.</p>
+  </header>
+
+  <div class="panel">
+    <div id="quiz" class="quiz"></div>
+  </div>
+
+  <div class="panel glossary-panel">
+    <div class="panel-head"><h3>📖 Glossary</h3></div>
+    <input type="search" id="gloss-search" class="input-line" placeholder="filter terms…">
+    <div class="glossary" id="glossary"></div>
+  </div>
+</section>
+
+</div><!-- /stage -->
+
+<div class="pager" id="pager">
+  <button class="btn btn-ghost" data-goto="prev">&larr; Back</button>
+  <div class="pager-dots" id="pager-dots"></div>
+  <button class="btn" data-goto="next">Next &rarr;</button>
+</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/mathkit.js"></script>
+<script src="js/content.js"></script>
+<script src="js/demos.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

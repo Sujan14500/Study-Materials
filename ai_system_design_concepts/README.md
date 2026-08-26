@@ -1,7 +1,7 @@
 # AI System Design Flow
 
 An interactive, animated course on AI/ML system design — the discipline, not the model zoo.
-Sixteen chapters spanning classic ML systems (recommenders, search, fraud) and LLM-era ones
+Nineteen chapters spanning classic ML systems (recommenders, search, fraud) and LLM-era ones
 (RAG at scale, model cascades), because real products contain both.
 
 **Written for someone with no prior experience.** Chapter 1 is nothing but vocabulary —
@@ -49,12 +49,15 @@ open index.html           # macOS
 | 10 | Offline → online | A/B sample-size calculator, plus a peeking slider that wrecks your false-positive rate |
 | 11 | Feedback loops | 60 items, 10 slots, 25 rounds — watch the catalogue collapse to 10, then add exploration |
 | 12 | RAG at scale | Chunk size, k, hybrid, rerank, cache → how often the right document is found, and what it costs |
-| 13 | LLM serving & cost | Model-cascade simulator; drop the router accuracy and watch the savings evaporate |
-| 14 | Canonical designs | Feed, search, fraud, support assistant — stage by stage, with the gotcha on each |
-| 15 | Operate it | Rollout ladder, failure modes and fallbacks, and a checklist that saves |
-| 16 | Final quiz | 12 questions with explanations, plus a 40-term glossary |
+| 13 | Vector indexes | Watch k-means carve a corpus into cells, then drag the query around: how many vectors the search skipped, and which true neighbours it lost by skipping them. Then the nprobe sweep, the four index families, product quantization and a walk down an HNSW graph |
+| 14 | LLM serving & cost | Model-cascade simulator; a KV-cache ceiling calculator that turns context length into a concurrency limit; and prefill/decode levers — streaming, prompt caching, speculative decoding — that each move one number and stubbornly not the others |
+| 15 | Canonical designs | Feed, search, fraud, support assistant — stage by stage, with the gotcha on each |
+| 16 | Operate it | Rollout ladder, failure modes and fallbacks, and a checklist that saves |
+| 17 | Design patterns | Fifteen cards, each with an animated diagram of its shape, the problem, five lines of code and the trap — plus a drill that hands you a situation and asks for the name |
+| 18 | Redis | The four use cases as cards — cache, sorted set, lock, geo hash — each with its commands and its trap, plus a drill that gives you a situation and asks which one |
+| 19 | Final quiz | 14 questions with explanations, plus a 40-term glossary |
 
-Every chapter opens with a jargon-free "in plain English" box, and the four calculators
+Every chapter opens with a jargon-free "in plain English" box, and the calculators
 each have a hand-worked example above them.
 
 Progress, XP and the checklist persist in `localStorage`.
@@ -74,7 +77,7 @@ test.js           node test.js — checks the content AND the widget maths
 
 Almost everything you'd want to edit is in `js/content.js`: scenarios, label sources,
 feature cards, ladder rungs, funnel stages, latency components, cascade tiers, the four
-canonical designs, quiz and glossary. `demos.js` renders it and does the arithmetic.
+canonical designs, the fifteen design patterns, the four Redis use cases, quiz and glossary. `demos.js` renders it and does the arithmetic.
 
 `test.js` is unusually load-bearing for this course, because several chapters make
 quantitative claims. It re-derives the widget maths independently and asserts the claims
@@ -84,6 +87,12 @@ actually hold:
 - A/B sample size matches the standard two-proportion approximation, and scales with 1/δ²
 - stage-1 recall genuinely caps end-to-end funnel quality
 - a reliable router saves >40% and a bad one visibly does not
+- **each serving lever moves only its own phase**: streaming changes perceived latency and not
+  total time, cost or throughput; prompt caching halves prefill and the input bill but leaves
+  tokens-per-second untouched; speculative decoding pays at the configured acceptance rate and
+  is a net **loss** at zero
+- halving the context roughly doubles KV-cache concurrency, while quantizing the weights helps
+  less — because the weights are a fixed cost and the KV cache is the term that scales per request
 - **the feedback-loop simulation actually collapses** (greedy stays at the launch slate;
   exploration opens the catalogue and raises the quality served)
 
@@ -93,6 +102,9 @@ the moment someone adds a chapter:
 - every chapter has a plain-English summary, and every summary is checked to contain **no
   jargon** (`p99`, `QPS`, `AUC`, `nDCG`, `SLO`… are all rejected in that box)
 - the vocabulary chapter actually defines every term the later chapters lean on
+- every design pattern carries a trap, and the pattern drill may only ask about patterns the cards taught
+- every Redis use case names its specific failure — stampede, unbounded key, lease-not-mutex, cell boundary —
+  and the drill covers all four exactly once
 - every calculator has a worked example, and the capacity walkthrough still lands on the
   same numbers the calculator produces
 
@@ -116,3 +128,8 @@ blended cascade quality — are plausible illustrative models, not measurements 
 specific system. They are tuned so the **shape** and the **direction** of every trade-off
 is right, which is what transfers. Do not quote the third decimal at your next design
 review; do quote "recall@k caps everything downstream" and "sample size scales with 1/δ²".
+
+The serving constants in chapter 13 (tokens per second, KV bytes per token, draft acceptance
+rate) are plausible figures for a mid-size model on one accelerator, not measurements of yours.
+The arithmetic around them is standard: Little’s Law for sizing, and the speculative-decoding
+expectation `E = (1 - a^(g+1)) / (1 - a)` from Leviathan et al. 2023 for the decode speedup.

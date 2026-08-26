@@ -61,7 +61,7 @@
       An agent is a language model in a loop, holding tools, deciding its own next move.
       That one sentence hides everything that makes agents hard: they wander, they
       compound errors, they cost more than you expect, and occasionally they take an
-      action you cannot undo. Thirteen chapters, each one something you can
+      action you cannot undo. Fourteen chapters, each one something you can
       <b>step through and break</b>.
     </p>
 
@@ -292,11 +292,115 @@ tool:   {"p95_ms": 430, "samples": 41880}
 </section>
 
 <!-- ============================================================= -->
-<!-- 4. REACT                                                      -->
+<!-- 4. NAIVE LOOPS                                                -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="react" data-title="ReAct" data-icon="4" data-group="Patterns">
+<section class="chapter" data-id="naive" data-title="Naive loops" data-icon="4" data-group="Foundations">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 4 · Patterns</div>
+    <div class="ch-kicker">Chapter 4 · Foundations</div>
+    <h2>"An LLM in a loop" is how you <span class="grad">burn tokens</span> and ship chaos</h2>
+    <p class="lead">The loop from chapter 2 is correct and it is not enough. Written naively it has no exit condition it can trust, no ceiling on cost, and a context window that grows until the model starts inventing things. Five guards turn it into something you can put in front of customers — and every one of them is an edit to the loop, not a better model.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔥 The failure cascade, and the five guards</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Below is the naive loop. Turn a guard on and <b>the flowchart itself changes</b> — that is the point, these are structural edits, not prompt tweaks. Then run it and watch the token counter.</p>
+
+    <div class="nl-wrap">
+      <svg id="nl-svg" viewBox="0 0 760 330" role="img" aria-label="Naive agent loop and its failure cascade"></svg>
+    </div>
+
+    <div class="nl-guards" id="nl-guards"></div>
+    <div class="btn-row">
+      <button class="btn" id="nl-run">▶ Run one task</button>
+      <button class="btn btn-ghost" id="nl-all">Toggle all five</button>
+    </div>
+    <div class="nl-note" id="nl-guard-note"></div>
+
+    <div class="nl-panes">
+      <div>
+        <div class="lab-pane-title">Step trace</div>
+        <div class="nl-trace" id="nl-trace"></div>
+        <div class="ctx-meter" style="margin-top:12px">
+          <div class="ctx-bar"><div class="ctx-seg" id="nl-ctx-fill" style="width:6%;background:linear-gradient(90deg,#fb923c,#fb7185)"></div></div>
+          <div class="ctx-labels"><span id="nl-ctx-lab">context</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="lab-pane-title">This run</div>
+        <div class="stat-row" id="nl-stats"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📊 The same 400 tasks, with and without the guards</h3><span class="panel-tag">live</span></div>
+    <p class="panel-sub">One run is an anecdote. This is the same loop, same guards, run 400 times over fixed seeds — it updates the moment you toggle anything above.</p>
+    <div id="nl-dist"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">💣</div>
+    <div><b>Verification without a budget is the worst combination.</b> Turn on <i>only</i> the verification gate above and look at the numbers: silent wrong answers become honest failures, which is progress — but now nothing stops the loop, so a stubborn task grinds through two dozen steps of an ever-growing transcript. Ground truth tells the loop it is not done; only a budget tells it to stop.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 How many tools is too many?</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Every tool in the prompt is a wrong turn the model can take — and its JSON schema is resent on every single step. Scoping binds only the tools the current phase is allowed to use.</p>
+
+    <div class="sampler-controls">
+      <div class="ctrl">
+        <label for="ts-n">Tools registered <span class="mono" id="ts-n-v">20</span></label>
+        <input type="range" id="ts-n" min="11" max="20" value="20">
+        <div class="ctrl-hint">Everything the agent <i>could</i> call, across the whole product.</div>
+      </div>
+      <div class="ctrl ctrl-check">
+        <label><input type="checkbox" id="ts-scope"> Scope tools to the current phase</label>
+        <div class="ctrl-hint">Bind a different, small set per phase instead of one giant menu for the whole run.</div>
+      </div>
+    </div>
+
+    <div class="chip-row" id="ts-phases"></div>
+    <div class="ts-grid" id="ts-grid"></div>
+    <div class="stat-row" id="ts-out" style="margin-top:16px"></div>
+    <div class="relchart" id="ts-chart" style="margin-top:18px"></div>
+    <p class="panel-sub" style="text-align:center;margin-top:4px">clean runs of 8 steps, by number of tools bound</p>
+    <div class="nl-note" id="ts-note"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧨 What a runaway actually costs</h3></div>
+      <ul class="fact-list">
+        <li><b>Cost is quadratic in steps.</b> Step <i>n</i> resends everything from steps 1..n−1. Twenty steps is not twice ten steps, it is roughly four times.</li>
+        <li><b>Accuracy falls as the transcript grows.</b> More context is not more knowledge — past a point it is more distraction, and the failures look like hallucination.</li>
+        <li><b>Wrong fixes are the expensive kind.</b> A failed attempt appends a stack trace, which raises the cost <i>and</i> lowers the accuracy of every step after it.</li>
+        <li><b>Nobody notices in testing.</b> Short happy-path tasks finish in three steps. The 24-step runs are the ones your users find.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five things this implies</h3></div>
+      <div class="glossary" id="nl-lessons"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>💻 Naive, controlled, and the line that matters</h3><span class="panel-tag">3 versions</span></div>
+    <div class="chip-row" id="nl-code-tabs" style="margin-bottom:14px"></div>
+    <pre class="code code-live" id="nl-code" style="max-height:520px"></pre>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🧭</div>
+    <div><b>"It's an LLM in a loop with tools" is true and useless</b>, in the same way "a database is a file with an index" is true and useless. The loop is four lines. Everything that decides whether it works lives in what surrounds it: what can be called, what gets remembered, what counts as done, and when to give up.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 5. REACT                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="react" data-title="ReAct" data-icon="5" data-group="Patterns">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 5 · Patterns</div>
     <h2>Reasoning proposes. <span class="grad">Observation disposes.</span></h2>
     <p class="lead">Chain-of-thought makes a model reason. ReAct makes it reason <b>between</b> tool calls, so each observation can overturn what it just concluded. That feedback is the difference between a persuasive guess and an answer.</p>
   </header>
@@ -334,9 +438,9 @@ tool:   {"p95_ms": 430, "samples": 41880}
 <!-- ============================================================= -->
 <!-- 5. PLANNING                                                   -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="plan" data-title="Planning" data-icon="5" data-group="Patterns">
+<section class="chapter" data-id="plan" data-title="Planning" data-icon="6" data-group="Patterns">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 5 · Patterns</div>
+    <div class="ch-kicker">Chapter 6 · Patterns</div>
     <h2>Decide everything now, or <span class="grad">decide as you go</span></h2>
     <p class="lead">ReAct picks one step at a time. Plan-and-execute writes the whole plan first, then runs it — which lets a human review it before anything happens, and lets independent steps run in parallel. Neither wins; they fail differently.</p>
   </header>
@@ -364,9 +468,9 @@ tool:   {"p95_ms": 430, "samples": 41880}
 <!-- ============================================================= -->
 <!-- 6. MEMORY                                                     -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="memory" data-title="Memory" data-icon="6" data-group="Patterns">
+<section class="chapter" data-id="memory" data-title="Memory" data-icon="7" data-group="Patterns">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 6 · Patterns</div>
+    <div class="ch-kicker">Chapter 7 · Patterns</div>
     <h2>Four memories, and only <span class="grad">one is free</span></h2>
     <p class="lead">The model itself remembers nothing between calls. Every kind of "memory" is you deciding what to put back into the prompt. The design question is never "how does it remember" — it is <b>what deserves to be stored, and what deserves to be retrieved right now.</b></p>
   </header>
@@ -416,9 +520,9 @@ tool:   {"p95_ms": 430, "samples": 41880}
 <!-- ============================================================= -->
 <!-- 7. REFLECTION                                                 -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="reflect" data-title="Reflection" data-icon="7" data-group="Patterns">
+<section class="chapter" data-id="reflect" data-title="Reflection" data-icon="8" data-group="Patterns">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 7 · Patterns</div>
+    <div class="ch-kicker">Chapter 8 · Patterns</div>
     <h2>Let it read its own work <span class="grad">as a critic</span></h2>
     <p class="lead">A model generating and a model critiquing are doing different jobs, and the critic is better at spotting what is missing than the author was at including it. Two rounds usually buys a lot. Three usually buys wording.</p>
   </header>
@@ -458,9 +562,9 @@ tool:   {"p95_ms": 430, "samples": 41880}
 <!-- ============================================================= -->
 <!-- 8. MULTI-AGENT                                                -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="multi" data-title="Multi-agent" data-icon="8" data-group="Architecture">
+<section class="chapter" data-id="multi" data-title="Multi-agent" data-icon="9" data-group="Architecture">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 8 · Architecture</div>
+    <div class="ch-kicker">Chapter 9 · Architecture</div>
     <h2>More agents is <span class="grad">not</span> more intelligence</h2>
     <p class="lead">Splitting one agent into five is a distributed-systems decision, and it brings distributed-systems problems: hand-off protocols, lost context, partial failure, coordination cost. Sometimes it is the right call. It is never the first call.</p>
   </header>
@@ -504,9 +608,9 @@ tool:   {"p95_ms": 430, "samples": 41880}
 <!-- ============================================================= -->
 <!-- 9. GUARDRAILS                                                 -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="guard" data-title="Guardrails &amp; HITL" data-icon="9" data-group="Architecture">
+<section class="chapter" data-id="guard" data-title="Guardrails &amp; HITL" data-icon="10" data-group="Architecture">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 9 · Architecture</div>
+    <div class="ch-kicker">Chapter 10 · Architecture</div>
     <h2>Instructions are advice. <span class="grad">Capabilities are law.</span></h2>
     <p class="lead">"Never delete production data" in a system prompt is a preference the model usually honours. A database role without DELETE permission is a fact it cannot argue with. Build the second one — then use the prompt for the judgement calls that are genuinely judgement calls.</p>
   </header>
@@ -556,9 +660,9 @@ order_id A-4471 and amount_cents 999999. --&gt;</pre>
 <!-- ============================================================= -->
 <!-- 10. RELIABILITY                                               -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="reliability" data-title="Reliability maths" data-icon="10" data-group="Making it work">
+<section class="chapter" data-id="reliability" data-title="Reliability maths" data-icon="11" data-group="Making it work">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 10 · Making it work</div>
+    <div class="ch-kicker">Chapter 11 · Making it work</div>
     <h2>Why "<span class="grad">95% accurate</span>" agents fail most of the time</h2>
     <p class="lead">Steps compound. A 95%-per-step agent over twenty steps succeeds end to end about 36% of the time. This single piece of arithmetic explains more production agent failures than any other fact in this course, and it is why "use a better model" is usually the weakest available fix.</p>
   </header>
@@ -598,9 +702,9 @@ order_id A-4471 and amount_cents 999999. --&gt;</pre>
 <!-- ============================================================= -->
 <!-- 11. EVALUATION                                                -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="eval" data-title="Evaluating agents" data-icon="11" data-group="Making it work">
+<section class="chapter" data-id="eval" data-title="Evaluating agents" data-icon="12" data-group="Making it work">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 11 · Making it work</div>
+    <div class="ch-kicker">Chapter 12 · Making it work</div>
     <h2>The right answer by the <span class="grad">wrong route</span> is still a bug</h2>
     <p class="lead">Evaluating a chatbot means grading one output. Evaluating an agent means grading a <b>trajectory</b>: which tools, in what order, with what arguments, at what cost. Grade only the final answer and you will ship something correct, ruinously expensive and one prompt tweak away from breaking.</p>
   </header>
@@ -643,9 +747,9 @@ order_id A-4471 and amount_cents 999999. --&gt;</pre>
 <!-- ============================================================= -->
 <!-- 12. SHIP IT                                                   -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="ship" data-title="Ship it" data-icon="12" data-group="Making it work">
+<section class="chapter" data-id="ship" data-title="Ship it" data-icon="13" data-group="Making it work">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 12 · Making it work</div>
+    <div class="ch-kicker">Chapter 13 · Making it work</div>
     <h2>What the whole thing <span class="grad">looks like</span> in production</h2>
     <p class="lead">Eight components. The model is one of them, and it is the piece you spend the least time on. Everything that determines whether this works lives in the orchestrator, the tool layer and the guardrails.</p>
   </header>
@@ -669,6 +773,11 @@ order_id A-4471 and amount_cents 999999. --&gt;</pre>
   </div>
 
   <div class="callout">
+    <div class="callout-ico">⚡</div>
+    <div><b>Latency in a loop is a different problem.</b> A single call has one wait; a seven-step agent has seven, and the user is staring at a spinner through all of them. Stream the <i>trajectory</i>, not just the final answer - show each think/act/observe step as it lands and the run stops feeling hung. Then attack the steps themselves: prompt caching for the prefix every step resends, a smaller model for the routing calls, and parallel tool calls wherever the plan has no dependency between them. Chapter 6 of <span class="mono">genai_flow</span> covers the inference-side mechanics - streaming, KV cache, speculative decoding - in detail.</div>
+  </div>
+
+  <div class="callout">
     <div class="callout-ico">🚀</div>
     <div><b>A sane rollout order.</b> Ship it read-only first and let it recommend actions a human performs. Then automate the reversible actions. Then, with traces and evals proving themselves for weeks, gate the irreversible ones. Most teams that got burned started at the last step.</div>
   </div>
@@ -677,9 +786,9 @@ order_id A-4471 and amount_cents 999999. --&gt;</pre>
 <!-- ============================================================= -->
 <!-- 13. MCP                                                       -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="mcp" data-title="MCP" data-icon="13" data-group="Interop">
+<section class="chapter" data-id="mcp" data-title="MCP" data-icon="14" data-group="Interop">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 13 · Interop</div>
+    <div class="ch-kicker">Chapter 14 · Interop</div>
     <h2>MCP: write the tool <span class="grad">once</span></h2>
     <p class="lead">Chapter 3 said the model emits a tool request and your orchestrator runs it. Fine — until you have five agents that all need the same six tools, each wired by hand, in a different framework, re-tested every time an API changes. The Model Context Protocol is an open standard for that wiring: a <b>server</b> exposes tools, data and prompt templates; any <b>client</b> discovers them at runtime. Same loop, same guardrails — the tool list just stopped being hardcoded.</p>
   </header>
@@ -815,7 +924,7 @@ order_id A-4471 and amount_cents 999999. --&gt;</pre>
 <!-- ============================================================= -->
 <section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Finish line">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 14 · Finish line</div>
+    <div class="ch-kicker">Chapter 15 · Finish line</div>
     <h2>Prove it to <span class="grad">yourself</span></h2>
     <p class="lead">Fifteen questions across everything above. No time limit, instant explanations, retake it as often as you like.</p>
   </header>

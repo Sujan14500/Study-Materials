@@ -61,7 +61,7 @@
       LangGraph is two ideas with a lot of consequences: <b>explicit state</b> that every node
       reads and writes, and a <b>checkpoint</b> written after every step. From those two you get
       cycles, resume-after-crash, pause-for-a-human, and rewinding a run to change one value and
-      try again. Fourteen chapters, every idea attached to something you can step and break.
+      try again. Fifteen chapters, every idea attached to something you can step and break.
     </p>
 
     <div class="hero-anim">
@@ -380,11 +380,92 @@ builder.add_conditional_edges("retrieve", fan_out)</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 7. PERSISTENCE                                                -->
+<!-- 7. SCOPED TOOLS & CONTROLLED STATE                            -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="persist" data-title="Checkpointers" data-icon="7" data-group="Durability">
+<section class="chapter" data-id="scoped" data-title="Scoped tools &amp; state" data-icon="7" data-group="Control flow">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 7 · Durability</div>
+    <div class="ch-kicker">Chapter 7 · Control flow</div>
+    <h2>Scope the tools. <span class="grad">Control the state.</span></h2>
+    <p class="lead">A plain agent loop binds every tool to one model call and keeps everything it learns in the transcript. Both of those are decisions, and both are usually wrong. In a graph you can bind a different tool set to each node and give every state key exactly one writer — so "the model called the deploy tool during research" stops being a prompt-engineering problem and becomes something the schema cannot express.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎛️ The same task, two graphs</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">One scripted run — <i>"some refunds are failing, find it and fix it"</i> — replayed through two graphs. Step it, then flip the toggle and step it again. Same model, same prompt, same task.</p>
+
+    <div class="btn-row">
+      <button class="toggle on" id="lgs-scope">
+        <span class="toggle-box">&#10003;</span>
+        <div><b>Tools scoped per node</b><small>click to bind everything to every node instead</small></div>
+      </button>
+      <button class="btn" id="lgs-step">▶ step</button>
+      <button class="btn btn-ghost" id="lgs-reset">reset</button>
+    </div>
+
+    <div class="graph-wrap" style="margin-top:16px">
+      <div>
+        <svg id="lgs-svg" viewBox="0 0 100 100" class="graph-svg"></svg>
+        <div class="lgs-pay" id="lgs-payload"></div>
+      </div>
+      <div>
+        <div class="lab-pane-title">Run</div>
+        <div class="lgs-trace" id="lgs-trace"></div>
+        <div class="lgs-verdict" id="lgs-verdict"></div>
+      </div>
+    </div>
+
+    <div class="two-up" style="margin-top:20px">
+      <div>
+        <div class="lab-pane-title">State after this step</div>
+        <div id="lgs-state"></div>
+      </div>
+      <div>
+        <div class="lab-pane-title">What each node may write</div>
+        <div class="lgs-phases" id="lgs-phases"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🔒</div>
+    <div><b>A tool that is not bound cannot be called.</b> This is the difference between a guardrail and a request. "Do not deploy during research" in a system prompt is a sentence the model weighs against everything else in its context. A tool absent from the request schema is a token sequence the sampler cannot produce.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🗂️ The state contract</h3></div>
+    <p class="panel-sub">Five keys, and for each one: how it merges, and which node is allowed to set it. The router reads these fields — not the model's summary of what it did.</p>
+    <div id="lgs-schema"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>💻 Three pieces of code</h3><span class="panel-tag">the whole pattern</span></div>
+    <div class="chip-row" id="lgs-code-tabs" style="margin-bottom:14px"></div>
+    <pre class="code code-live" id="lgs-code" style="max-height:520px"></pre>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📌 Five things to keep</h3></div>
+      <div class="glossary" id="lgs-notes"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>⚖️ When not to bother</h3></div>
+      <ul class="fact-list">
+        <li><b>Four tools total.</b> Scoping three of them costs more code than it saves. <span class="mono">create_react_agent</span> is the right answer.</li>
+        <li><b>No dangerous tools.</b> If every tool is read-only, a wrong call is a wasted step, not an incident.</li>
+        <li><b>One phase.</b> Scoping needs phases to scope to. If the run has no shape, give it one first — or accept that it does not have one.</li>
+        <li><b>You have not measured it.</b> Bind everything, log the wrong calls for a week, then scope the phases the log actually complains about.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 8. PERSISTENCE                                                -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="persist" data-title="Checkpointers" data-icon="8" data-group="Durability">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 8 · Durability</div>
     <h2>Save the state after <span class="grad">every step</span></h2>
     <p class="lead">A checkpointer writes the full state after every super-step, keyed by <span class="mono">thread_id</span>. That one mechanism is where memory, resume-after-crash, interrupts and time travel all come from — the next three chapters are just consequences of this one.</p>
   </header>
@@ -423,9 +504,9 @@ builder.add_conditional_edges("retrieve", fan_out)</pre>
 <!-- ============================================================= -->
 <!-- 8. INTERRUPTS                                                 -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="hitl" data-title="Interrupts &amp; HITL" data-icon="8" data-group="Durability">
+<section class="chapter" data-id="hitl" data-title="Interrupts &amp; HITL" data-icon="9" data-group="Durability">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 8 · Durability</div>
+    <div class="ch-kicker">Chapter 9 · Durability</div>
     <h2>Stop, ask a human, <span class="grad">carry on tomorrow</span></h2>
     <p class="lead">Because the state is checkpointed, a graph can stop in the middle of a node and wait — not for a second, but for as long as it takes. The process can exit. The server can redeploy. When the answer arrives, the run continues from exactly where it paused.</p>
   </header>
@@ -461,9 +542,9 @@ builder.add_conditional_edges("retrieve", fan_out)</pre>
 <!-- ============================================================= -->
 <!-- 9. TIME TRAVEL                                                -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="timetravel" data-title="Time travel" data-icon="9" data-group="Durability">
+<section class="chapter" data-id="timetravel" data-title="Time travel" data-icon="10" data-group="Durability">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 9 · Durability</div>
+    <div class="ch-kicker">Chapter 10 · Durability</div>
     <h2>Every past moment is <span class="grad">addressable</span></h2>
     <p class="lead">Checkpoints are not just for resume. Each one has an id, so you can jump to the middle of a finished run, change a value, and run a different future from there — with the original branch left intact beside it.</p>
   </header>
@@ -501,9 +582,9 @@ builder.add_conditional_edges("retrieve", fan_out)</pre>
 <!-- ============================================================= -->
 <!-- 10. STREAMING                                                 -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="streaming" data-title="Streaming" data-icon="10" data-group="Working with it">
+<section class="chapter" data-id="streaming" data-title="Streaming" data-icon="11" data-group="Working with it">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 10 · Working with it</div>
+    <div class="ch-kicker">Chapter 11 · Working with it</div>
     <h2>Five different things called <span class="grad">"streaming"</span></h2>
     <p class="lead">A graph run emits state, per-node updates, model tokens, your own progress events, and execution traces. They are different streams, and <span class="mono">stream_mode</span> chooses which ones you get. Picking the wrong one is why "streaming does not work" is such a common complaint.</p>
   </header>
@@ -536,9 +617,9 @@ builder.add_conditional_edges("retrieve", fan_out)</pre>
 <!-- ============================================================= -->
 <!-- 11. SUBGRAPHS AND MULTI-AGENT                                 -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="multi" data-title="Subgraphs &amp; handoffs" data-icon="11" data-group="Working with it">
+<section class="chapter" data-id="multi" data-title="Subgraphs &amp; handoffs" data-icon="12" data-group="Working with it">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 11 · Working with it</div>
+    <div class="ch-kicker">Chapter 12 · Working with it</div>
     <h2>A graph inside a <span class="grad">graph</span></h2>
     <p class="lead">A compiled graph is a callable that takes state and returns updates — which is exactly the definition of a node. So graphs nest, with no special API. Multi-agent systems are just that, plus <span class="mono">Command</span> to route and update in one move.</p>
   </header>
@@ -577,9 +658,9 @@ builder.add_conditional_edges("retrieve", fan_out)</pre>
 <!-- ============================================================= -->
 <!-- 12. MEMORY                                                    -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="memory" data-title="Long-term memory" data-icon="12" data-group="Working with it">
+<section class="chapter" data-id="memory" data-title="Long-term memory" data-icon="13" data-group="Working with it">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 12 · Working with it</div>
+    <div class="ch-kicker">Chapter 13 · Working with it</div>
     <h2>The checkpointer is not <span class="grad">memory</span></h2>
     <p class="lead">A checkpointer remembers <i>this thread</i>. When a user opens a new chat, that is a new thread and it knows nothing about them. Facts that should outlive a conversation go in the <b>store</b> — a separate thing, scoped by namespace rather than by thread.</p>
   </header>
@@ -614,9 +695,9 @@ builder.add_conditional_edges("retrieve", fan_out)</pre>
 <!-- ============================================================= -->
 <!-- 13. SHIP IT                                                   -->
 <!-- ============================================================= -->
-<section class="chapter" data-id="ship" data-title="Ship it" data-icon="13" data-group="Shipping">
+<section class="chapter" data-id="ship" data-title="Ship it" data-icon="14" data-group="Shipping">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 13 · Shipping</div>
+    <div class="ch-kicker">Chapter 14 · Shipping</div>
     <h2>What breaks in <span class="grad">production</span></h2>
     <p class="lead">Nearly every LangGraph production problem is one of four things: state that grew too big, a loop with no guard, a node that is not safe to re-run, or a node rename that broke resume for every in-flight thread. All four are cheap to prevent and expensive to discover.</p>
   </header>
@@ -667,7 +748,7 @@ langgraph dev        # local server + Studio UI</pre>
 <!-- ============================================================= -->
 <section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Shipping">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 14 · Finish line</div>
+    <div class="ch-kicker">Chapter 15 · Finish line</div>
     <h2>Prove it to <span class="grad">yourself</span></h2>
     <p class="lead">Twelve questions across everything above. No time limit, instant explanations, retake it as often as you like.</p>
   </header>

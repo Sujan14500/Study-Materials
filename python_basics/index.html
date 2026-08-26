@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Python Basics — Learn Python, Visually</title>
+<meta name="description" content="An interactive, animated course that takes you from 'what is a variable' to reading a traceback and writing a comprehension without thinking about it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐍</text></svg>">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<canvas id="bg-particles" class="bg-particles" aria-hidden="true"></canvas>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark"><span>🐍</span></div>
+    <div>
+      <div class="brand-name">Python Basics</div>
+      <div class="brand-sub">names, objects, and why</div>
+    </div>
+  </div>
+
+  <div class="progress-block">
+    <div class="progress-top">
+      <span>Progress</span><span id="progress-label">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="xp-row">
+      <span class="xp-badge" id="xp-badge">0 XP</span>
+      <button class="reset-btn" id="reset-btn" title="Clear saved progress">reset</button>
+    </div>
+  </div>
+
+  <nav class="chapter-nav" id="chapter-nav" aria-label="Chapters"></nav>
+
+  <div class="sidebar-foot">
+    <kbd>&larr;</kbd><kbd>&rarr;</kbd> to navigate
+  </div>
+</aside>
+
+<button class="menu-toggle" id="menu-toggle" aria-label="Toggle chapters">&#9776;</button>
+
+<!-- ============ MAIN ============ -->
+<main class="main" id="main">
+<div class="stage" id="stage">
+
+<!-- ============================================================= -->
+<!-- 0. WELCOME                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="welcome" data-title="Welcome" data-icon="&#10022;" data-group="Start here">
+  <div class="hero">
+    <div class="hero-tag">interactive course · no signup · no install</div>
+    <h1 class="hero-title">Learn <span class="grad">Python</span><br>by watching it run</h1>
+    <p class="hero-sub">
+      Eleven chapters. Every idea is something you can <b>touch</b> — step a program line by line,
+      watch two names point at one list, race a list against a set.
+      Syntax is the easy half; this course is about the model underneath it.
+    </p>
+
+    <div class="hero-anim">
+      <svg viewBox="0 0 640 180" class="flow-svg" id="hero-flow">
+        <defs>
+          <linearGradient id="gradFlow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#7c5cff"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#34d399"/>
+          </linearGradient>
+        </defs>
+        <path id="flow-path" d="M40,90 C170,20 250,160 380,90 S560,40 600,90" fill="none" stroke="url(#gradFlow)" stroke-width="2" stroke-dasharray="6 6" opacity=".45"/>
+        <g id="hero-nodes"></g>
+        <circle r="6" fill="#fff"><animateMotion dur="4s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#22d3ee"><animateMotion dur="4s" begin="1.3s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#7c5cff"><animateMotion dur="4s" begin="2.6s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+      </svg>
+      <div class="hero-flow-labels">
+        <span>values</span><span>names</span><span>containers</span><span>flow</span><span>working code</span>
+      </div>
+    </div>
+
+    <div class="hero-cards">
+      <div class="hcard"><div class="hcard-ico">▶</div><h4>Step it</h4><p>A tracer that runs programs one line at a time, showing every variable as it changes.</p></div>
+      <div class="hcard"><div class="hcard-ico">🔗</div><h4>See the arrows</h4><p>Names point at objects. Once you can see that, aliasing stops being magic.</p></div>
+      <div class="hcard"><div class="hcard-ico">🐛</div><h4>Read the error</h4><p>Seven tracebacks you <i>will</i> hit, decoded bottom-up with the fix beside them.</p></div>
+    </div>
+
+    <button class="btn btn-lg" data-goto="next">Start the course <span class="arr">&rarr;</span></button>
+    <p class="hero-note">Progress saves in your browser. Close the tab, come back, keep going.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 1. VALUES & TYPES                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="types" data-title="Values &amp; types" data-icon="1" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 1 · Foundations</div>
+    <h2>Everything is an <span class="grad">object</span></h2>
+    <p class="lead">An int, a string, a list, a function, a class — all objects, all with a type, all sitting somewhere in memory. Python has no "primitives" hiding in a corner. Get that straight now and the next ten chapters follow from it.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔬 The type explorer</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Click any literal. See what Python says about it: its type, whether it can be changed in place, and how it behaves inside an <span class="mono">if</span>.</p>
+    <div class="type-grid" id="type-grid"></div>
+    <div class="type-out" id="type-out"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧊 Mutable vs immutable</h3></div>
+      <p class="panel-sub">The single most useful split in the language.</p>
+      <ul class="fact-list">
+        <li><b>Immutable</b> — int, float, str, bool, tuple, frozenset, None. Any "change" builds a new object.</li>
+        <li><b>Mutable</b> — list, dict, set, and almost every class you write.</li>
+        <li>Only immutable objects can be dict keys or set members, because their hash must never change.</li>
+        <li>Only mutable objects can surprise you through aliasing — which is Chapter 2.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🎚️ Truthiness</h3></div>
+      <p class="panel-sub"><span class="mono">if x:</span> does not ask "is x True". It asks "is x truthy".</p>
+      <pre class="code">falsy:  False  None  0  0.0  ""  []  {}  set()
+truthy: everything else — including
+        "0", " ", [0], {0: None}</pre>
+      <p class="panel-sub">Which is why <span class="mono">if items:</span> is idiomatic, and why <span class="mono">if count:</span> is a bug the day count is legitimately 0.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">💡</div>
+    <div><b>Type is on the object, not the name.</b> <span class="mono">x = 5</span> then <span class="mono">x = "five"</span> is perfectly legal — the name x just points somewhere else now. Python is dynamically typed but <i>strongly</i> typed: it will re-point a name freely and still refuse <span class="mono">"1" + 1</span>.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Every value is an object with a type, an identity and a value.</li>
+      <li>Mutable vs immutable decides what can alias, what can be a dict key, and what surprises you later.</li>
+      <li>Empty containers, 0, "" and None are falsy. Everything else is truthy.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 2. NAMES & OBJECTS                                            -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="names" data-title="Names &amp; objects" data-icon="2" data-group="Foundations">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 2 · Foundations</div>
+    <h2>Variables are <span class="grad">labels</span>, not boxes</h2>
+    <p class="lead">Most languages teach you that a variable is a box holding a value. Python is not like that, and every confusing bug you will hit in your first year comes from believing it is. A name is a label tied to an object. Assignment moves the label. It never copies the object.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔗 Watch the arrows move</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Three tiny programs. Press <b>Run</b> and watch names on the left get wired to objects on the right, one line at a time. An <span style="color:#fbbf24">amber</span> arrow means two names share one object.</p>
+    <div id="bind-demo"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📋 How to actually copy</h3></div>
+      <pre class="code">shallow = original.copy()   # or original[:]
+shallow = list(original)
+
+import copy
+deep = copy.deepcopy(original)</pre>
+      <p class="panel-sub">A shallow copy gives you a new outer list whose items are still the <i>same</i> inner objects. If the list holds lists, you need <span class="mono">deepcopy</span> — or you have solved nothing.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🆔 is vs ==</h3></div>
+      <pre class="code">a = [1, 2];  b = [1, 2];  c = a
+
+a == b   # True  — same value
+a is b   # False — different objects
+a is c   # True  — the same object
+
+x is None      # correct
+x == None      # works, but never write it</pre>
+      <p class="panel-sub"><span class="mono">is</span> is for singletons: None, True, False. For everything else you mean <span class="mono">==</span>.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">⚠️</div>
+    <div><b>Passing to a function is assignment too.</b> <span class="mono">def f(items): items.append(1)</span> mutates the caller's list, because the parameter is just another label on the same object. Python is neither "by value" nor "by reference" — it passes the reference, by value. Mutate and the caller sees it; rebind and they do not.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li><span class="mono">b = a</span> creates a second name, never a second object.</li>
+      <li>Mutating (<span class="mono">.append</span>, <span class="mono">+=</span> on a list, item assignment) is visible through every name bound to that object.</li>
+      <li>Rebinding (<span class="mono">b = b + x</span>) moves only that one name.</li>
+      <li>Immutable objects can never surprise you this way — they have no in-place change to make.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 3. STRINGS                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="strings" data-title="Strings &amp; slicing" data-icon="3" data-group="Core data">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 3 · Core data</div>
+    <h2>Text, and the <span class="grad">ruler</span> that cuts it</h2>
+    <p class="lead">Strings are immutable sequences of characters. Every method returns a new string, slicing works the same way on every sequence in the language, and f-strings ended the formatting wars. Three ideas, most of your text handling.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧪 The string lab</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Note the two spaces at each end — they are there so <span class="mono">strip()</span> has something to do.</p>
+    <pre class="code" id="str-subject"></pre>
+    <div class="chip-row" id="str-ops"></div>
+    <pre class="code console-out" id="str-out"></pre>
+    <div class="stepper-say" id="str-why"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📏 The slice ruler</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Every index is a position, and negative indexes count from the right. Click a slice and watch which characters survive. This syntax works identically on lists and tuples.</p>
+    <div class="slice-strip" id="slice-strip"></div>
+    <div class="chip-row" id="slice-ops"></div>
+    <pre class="code console-out" id="slice-out"></pre>
+    <div class="stepper-say" id="slice-why"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>💬 f-strings</h3></div>
+    <p class="panel-sub">The modern way to build a string. An <span class="mono">f</span> before the quote turns <span class="mono">{...}</span> into a live expression.</p>
+    <div class="fs-grid" id="fstr"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🧵</div>
+    <div><b>Building a string in a loop?</b> <span class="mono">s += piece</span> creates a whole new string every iteration, because strings are immutable — that is O(n²) over the loop. Collect the pieces in a list and <span class="mono">"".join(parts)</span> at the end. On ten items it does not matter; on a hundred thousand it is the difference between instant and a coffee break.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>String methods never modify — they return. <span class="mono">s.strip()</span> alone does nothing; you need <span class="mono">s = s.strip()</span>.</li>
+      <li><span class="mono">[start:stop:step]</span>, stop exclusive, negatives from the end, and it never raises on over-range.</li>
+      <li>f-strings for everything, with format specs after the colon for money, percentages and alignment.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 4. COLLECTIONS                                                -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="collections" data-title="Collections" data-icon="4" data-group="Core data">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 4 · Core data</div>
+    <h2>Four containers, one <span class="grad">decision</span></h2>
+    <p class="lead">list, tuple, dict, set. Beginners reach for a list every time and pay for it later. Choosing the right one is usually the difference between code that reads well and runs fast, and code that does neither.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏁 list vs set: watch the difference</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Both containers hold the same 24 numbers. Both answer <span class="mono">target in container</span> correctly. Press race and count the work each one does.</p>
+    <div class="race" id="coll-race"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📊 The cheat sheet</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Click any row for why it matters.</p>
+    <div id="coll-table"></div>
+    <div class="stepper-say" id="coll-note"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Pick the container</h3><span class="panel-tag">quiz</span></div>
+    <p class="panel-sub">Five jobs from real code. Choose before you look.</p>
+    <div id="coll-tasks"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧰 Moves worth memorising</h3></div>
+      <pre class="code">list(set(items))              # dedupe
+sorted(d.items(), key=lambda kv: kv[1])
+d.get("k", default)           # no KeyError
+d.setdefault("k", []).append(v)
+for k, v in d.items(): ...
+a, *rest = [1, 2, 3]          # a=1, rest=[2,3]
+zip(names, scores)            # pair up
+{**d1, **d2}                  # merge (d2 wins)</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📦 When the built-ins run out</h3></div>
+      <ul class="fact-list">
+        <li><b>Counter</b> — counting anything, plus <span class="mono">.most_common(3)</span>.</li>
+        <li><b>defaultdict(list)</b> — grouping without the "does this key exist yet" dance.</li>
+        <li><b>deque</b> — O(1) append and pop at <i>both</i> ends. The right queue.</li>
+        <li><b>namedtuple</b> / <b>dataclass</b> — a tuple whose fields have names, and a class without the boilerplate.</li>
+      </ul>
+      <pre class="code">from collections import Counter, defaultdict
+
+by_dept = defaultdict(list)
+for emp in staff:
+    by_dept[emp.dept].append(emp)</pre>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Default to a list. Move to a dict the moment you find yourself searching by a key.</li>
+      <li>Any repeated membership test on a big collection wants a set.</li>
+      <li>Use a tuple to say "this is a fixed record and it will not change".</li>
+      <li><span class="mono">collections</span> already solved counting, grouping and queues. Import, do not implement.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 5. CONTROL FLOW                                               -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="flow" data-title="Control flow" data-icon="5" data-group="Logic">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 5 · Logic</div>
+    <h2>Run it <span class="grad">one line at a time</span></h2>
+    <p class="lead">Reading code is guessing what will happen. Tracing it is knowing. This tracer runs three small programs step by step and shows every variable as it changes — the same thing a debugger does, and the same thing you should do in your head.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>▶ The tracer</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Press <b>Run</b> to watch it go, or step manually. Changed variables flash.</p>
+    <div id="trace-demo"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🔁 Loop like a Python programmer</h3></div>
+      <pre class="code"># not this
+for i in range(len(items)):
+    print(items[i])
+
+# this
+for item in items: ...
+for i, item in enumerate(items): ...
+for a, b in zip(xs, ys): ...
+for item in reversed(items): ...
+for item in sorted(items, key=len): ...</pre>
+      <p class="panel-sub">If you are indexing to get the item, the loop is written wrong. <span class="mono">range(len(x))</span> is the tell.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🚦 Conditions, compactly</h3></div>
+      <pre class="code">if 0 &lt; age &lt; 18:          # chained, no `and`
+if name in {"ada", "bob"}: # set literal
+status = "adult" if age &gt;= 18 else "minor"
+
+match command.split():     # 3.10+
+    case ["go", direction]:
+        move(direction)
+    case ["quit"]:
+        raise SystemExit
+    case _:
+        print("unknown")</pre>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🧭</div>
+    <div><b>break, continue, else.</b> <span class="mono">break</span> exits the loop entirely; <span class="mono">continue</span> skips to the next iteration. A loop can have an <span class="mono">else</span>, which runs only if the loop finished <i>without</i> breaking — useful for search loops ("if we got here, we never found it"), and confusing enough that a comment is usually kinder.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Indentation is the block structure. Four spaces, never tabs mixed in.</li>
+      <li>Iterate over items, not indexes. enumerate and zip cover almost every remaining case.</li>
+      <li>The loop variable outlives the loop — Python scopes by function, not by block.</li>
+      <li>When you cannot predict what a loop does, trace it: pen, paper, two columns. It always works.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 6. FUNCTIONS                                                  -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="functions" data-title="Functions" data-icon="6" data-group="Logic">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 6 · Logic</div>
+    <h2>Arguments, and where they <span class="grad">land</span></h2>
+    <p class="lead">Python's argument handling is more flexible than most languages', which makes it powerful and occasionally baffling. Positional, default, *args, keyword-only, **kwargs — five mechanisms, one signature. Here is exactly where each call ends up.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📥 Argument binding</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">One signature, six calls. Click a call and watch each parameter get filled — green for what you passed, grey for what defaulted.</p>
+    <div id="func-demo"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪤 The mutable default</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">The most famous Python gotcha, and one that survives code review because it looks completely reasonable. Run it.</p>
+    <div id="mutdef"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>✍️ Writing a good function</h3></div>
+      <pre class="code">def parse_age(text: str) -> int:
+    """Return text as an age, or raise ValueError.
+
+    Ages outside 0-130 are rejected rather than
+    clamped: a bad value should be loud.
+    """
+    age = int(text)          # raises on junk
+    if not 0 &lt;= age &lt;= 130:
+        raise ValueError(f"age out of range: {age}")
+    return age</pre>
+      <ul class="fact-list">
+        <li>One job. If the name needs an "and", split it.</li>
+        <li>Type hints are free documentation your editor can check.</li>
+        <li>Return a value or raise. Do not print and return None.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🔭 Scope, in four letters</h3></div>
+      <pre class="code">x = "global"
+
+def outer():
+    y = "enclosing"
+    def inner():
+        z = "local"
+        print(z, y, x)   # L, E, G
+    inner()</pre>
+      <p class="panel-sub"><b>LEGB</b>: Local, Enclosing, Global, Built-in — the order Python searches. Assigning to a name anywhere in a function makes it local <i>for the whole function</i>, which is why reading it before that line raises UnboundLocalError. Use <span class="mono">nonlocal</span> or <span class="mono">global</span> only when you have run out of better ideas.</p>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Positional by position, keyword by name, and after <span class="mono">*args</span> everything is keyword-only.</li>
+      <li>Defaults are evaluated once at definition time. Never make one mutable.</li>
+      <li>Mutating an argument mutates the caller's object. Say so in the docstring, or return a new one.</li>
+      <li>LEGB decides which name you get; assignment anywhere in the body makes it local.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 7. ERRORS                                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="errors" data-title="Errors" data-icon="7" data-group="Logic">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 7 · Logic</div>
+    <h2>The traceback is <span class="grad">telling you</span></h2>
+    <p class="lead">Beginners see a red wall and panic. It is the single most helpful thing Python prints. It names the exception, the message, the file and the exact line — and the fix is usually mechanical once you can read it.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔍 Seven errors you will actually hit</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">The traceback types in bottom-up — the order you should read it. The highlighted last line is the answer.</p>
+    <div class="chip-row" id="err-tabs"></div>
+    <div id="err-body"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">📖</div>
+    <div><b>How to read any traceback.</b> Start at the bottom: exception type and message. Move up one line: the code that raised. Keep going up only if that line is inside a library — then look for the last frame that is <i>your</i> file. That is where the bad value came from.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🛡️ Handling, properly</h3></div>
+    <p class="panel-sub">Catch what you can actually deal with. Let everything else crash loudly — a crash you can see beats corrupt data you cannot.</p>
+    <div class="three-up" id="try-pat"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🚫 Anti-patterns</h3></div>
+      <pre class="code">try:
+    risky()
+except:            # catches KeyboardInterrupt too
+    pass           # and now the bug is invisible
+
+except Exception as e:
+    print("error")  # loses the traceback entirely</pre>
+      <p class="panel-sub">If you must catch broadly, log the traceback: <span class="mono">logging.exception("...")</span> keeps the whole thing.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>✅ Ask forgiveness, not permission</h3></div>
+      <pre class="code"># LBYL — look before you leap
+if os.path.exists(p):
+    f = open(p)      # still races
+
+# EAFP — the Python way
+try:
+    f = open(p)
+except FileNotFoundError:
+    f = None</pre>
+      <p class="panel-sub">Between the check and the use, the world can change. Try it and handle the failure.</p>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Read tracebacks bottom-up. The last line is the what; the frames above are the how.</li>
+      <li>Catch specific exception types. Bare <span class="mono">except:</span> hides your own typos.</li>
+      <li><span class="mono">with</span> beats try/finally for anything that must be closed or released.</li>
+      <li>Raise early at boundaries, with the offending value in the message.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 8. COMPREHENSIONS                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="comprehensions" data-title="Comprehensions" data-icon="8" data-group="Idiomatic">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 8 · Idiomatic</div>
+    <h2>The loop that is an <span class="grad">expression</span></h2>
+    <p class="lead">A comprehension is the same loop, written as a description of the result. It is shorter, faster in CPython, and — once your eye adjusts — easier to read, because you see the shape of the output first.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔄 Watch one build</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Same input every time: <span class="mono">nums = [1, 2, 3, 4, 5]</span>. Pick a form, press play, and watch which items survive.</p>
+    <div id="comp-demo"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🎓 The grammar</h3></div>
+      <pre class="code">[ EXPR for ITEM in ITERABLE if CONDITION ]
+   │        │                      │
+   │        └─ the loop            └─ optional filter
+   └─ what each surviving item becomes</pre>
+      <p class="panel-sub">Nested loops read in the same order you would write them:</p>
+      <pre class="code">flat = [x for row in grid for x in row]
+
+# same as
+flat = []
+for row in grid:
+    for x in row:
+        flat.append(x)</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🛑 When not to</h3></div>
+      <ul class="fact-list">
+        <li>More than one filter <b>and</b> a transform — that is a loop with a name, not a one-liner.</li>
+        <li>Anything you would need to comment inside. A comprehension has nowhere to put the comment.</li>
+        <li>Side effects. <span class="mono">[print(x) for x in xs]</span> builds a list of Nones for no reason; write the loop.</li>
+        <li>Three levels of nesting. Nobody has ever read that twice successfully.</li>
+      </ul>
+      <p class="panel-sub">The test: can you say it out loud in one breath? Then it is a comprehension.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">💧</div>
+    <div><b>Drop the brackets and it becomes lazy.</b> <span class="mono">sum(x*x for x in nums)</span> is a generator expression: values are produced one at a time and never collected. Any function taking an iterable — <span class="mono">sum</span>, <span class="mono">max</span>, <span class="mono">any</span>, <span class="mono">all</span>, <span class="mono">join</span> — should get one. That is how you process a file bigger than RAM.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li><span class="mono">[...]</span> list, <span class="mono">{k: v ...}</span> dict, <span class="mono">{...}</span> set, <span class="mono">(...)</span> generator.</li>
+      <li><span class="mono">if</span> after the for filters; <span class="mono">if/else</span> before the for chooses a value.</li>
+      <li>Generator expressions keep memory flat no matter how big the input is.</li>
+      <li>If it does not fit comfortably on one line, it was a loop all along.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 9. FILES, MODULES, ENVIRONMENTS                               -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="projects" data-title="Files &amp; projects" data-icon="9" data-group="Idiomatic">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 9 · Idiomatic</div>
+    <h2>From a script to a <span class="grad">project</span></h2>
+    <p class="lead">Reading a file, importing your own code, and isolating your dependencies. This is the chapter that turns "I can write Python" into "I can hand this to someone else and it runs".</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📂 Reading and writing</h3></div>
+    <p class="panel-sub">Always use <span class="mono">with</span>. Always name the encoding.</p>
+    <div class="three-up" id="file-ops"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>💻 Set up a project</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Five commands. Press run and watch them go, with the reason for each underneath.</p>
+    <div id="env-demo"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>📦 Imports and modules</h3></div>
+      <pre class="code">import math                 # math.sqrt(2)
+from math import sqrt       # sqrt(2)
+from mypkg import helpers   # your own code
+import numpy as np          # conventional alias
+
+if __name__ == "__main__":
+    main()</pre>
+      <p class="panel-sub">A module is one <span class="mono">.py</span> file; a package is a folder of them. That last guard means "only run this when executed directly, not when imported" — without it, importing your script runs it.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🗂️ A layout that scales</h3></div>
+      <pre class="code">myproject/
+├── .venv/              # never committed
+├── src/myproject/
+│   ├── __init__.py
+│   ├── core.py
+│   └── cli.py
+├── tests/
+│   └── test_core.py
+├── requirements.txt
+└── README.md</pre>
+      <p class="panel-sub">Code in one place, tests beside it, dependencies pinned in a file. Boring, and it never becomes a problem.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏛️ One class, annotated</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">You do not need OOP to write good Python. But you will read classes constantly, so click each part.</p>
+    <div id="class-demo"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li><span class="mono">with open(...)</span> and an explicit encoding, every time.</li>
+      <li>One venv per project, and a requirements.txt that recreates it.</li>
+      <li><span class="mono">if __name__ == "__main__":</span> keeps a file importable and runnable.</li>
+      <li>Use <span class="mono">csv</span> and <span class="mono">json</span> instead of parsing by hand. They handle the edge cases you have not thought of.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 10. GOTCHAS                                                   -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="gotchas" data-title="Gotchas" data-icon="🪤" data-group="Finish line">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 10 · Finish line</div>
+    <h2>Nine things that will <span class="grad">catch you</span> once</h2>
+    <p class="lead">Every one of these has cost a real person a real afternoon. Guess before you look — the ones you get wrong are the ones worth remembering.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪤 Guess the output</h3><span class="panel-tag">quiz</span></div>
+    <div class="got-grid" id="gotchas"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>🧮 Floats and money</h3></div>
+      <pre class="code">&gt;&gt;&gt; 0.1 + 0.2
+0.30000000000000004
+
+from decimal import Decimal
+Decimal("0.1") + Decimal("0.2")   # 0.3 exactly
+
+import math
+math.isclose(a, b)                # comparing floats</pre>
+      <p class="panel-sub">Not a Python bug — it is IEEE-754, and every language has it. Money is integers of cents, or Decimal. Never a float.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🔒 Mutating while iterating</h3></div>
+      <pre class="code"># skips items — the index shifts underneath you
+for item in items:
+    if bad(item):
+        items.remove(item)
+
+# do this instead
+items = [i for i in items if not bad(i)]</pre>
+      <p class="panel-sub">Same for dicts: changing size during iteration raises RuntimeError. Iterate over a copy, or build a new one.</p>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Most gotchas are one idea wearing different hats: <b>names are labels, and defaults are evaluated once</b>.</li>
+      <li>When something is genuinely surprising, open the REPL and check. Three seconds beats an hour of theory.</li>
+      <li><span class="mono">id(x)</span> tells you which object you actually have when arrows get confusing.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 11. QUIZ                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Finish line">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 11 · Finish line</div>
+    <h2>Prove it to <span class="grad">yourself</span></h2>
+    <p class="lead">Fifteen questions covering everything above. No time limit, instant explanations, and you can retake it.</p>
+  </header>
+
+  <div class="panel">
+    <div id="quiz" class="quiz"></div>
+  </div>
+
+  <div class="panel glossary-panel">
+    <div class="panel-head"><h3>📖 Glossary</h3></div>
+    <input type="search" id="gloss-search" class="input-line" placeholder="filter terms…">
+    <div class="glossary" id="glossary"></div>
+  </div>
+</section>
+
+</div><!-- /stage -->
+
+<div class="pager" id="pager">
+  <button class="btn btn-ghost" data-goto="prev">&larr; Back</button>
+  <div class="pager-dots" id="pager-dots"></div>
+  <button class="btn" data-goto="next">Next &rarr;</button>
+</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/content.js"></script>
+<script src="js/demos.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

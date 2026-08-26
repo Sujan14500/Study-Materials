@@ -2,7 +2,7 @@
 
 An interactive, animated course on agentic AI — from "what actually makes something
 an agent" to "I can review someone's agent design and name what will break".
-Fourteen chapters, every concept attached to something you can step, drag or break.
+Fifteen chapters, every concept attached to something you can step, drag or break.
 
 Companion to [`genai_flow`](../genai_flow) (tokens → RAG),
 [`langgraph`](../langgraph) (stateful graphs) and
@@ -28,17 +28,18 @@ open index.html           # macOS
 | 1 | What is agentic? | Sort six real requests into prompt / chain / agent — the cheapest one that works is the right one |
 | 2 | The agent loop | Step think→act→observe through three real traces, including one that fails and recovers |
 | 3 | Tools & function calling | Switch tools off and watch the model lose the ability, not just the will |
-| 4 | ReAct | Same question answered three ways; the tool call reverses the model's prior |
-| 5 | Planning | Watch a goal decompose into dependency waves, and see what parallelism buys |
-| 6 | Memory | Four memory types, a conversation getting filed, and a quiz on which one did the work |
-| 7 | Reflection | Draft → critique → revise, with the score flattening out so you can see where to stop |
-| 8 | Multi-agent | Four topologies animated, with call counts, latency and cost side by side |
-| 9 | Guardrails & HITL | Gate drill: run it, ask a human, or block in code — seven actions, real answers |
-| 10 | Reliability maths | Sliders for per-step accuracy and step count; watch 95% become 36% |
-| 11 | Evaluating agents | Four runs graded on outcome *and* trajectory — two pass an outcome-only eval and shouldn't |
-| 12 | Ship it | Cost calculator showing quadratic growth, architecture, and a checklist that saves |
-| 13 | MCP | Step a whole JSON-RPC session frame by frame, and watch the N×M wiring grid collapse |
-| 14 | Final quiz | 15 questions with explanations, plus a glossary |
+| 4 | Naive loops | Turn five guards on one at a time — the flowchart rewrites itself, and the same 400 tasks re-run live so you can watch tokens-per-finished-task drop |
+| 5 | ReAct | Same question answered three ways; the tool call reverses the model's prior |
+| 6 | Planning | Watch a goal decompose into dependency waves, and see what parallelism buys |
+| 7 | Memory | Four memory types, a conversation getting filed, and a quiz on which one did the work |
+| 8 | Reflection | Draft → critique → revise, with the score flattening out so you can see where to stop |
+| 9 | Multi-agent | Four topologies animated, with call counts, latency and cost side by side |
+| 10 | Guardrails & HITL | Gate drill: run it, ask a human, or block in code — seven actions, real answers |
+| 11 | Reliability maths | Sliders for per-step accuracy and step count; watch 95% become 36% |
+| 12 | Evaluating agents | Four runs graded on outcome *and* trajectory — two pass an outcome-only eval and shouldn't |
+| 13 | Ship it | Cost calculator showing quadratic growth, architecture, and a checklist that saves |
+| 14 | MCP | Step a whole JSON-RPC session frame by frame, and watch the N×M wiring grid collapse |
+| 15 | Final quiz | 15 questions with explanations, plus a glossary |
 
 Progress, XP and the checklist persist in `localStorage`.
 

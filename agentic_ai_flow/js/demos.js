@@ -604,7 +604,8 @@ function initShip() {
       ['tin', 'prompt tokens at step 1', 1500],
       ['tout', 'output tokens / step', 250],
       ['pin', '$ per 1M input', 3],
-      ['pout', '$ per 1M output', 15]
+      ['pout', '$ per 1M output', 15],
+      ['cache', 'cached input billed at (%)', 10]
     ];
     calc.innerHTML = fields.map(f =>
       '<div class="calc-f"><label for="c-' + f[0] + '">' + f[1] + '</label><input id="c-' + f[0] + '" type="number" min="0" value="' + f[2] + '"></div>')
@@ -613,11 +614,21 @@ function initShip() {
     function run() {
       const v = id => Math.max(0, +($('#c-' + id).value || 0));
       const runs = v('runs'), n = v('steps'), tin = v('tin'), tout = v('tout');
-      // step k resends the base prompt plus every previous step's output + observation
-      let inTok = 0;
-      for (let k = 0; k < n; k++) inTok += tin + k * (tout + 200);
+      // Step k resends step k-1's prompt verbatim and appends one observation, so almost
+      // all of it is a prefix the provider has already processed. That is what makes an
+      // agent loop the best-shaped workload there is for prompt caching.
+      const disc = clamp(v('cache'), 0, 100) / 100;
+      let inTok = 0, billedTok = 0;
+      for (let k = 0; k < n; k++) {
+        const stepIn = tin + k * (tout + 200);
+        // at step 0 only the system prompt and tool schemas are a known prefix
+        const cached = k === 0 ? tin * 0.8 : tin + (k - 1) * (tout + 200);
+        inTok += stepIn;
+        billedTok += (stepIn - cached) + cached * disc;
+      }
       const outTok = n * tout;
       const perRun = inTok / 1e6 * v('pin') + outTok / 1e6 * v('pout');
+      const cachedRun = billedTok / 1e6 * v('pin') + outTok / 1e6 * v('pout');
       const day = perRun * runs;
       const oneStep = (tin / 1e6 * v('pin') + tout / 1e6 * v('pout'));
       $('#calc-out').innerHTML = [
@@ -625,9 +636,10 @@ function initShip() {
         ['cost / run', '$' + perRun.toFixed(4)],
         ['cost / day', '$' + day.toFixed(2)],
         ['cost / month', '$' + (day * 30).toFixed(0)],
-        ['vs. a single call', (perRun / (oneStep || 1)).toFixed(1) + '× more']
+        ['vs. a single call', (perRun / (oneStep || 1)).toFixed(1) + '× more'],
+        ['with prompt caching', '$' + (cachedRun * runs * 30).toFixed(0) + '/mo']
       ].map(c => '<div class="stat"><div class="stat-v">' + c[1] + '</div><div class="stat-k">' + c[0] + '</div></div>').join('') +
-      '<p class="panel-sub" style="grid-column:1/-1;margin:8px 0 0">Cost grows <b>quadratically</b> with step count, because every turn resends the whole transcript. Doubling steps roughly quadruples the bill. This is the single strongest argument for shorter trajectories — and for summarising or pruning the transcript once it gets long.</p>';
+      '<p class="panel-sub" style="grid-column:1/-1;margin:8px 0 0">Cost grows <b>quadratically</b> with step count, because every turn resends the whole transcript. Doubling steps roughly quadruples the bill. This is the single strongest argument for shorter trajectories — and for summarising or pruning the transcript once it gets long. Prompt caching is the other half: at ' + Math.round(disc * 100) + '% billing on cached input it takes the month down to <b>$' + (cachedRun * runs * 30).toFixed(0) + '</b>, because every step after the first resends a prefix the provider has already processed. It bends the curve; it does not straighten it, and it does nothing at all for how fast the answer comes out.</p>';
     }
     $$('input', calc).forEach(i => i.oninput = run);
     run();
@@ -811,10 +823,325 @@ function initMcp() {
   paintWire();
 }
 
+
+/* ============================================================
+   Ch4 — the naive loop and the guards that fix it.
+   The simulation is deterministic: same guards + same seed give
+   the same run, every time. test.js re-derives it independently.
+   ============================================================ */
+const NL = (function () {
+  const M = C.nlModel;
+  /* a plain LCG. Math.random() would make the demo unreproducible and
+     the test flaky, and neither is worth the convenience. */
+  function lcg(seed) {
+    let s = (seed * 1103515245 + 12345) >>> 0;
+    return () => { s = (s * 1103515245 + 12345) >>> 0; return s / 4294967296; };
+  }
+  /* one run. `g` is the guard set; every guard removes one specific
+     failure mode and nothing else. */
+  function sim(g, seed) {
+    const rnd = lcg(seed);
+    const cap = g.budget ? M.budgetSteps : M.hardCap;
+    let ctx = M.ctx0, tokens = 0, prog = 0, step = 0;
+    const trace = [];
+    while (step < cap) {
+      step++;
+      tokens += ctx;                       // the whole transcript, resent
+      const hp = Math.min(M.hpMax, ctx * M.hpPerToken);
+      const tc = g.scope ? M.tcScoped : M.tcAll;
+      const sp = g.state ? 0 : M.statePenalty;
+      const p = Math.min(0.95, Math.max(0.05, M.p0 - hp - tc - sp));
+      const ok = rnd() < p;
+      if (ok) prog++; else prog = Math.max(0, prog - 1);
+      ctx += M.obsTokens + (ok ? 0 : M.wrongTokens);
+      if (g.compact) ctx = Math.min(ctx, M.ctxCap);
+      trace.push({ step: step, ok: ok, p: p, ctx: ctx, tokens: tokens, prog: prog, hp: hp });
+
+      if (g.verify) {
+        if (prog >= M.need) return { o: 'done', step: step, tokens: tokens, ctx: ctx, trace: trace };
+      } else if (rnd() < M.pDeclare) {
+        const o = prog >= M.need ? 'done' : 'shipped';
+        trace[trace.length - 1].declared = true;
+        return { o: o, step: step, tokens: tokens, ctx: ctx, trace: trace };
+      }
+    }
+    return { o: g.budget ? 'escalated' : 'runaway', step: step, tokens: tokens, ctx: ctx, trace: trace };
+  }
+  /* 400 runs, so the headline number is a rate and not an anecdote */
+  function agg(g) {
+    const t = { done: 0, shipped: 0, escalated: 0, runaway: 0 };
+    let tokens = 0;
+    for (let s = 1; s <= 400; s++) { const r = sim(g, s); t[r.o]++; tokens += r.tokens; }
+    return { t: t, tokens: tokens / 400,
+             perDone: t.done ? tokens / t.done : Infinity };
+  }
+  return { sim: sim, agg: agg };
+})();
+
+function initNaiveLoop() {
+  const svg = $('#nl-svg'); if (!svg) return;
+  const NS = 'http://www.w3.org/2000/svg';
+  const g = { verify: false, scope: false, compact: false, state: false, budget: false };
+  let seed = 7, timers = [];
+
+  const byId = {};
+  C.nlNodes.forEach(n => { byId[n.id] = n; });
+  const cx = n => n.x + n.w / 2, cy = n => n.y + n.h / 2;
+
+  /* ---- edges first so nodes paint over them ---- */
+  C.nlEdges.forEach(e => {
+    const a = byId[e.a], b = byId[e.b];
+    const p = document.createElementNS(NS, 'path');
+    let d;
+    if (a.y === b.y) {                        // straight across
+      const dir = b.x > a.x ? 1 : -1;
+      d = 'M' + (dir > 0 ? a.x + a.w : a.x) + ',' + cy(a) + ' H' + (dir > 0 ? b.x : b.x + b.w);
+    } else if (a.x === b.x) {                 // straight down
+      d = 'M' + cx(a) + ',' + (b.y > a.y ? a.y + a.h : a.y) + ' V' + (b.y > a.y ? b.y : b.y + b.h);
+    } else {                                  // elbow
+      d = 'M' + cx(a) + ',' + (b.y > a.y ? a.y + a.h : a.y) +
+          ' V' + (b.y > a.y ? b.y - 14 : b.y + b.h + 14) +
+          ' H' + cx(b) + ' V' + (b.y > a.y ? b.y : b.y + b.h);
+    }
+    p.setAttribute('d', d);
+    p.setAttribute('class', 'nl-edge' + (e.l === 'no' || byId[e.b].bad ? ' bad' : ''));
+    p.dataset.e = e.a + '>' + e.b;
+    svg.appendChild(p);
+    if (e.l) {
+      const t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', (cx(a) + cx(b)) / 2); t.setAttribute('y', cy(a) - 8);
+      t.setAttribute('class', 'nl-elab'); t.textContent = e.l;
+      if (e.l === 'no') { t.setAttribute('x', cx(a) + 12); t.setAttribute('y', a.y + a.h + 20); }
+      svg.appendChild(t);
+    }
+  });
+
+  C.nlNodes.forEach(n => {
+    const grp = document.createElementNS(NS, 'g');
+    grp.setAttribute('class', 'nl-node' + (n.bad ? ' bad' : ''));
+    grp.dataset.n = n.id;
+    const r = document.createElementNS(NS, n.dia ? 'polygon' : 'rect');
+    if (n.dia) r.setAttribute('points',
+      [cx(n) + ',' + n.y, (n.x + n.w) + ',' + cy(n), cx(n) + ',' + (n.y + n.h), n.x + ',' + cy(n)].join(' '));
+    else { r.setAttribute('x', n.x); r.setAttribute('y', n.y);
+           r.setAttribute('width', n.w); r.setAttribute('height', n.h); r.setAttribute('rx', 10); }
+    grp.appendChild(r);
+    const t = document.createElementNS(NS, 'text');
+    t.setAttribute('x', cx(n)); t.setAttribute('y', cy(n) + 4);
+    t.textContent = n.t;
+    grp.appendChild(t);
+    svg.appendChild(grp);
+  });
+  const label = id => $('.nl-node[data-n="' + id + '"] text', svg);
+
+  /* ---- guard toggles ---- */
+  $('#nl-guards').innerHTML = C.nlGuards.map(gu =>
+    '<button class="toggle" data-g="' + gu.id + '"><span class="toggle-box">&#10003;</span>' +
+    '<div><b>' + gu.n + '</b><small>' + gu.s + '</small></div></button>').join('');
+  $$('#nl-guards .toggle').forEach(b => {
+    b.onclick = () => {
+      const id = b.dataset.g;
+      g[id] = !g[id];
+      b.classList.toggle('on', g[id]);
+      const gu = C.nlGuards.filter(x => x.id === id)[0];
+      $('#nl-guard-note').innerHTML = '<b>' + gu.n + '</b> — ' + gu.d;
+      relabel(); paintDist(); xp(1);
+    };
+  });
+  $('#nl-all').onclick = () => {
+    const turnOn = !C.nlGuards.every(gu => g[gu.id]);
+    C.nlGuards.forEach(gu => { g[gu.id] = turnOn; });
+    $$('#nl-guards .toggle').forEach(b => b.classList.toggle('on', turnOn));
+    $('#nl-guard-note').innerHTML = turnOn
+      ? '<b>All five on.</b> This is the loop you actually ship. Run it and compare the outcome bar with the naive one.'
+      : '<b>All five off.</b> The loop from the top of the chapter: no cap, no ground truth, no context control.';
+    relabel(); paintDist();
+  };
+
+  /* the flowchart itself changes when you turn a guard on — that is the
+     point, the guards are edits to the graph, not settings on a model */
+  function relabel() {
+    label('check').textContent = g.verify ? 'Tests pass?' : 'Looks good?';
+    label('fix').textContent = g.scope ? 'Targeted fix' : 'Try a random fix';
+    label('grow').textContent = g.compact ? 'Context compacted' : 'Context grows';
+    label('hall').textContent = g.state ? 'State stays true' : 'Hallucinations up';
+    label('ship').textContent = g.budget ? 'Escalate to human' : 'Hidden bugs ship';
+    ['check', 'fix', 'grow', 'hall', 'ship'].forEach((id, i) => {
+      const key = ['verify', 'scope', 'compact', 'state', 'budget'][i];
+      $('.nl-node[data-n="' + id + '"]', svg).classList.toggle('fixed', !!g[key]);
+    });
+  }
+
+  /* ---- one animated run ---- */
+  function walk() {
+    timers.forEach(clearTimeout); timers = [];
+    const r = NL.sim(g, seed++);
+    $('#nl-trace').innerHTML = '';
+    $('#nl-stats').innerHTML = '';
+    r.trace.forEach((t, i) => {
+      const seq = t.ok || t.declared ? ['gen', 'check'] : ['gen', 'check', 'fix', 'grow', 'hall', 'worse'];
+      seq.forEach((id, j) => timers.push(setTimeout(() => {
+        $$('.nl-node', svg).forEach(n => n.classList.remove('lit'));
+        $('.nl-node[data-n="' + id + '"]', svg).classList.add('lit');
+      }, i * 460 + j * 62)));
+
+      timers.push(setTimeout(() => {
+        const row = el('div', 'nl-row ' + (t.ok ? 'ok' : 'bad'),
+          '<span class="nl-s">' + t.step + '</span>' +
+          '<span class="nl-a">' + (t.ok ? 'progress' : 'wrong turn') + '</span>' +
+          '<span class="nl-p">p=' + t.p.toFixed(2) + '</span>' +
+          '<span class="nl-c">ctx ' + (t.ctx / 1000).toFixed(1) + 'k</span>' +
+          '<span class="nl-t">' + (t.tokens / 1000).toFixed(1) + 'k billed</span>');
+        $('#nl-trace').appendChild(row);
+        $('#nl-trace').scrollTop = 1e6;
+        $('#nl-ctx-fill').style.width = Math.min(100, t.ctx / (M_ctxMax()) * 100) + '%';
+        $('#nl-ctx-lab').textContent = (t.ctx / 1000).toFixed(1) + 'k tokens of context · accuracy penalty −' +
+          (t.hp * 100).toFixed(0) + ' points';
+      }, i * 460 + 300));
+    });
+
+    timers.push(setTimeout(() => {
+      $$('.nl-node', svg).forEach(n => n.classList.remove('lit'));
+      const o = C.nlOutcomes[r.o];
+      $('.nl-node[data-n="' + (r.o === 'done' ? 'declare' : 'ship') + '"]', svg).classList.add('lit');
+      $('#nl-stats').innerHTML =
+        '<div class="stat"><div class="stat-v" style="color:' + o.c + '">' + r.step + '</div><div class="stat-k">steps taken</div></div>' +
+        '<div class="stat"><div class="stat-v">' + (r.tokens / 1000).toFixed(1) + 'k</div><div class="stat-k">tokens billed</div></div>' +
+        '<div class="stat"><div class="stat-v">' + (r.ctx / 1000).toFixed(1) + 'k</div><div class="stat-k">final context</div></div>' +
+        '<div class="stat" style="grid-column:span 2"><div class="stat-v" style="font-size:15px;color:' + o.c + '">' +
+          o.n + '</div><div class="stat-k">' + o.d + '</div></div>';
+      xp(3, r.o === 'done' ? '+3 XP — the loop actually finished' : null);
+    }, r.trace.length * 460 + 340));
+  }
+  function M_ctxMax() { return C.nlModel.ctx0 + C.nlModel.hardCap * (C.nlModel.obsTokens + C.nlModel.wrongTokens) / 2; }
+
+  $('#nl-run').onclick = walk;
+
+  /* ---- 400-run distribution: the number that actually decides things ---- */
+  function paintDist() {
+    const a = NL.agg(g);
+    const naive = NL.agg({ verify: 0, scope: 0, compact: 0, state: 0, budget: 0 });
+    const keys = ['done', 'shipped', 'escalated', 'runaway'];
+    $('#nl-dist').innerHTML =
+      '<div class="nl-bar">' + keys.map(k => {
+        const pct = a.t[k] / 400 * 100;
+        return pct ? '<span style="width:' + pct + '%;background:' + C.nlOutcomes[k].c + '" title="' +
+          C.nlOutcomes[k].n + ': ' + pct.toFixed(0) + '%">' + (pct > 9 ? pct.toFixed(0) + '%' : '') + '</span>' : '';
+      }).join('') + '</div>' +
+      '<div class="nl-key">' + keys.map(k =>
+        '<span><i style="background:' + C.nlOutcomes[k].c + '"></i>' + C.nlOutcomes[k].n +
+        ' <b>' + (a.t[k] / 4).toFixed(0) + '%</b></span>').join('') + '</div>' +
+      '<div class="stat-row" style="margin-top:14px">' +
+        '<div class="stat"><div class="stat-v" style="color:' + (a.t.done > 200 ? '#34d399' : '#fb7185') + '">' +
+          (a.t.done / 4).toFixed(0) + '%</div><div class="stat-k">runs that actually finished</div></div>' +
+        '<div class="stat"><div class="stat-v">' + (a.tokens / 1000).toFixed(0) + 'k</div><div class="stat-k">avg tokens per run</div></div>' +
+        '<div class="stat"><div class="stat-v" style="color:#fbbf24">' +
+          (isFinite(a.perDone) ? (a.perDone / 1000).toFixed(0) + 'k' : '∞') +
+          '</div><div class="stat-k">tokens per finished task</div></div>' +
+        '<div class="stat"><div class="stat-v">' +
+          (isFinite(a.perDone) ? (naive.perDone / a.perDone).toFixed(1) + '×' : '—') +
+          '</div><div class="stat-k">vs the naive loop</div></div>' +
+      '</div>' +
+      '<p class="panel-sub" style="margin-top:12px">Average tokens per <i>run</i> flatters the naive loop, because giving up early with a wrong answer is cheap. Tokens per <b>finished task</b> is the number that survives contact with a finance team.</p>';
+  }
+
+  relabel();
+  paintDist();
+  $('#nl-guard-note').innerHTML = 'Toggle a guard to read what it does — and watch the flowchart itself change. Each one is an edit to the graph, not a setting on the model.';
+
+  /* code tabs */
+  const row = $('#nl-code-tabs'), blk = $('#nl-code');
+  C.nlCode.forEach((it, i) => {
+    const b = el('button', 'chip' + (i === 0 ? ' active' : ''), it.t);
+    b.onclick = () => {
+      $$('.chip', row).forEach(c => c.classList.remove('active'));
+      b.classList.add('active'); blk.textContent = it.code;
+    };
+    row.appendChild(b);
+  });
+  blk.textContent = C.nlCode[0].code;
+
+  $('#nl-lessons').innerHTML = C.nlLessons.map(l =>
+    '<div class="gterm"><b>' + l[0] + '</b><span>' + l[1] + '</span></div>').join('');
+}
+
+/* ---------- Ch4b: how many tools is too many ---------- */
+function initToolScope() {
+  const grid = $('#ts-grid'); if (!grid) return;
+  const M = C.tsModel;
+  let n = 20, scoped = false, phase = 'act';
+
+  /* accuracy falls with the log of the menu size — doubling the tool list
+     costs a fixed number of points, which is why 8 -> 16 hurts as much as
+     4 -> 8 does */
+  const acc = k => Math.max(M.floor, Math.min(0.99, M.baseAcc - M.decay * Math.log2(Math.max(1, k) / 4)));
+  const bound = () => scoped
+    ? C.tsTools.slice(0, n).filter(t => t.ph === phase)
+    : C.tsTools.slice(0, n);
+
+  C.tsPhases.forEach((p, i) => {
+    const b = el('button', 'chip' + (p.id === phase ? ' active' : ''), p.n);
+    b.onclick = () => {
+      $$('.chip', $('#ts-phases')).forEach(c => c.classList.remove('active'));
+      b.classList.add('active'); phase = p.id; render();
+    };
+    $('#ts-phases').appendChild(b);
+  });
+
+  $('#ts-n').oninput = () => { n = +$('#ts-n').value; render(); };
+  $('#ts-scope').onchange = () => { scoped = $('#ts-scope').checked; render(); xp(2); };
+
+  function render() {
+    const list = bound();
+    const k = list.length;
+    const pStep = acc(k);
+    const pRun = Math.pow(pStep, M.steps);
+    const perStep = M.tokensPerTool * k;
+    const perRun = perStep * M.steps;
+    const naiveRun = Math.pow(acc(n), M.steps);
+
+    $('#ts-n-v').textContent = n;
+    $('#ts-phases').style.opacity = scoped ? 1 : .35;
+
+    grid.innerHTML = C.tsTools.slice(0, n).map(t => {
+      const inScope = !scoped || t.ph === phase;
+      return '<span class="ts-tool' + (inScope ? '' : ' out') + ' ph-' + t.ph + '">' + t.n + '</span>';
+    }).join('');
+
+    $('#ts-out').innerHTML =
+      '<div class="stat"><div class="stat-v">' + k + '</div><div class="stat-k">tools in the prompt</div></div>' +
+      '<div class="stat"><div class="stat-v" style="color:' + (pStep > .9 ? '#34d399' : pStep > .8 ? '#fbbf24' : '#fb7185') + '">' +
+        (pStep * 100).toFixed(0) + '%</div><div class="stat-k">right tool, per step</div></div>' +
+      '<div class="stat"><div class="stat-v" style="color:' + (pRun > .6 ? '#34d399' : pRun > .3 ? '#fbbf24' : '#fb7185') + '">' +
+        (pRun * 100).toFixed(0) + '%</div><div class="stat-k">clean run of ' + M.steps + ' steps</div></div>' +
+      '<div class="stat"><div class="stat-v">' + (perRun / 1000).toFixed(1) + 'k</div><div class="stat-k">tokens on schemas alone</div></div>';
+
+    /* the curve: run success against menu size, with the current point marked */
+    const xs = [4, 6, 8, 10, 12, 16, 20];
+    $('#ts-chart').innerHTML = xs.map(x => {
+      const v = Math.pow(acc(x), M.steps);
+      return '<div class="relbar" title="' + x + ' tools → ' + (v * 100).toFixed(0) + '% clean runs">' +
+        '<div class="relbar-fill' + (x === k ? ' here' : '') + '" style="height:' + (v * 100) + '%;background:' +
+        (v > .6 ? '#34d399' : v > .3 ? '#fbbf24' : '#fb7185') + '"></div><span>' + x + '</span></div>';
+    }).join('');
+
+    $('#ts-note').innerHTML = scoped
+      ? 'Scoped to <b>' + C.tsPhases.filter(p => p.id === phase)[0].n.toLowerCase() + '</b>: ' + k +
+        ' tools instead of ' + n + '. Clean-run rate goes from <b>' + (naiveRun * 100).toFixed(0) + '%</b> to <b>' +
+        (pRun * 100).toFixed(0) + '%</b>, and you stopped paying for ' +
+        (((n - k) * M.tokensPerTool * M.steps) / 1000).toFixed(1) + 'k tokens of schemas the agent was never allowed to call.'
+      : 'All ' + n + ' tools bound at once. Note that <span class="mono">refund_charge</span> and <span class="mono">deploy_prod</span> ' +
+        'are on the menu during a code-fixing task — the model is one bad sample away from calling them, and the only thing ' +
+        'preventing it is the prompt asking nicely.';
+  }
+  render();
+}
+
 /* ---------- boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   [initBackground, initAgency, initLoop, initTools, initReact, initPlan, initMemory,
-   initReflect, initTopo, initGuard, initReliability, initEval, initShip, initMcp, initQuiz]
+   initReflect, initTopo, initGuard, initReliability, initEval, initShip, initMcp,
+   initNaiveLoop, initToolScope, initQuiz]
     .forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 });
 })();

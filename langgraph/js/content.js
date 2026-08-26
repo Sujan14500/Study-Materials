@@ -458,3 +458,202 @@ C.glossary = [
   ['create_react_agent', 'Prebuilt two-node tool-calling agent. An ordinary compiled graph underneath.'],
   ['LangGraph Studio', 'The UI from `langgraph dev`: step nodes, inspect state, fork checkpoints in a browser.']
 ];
+
+/* ============================================================
+   Ch7: scoped tools and controlled state
+   ------------------------------------------------------------
+   The run below is scripted rather than simulated — it is a
+   transcript of one task, and the demo replays it under two
+   different graphs. `wide` steps only happen when every tool is
+   bound to one node, which is the whole argument for scoping.
+   ============================================================ */
+C.lgsTools = [
+  { n: 'grep_repo',       ph: 'research', tk: 96,  d: 'search the codebase for a literal string' },
+  { n: 'read_file',       ph: 'research', tk: 104, d: 'read a file, optionally a line range' },
+  { n: 'search_docs',     ph: 'research', tk: 118, d: 'semantic search over the runbooks' },
+  { n: 'apply_patch',     ph: 'act',      tk: 182, d: 'apply a unified diff to one file' },
+  { n: 'run_tests',       ph: 'act',      tk: 121, d: 'run a test path, return pass/fail plus failures' },
+  { n: 'run_lint',        ph: 'act',      tk: 88,  d: 'style and type check' },
+  { n: 'open_pr',         ph: 'finish',   tk: 143, d: 'open a pull request with a title and body' },
+  { n: 'post_summary',    ph: 'finish',   tk: 110, d: 'write the outcome back to the ticket' },
+  { n: 'restart_service', ph: 'ops',      tk: 92,  d: 'restart a production service', danger: true },
+  { n: 'deploy_prod',     ph: 'ops',      tk: 134, d: 'deploy the current SHA to production', danger: true },
+  { n: 'refund_charge',   ph: 'ops',      tk: 126, d: 'issue a refund against a charge id', danger: true },
+  { n: 'page_oncall',     ph: 'ops',      tk: 74,  d: 'page the on-call engineer', danger: true }
+];
+
+C.lgsPhases = [
+  { id: 'research', n: 'research', d: 'read-only. Understand before touching anything.',
+    writes: ['messages', 'findings'] },
+  { id: 'act',      n: 'act',      d: 'change the code, then prove the change with tests.',
+    writes: ['messages', 'patch', 'test_result'] },
+  { id: 'finish',   n: 'finish',   d: 'hand the work to a human. No code changes here.',
+    writes: ['messages', 'pr'] }
+];
+
+/* the compiled graph, in the coordinate system drawGraph() already uses */
+C.lgsNodes = [
+  { id: 'START',    label: 'START',    x: 50, y: 8 },
+  { id: 'agent',    label: 'agent',    x: 50, y: 32 },
+  { id: 'research', label: 'research', x: 15, y: 62 },
+  { id: 'act',      label: 'act',      x: 50, y: 62 },
+  { id: 'finish',   label: 'finish',   x: 85, y: 62 },
+  { id: 'END',      label: 'END',      x: 85, y: 90 }
+];
+C.lgsEdges = [
+  ['START', 'agent', ''],
+  ['agent', 'research', 'act'],
+  ['agent', 'act', 'act'],
+  ['agent', 'finish', 'act'],
+  ['research', 'agent', 'obs'],
+  ['act', 'agent', 'obs'],
+  ['finish', 'END', '']
+];
+
+C.lgsSchema = [
+  { k: 'messages',    t: 'Annotated[list, add_messages]', w: 'every node',
+    d: 'The transcript. Appended, never overwritten — that is what the reducer buys you.' },
+  { k: 'findings',    t: 'Annotated[dict, merge_dicts]',  w: 'research',
+    d: 'What the agent learned, as typed fields. Later nodes read this instead of re-reading message 6.' },
+  { k: 'patch',       t: 'str | None',                    w: 'act',
+    d: 'Last write wins. Only one node can produce it, so there is no merge to define.' },
+  { k: 'test_result', t: 'Literal["pass","fail"] | None', w: 'act',
+    d: 'The exit condition. The router reads this, not the model\'s opinion of its own work.' },
+  { k: 'pr',          t: 'int | None',                    w: 'finish',
+    d: 'Set once, at the end. If it is None the run did not finish, whatever the transcript says.' }
+];
+
+/* ph = which node runs; wide = only happens when everything is bound to one node */
+C.lgsRun = [
+  { ph: 'research', think: 'The ticket says "some refunds fail". Find the error string first.',
+    act: 'grep_repo("E-4021")',
+    obs: '2 matches · refund_worker.py:88 · runbooks/gateway.md:12',
+    w: { findings: { code: 'E-4021' } } },
+
+  { ph: 'research', wide: true, bad: true,
+    think: 'A restart usually clears transient gateway errors. Worth a try.',
+    act: 'restart_service("payments")',
+    obs: '⚠ executed · 2,100 in-flight refunds dropped',
+    note: 'Nothing in the state changed, because this tool has no contract with the state machine at all. It just reached into production. The research node was never supposed to be able to call it — but every tool was bound to every node.' },
+
+  { ph: 'research', think: 'Read the handler around the match before changing anything.',
+    act: 'read_file("refund_worker.py", lines="80-96")',
+    obs: 'the retry loop catches TimeoutError and returns None',
+    w: { findings: { code: 'E-4021', cause: 'timeout swallowed by retry loop' } } },
+
+  { ph: 'act', think: 'Re-raise instead of swallowing, and cap the retries at 2.',
+    act: 'apply_patch("refund_worker.py", diff)',
+    obs: 'applied · 1 file, +6 −2',
+    w: { patch: 'refund_worker.py' } },
+
+  { ph: 'act', think: 'Ground truth, not a vibe.',
+    act: 'run_tests("tests/test_refund.py")',
+    obs: '1 failed · test_refund_timeout expects RefundError, got TimeoutError',
+    w: { test_result: 'fail' } },
+
+  { ph: 'act', think: 'Wrap the re-raise in RefundError so callers see one exception type.',
+    act: 'apply_patch("refund_worker.py", diff2)',
+    obs: 'applied · 1 file, +3 −1',
+    w: { patch: 'refund_worker.py' } },
+
+  { ph: 'act', think: 'Run them again.',
+    act: 'run_tests("tests/test_refund.py")',
+    obs: '12 passed',
+    w: { test_result: 'pass' } },
+
+  { ph: 'act', wide: true, bad: true,
+    think: 'Tests are green. I will roll it out.',
+    act: 'deploy_prod("refund-worker")',
+    obs: '⚠ deployed · no review, no staging',
+    note: 'Green tests are not permission to deploy. The finish node exists precisely so that "what happens after the tests pass" is a routing decision you made, not one the model made at temperature 1.' },
+
+  { ph: 'finish', think: 'Tests pass and the patch is on disk. Hand it over.',
+    act: 'open_pr(title="fix: surface refund gateway timeouts")',
+    obs: 'PR #412 opened · awaiting review',
+    w: { pr: 412 } }
+];
+
+C.lgsPayload = { base: 620, perMessage: 145 };
+
+C.lgsCode = [
+  { t: 'bind per node', code:
+`# One model, three tool sets. The node decides what is callable —
+# not the prompt, and not the model's judgement.
+
+TOOLS = {
+    "research": [grep_repo, read_file, search_docs],
+    "act":      [apply_patch, run_tests, run_lint],
+    "finish":   [open_pr, post_summary],
+}
+
+def agent(state: State) -> Command[Literal["research", "act", "finish"]]:
+    phase = state["phase"]
+    reply = llm.bind_tools(TOOLS[phase]).invoke(
+        build_prompt(state, phase)
+    )
+    # Command returns the state update AND the routing decision together,
+    # so there is no window where one is applied without the other.
+    return Command(goto=phase, update={"messages": [reply]})
+
+# Each tool node only ever executes its own set. A tool call for
+# deploy_prod arriving at the research node is not "discouraged" —
+# it is not in the schema the model was given, so it cannot be produced.
+builder.add_node("research", ToolNode(TOOLS["research"]))
+builder.add_node("act",      ToolNode(TOOLS["act"]))
+builder.add_node("finish",   ToolNode(TOOLS["finish"]))` },
+
+  { t: 'the state contract', code:
+`class State(TypedDict):
+    messages:    Annotated[list[AnyMessage], add_messages]
+    findings:    Annotated[dict, merge_dicts]   # research writes
+    patch:       str | None                     # act writes
+    test_result: Literal["pass", "fail"] | None # act writes
+    pr:          int | None                     # finish writes
+    phase:       Literal["research", "act", "finish"]
+
+# Routing reads the state, never the model's self-assessment.
+def route(state: State) -> Literal["act", "finish", "__end__"]:
+    if state["test_result"] == "pass":
+        return "finish"
+    if state["pr"]:
+        return "__end__"
+    return "act"
+
+builder.add_conditional_edges("agent", route)
+
+# Why this matters: "did it work" is now a field with three legal values,
+# checked by code. In a plain loop it is a sentence in message 14 that
+# somebody has to parse, and the model wrote it.` },
+
+  { t: 'guarding the writes', code:
+`# LangGraph merges whatever a node returns. It will not stop the finish
+# node writing "patch" — so if that invariant matters, assert it.
+
+WRITABLE = {
+    "research": {"messages", "findings"},
+    "act":      {"messages", "patch", "test_result"},
+    "finish":   {"messages", "pr"},
+}
+
+def guarded(node_name, fn):
+    def wrapped(state: State):
+        update = fn(state) or {}
+        illegal = set(update) - WRITABLE[node_name]
+        if illegal:
+            raise ValueError(f"{node_name} may not write {illegal}")
+        return update
+    return wrapped
+
+builder.add_node("act", guarded("act", act_node))
+
+# Ten lines, and every "how did that field get set?" debugging session
+# for the rest of the project turns into a stack trace instead.` }
+];
+
+C.lgsNotes = [
+  ['Scoping is a graph edit, not a prompt', 'Listing the allowed tools in the system prompt is a request. Binding a different tool set per node makes the wrong call unrepresentable — the schema the model samples from does not contain it.'],
+  ['Command fuses routing and update', 'Returning `Command(goto=..., update=...)` means the next node and the state change land together. Two separate mechanisms is two things that can disagree.'],
+  ['The router reads state, not prose', '`state["test_result"] == "pass"` is a comparison. "The agent said it was done" is a parsing problem you gave yourself.'],
+  ['Tool schemas are resent every step', 'Twelve bound tools is roughly 1.4k tokens of JSON on every single call, all run long. Three is 320.'],
+  ['Write permissions are yours to enforce', 'LangGraph merges anything a node returns. If only one node should set `patch`, wrap the node and assert it — the framework will not do it for you.']
+];

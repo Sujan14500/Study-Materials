@@ -427,7 +427,9 @@ C.checklist = [
 C.costRows = [
   { k: 'model', label: 'Model calls', note: 'Steps × (transcript in + tokens out). Grows quadratically with steps — turn 10 resends turns 1-9.' },
   { k: 'tools', label: 'Tool calls', note: 'Search APIs, database time, third-party per-call fees.' },
-  { k: 'human', label: 'Human review', note: 'The most expensive line by far once approval gates are on. Minimise how often you need it, not how fast people click.' }
+  { k: 'human', label: 'Human review', note: 'The most expensive line by far once approval gates are on. Minimise how often you need it, not how fast people click.' },
+  { k: 'cache', label: 'What prompt caching gives back', note: 'An agent loop is the best-shaped workload for it: step k’s prompt is step k-1’s prompt plus one new observation, so nearly everything is a prefix you already sent. Cached input is billed at a fraction of the normal rate, which bends that quadratic curve back down without shortening a single trajectory.' },
+  { k: 'cachetrap', label: 'And how to destroy it', note: 'The prefix has to be byte-identical. A timestamp in the system prompt, tool schemas serialised in a different order, or a user name injected at the top all invalidate every token below them. Stable content first, volatile content last — and check your cache-hit metric, because this fails silently and only shows up on the invoice.' }
 ];
 
 /* ---------- Ch13: quiz ---------- */
@@ -802,6 +804,11 @@ mcp dev server.py
 
 /* ---------- glossary ---------- */
 C.glossary = [
+  ['Streaming', 'Sending tokens to the client as they are generated. In an agent it also means surfacing each think/act/observe step as it happens instead of after the run — the same perception fix, applied to the loop rather than the sentence.'],
+  ['Time to first token', 'How long before any output appears. In a multi-step agent the honest version is time to first *visible progress*, because the first model call is only step one of seven.'],
+  ['Prompt caching', 'Reusing the already-processed prefix of a prompt across calls. Agent loops benefit more than anything else, because each step resends the previous step verbatim. Needs a byte-identical prefix.'],
+  ['KV cache', 'The attention keys and values a server keeps for tokens already processed, so generation is O(n) instead of O(n²). Not something you switch on; it is memory spent per concurrent request, and it is what limits how many agents run at once.'],
+  ['Speculative decoding', 'A draft model proposes several tokens that the big model verifies in one pass. Identical output, lower latency, more total compute — useful when an agent makes many sequential calls and each one is on the critical path.'],
   ['Agent', 'An LLM in a loop with tools, where the model decides the next step instead of following a script.'],
   ['Agent loop', 'Think → Act → Observe, repeated until a stopping condition is met.'],
   ['ReAct', 'Reason + Act: interleaving reasoning steps with tool calls so observations correct the reasoning.'],
@@ -839,4 +846,212 @@ C.glossary = [
   ['Token budget', 'A per-run spend cap. The difference between a bad night and a bad quarter.'],
   ['Swarm', 'Peer agents communicating without a central coordinator. Expensive; use narrowly.'],
   ['Deterministic fallback', 'Plain code that handles the case when the agent gives up. Every production agent needs one.']
+];
+
+/* ============================================================
+   Ch4: the naive loop, and the five guards that fix it
+   ------------------------------------------------------------
+   Every constant below is used by demos.js AND re-derived in
+   test.js. If the two disagree the chapter is lying, and the
+   test says so.
+
+   The model: a task needs `need` correct actions. Each step the
+   agent either makes progress or makes things worse. Two things
+   push the per-step success rate down — a context that keeps
+   growing, and a tool menu it has to choose from — and both of
+   them are things you control, which is the whole point.
+   ============================================================ */
+C.nlModel = {
+  need: 3,              // correct actions required to actually finish the task
+  p0: 0.80,             // per-step success with a clean context and a short tool list
+  hpPerToken: 0.000032, // every token of accumulated context costs a little accuracy
+  hpMax: 0.42,          // ...but the damage plateaus; it does not go to zero
+  tcAll: 0.14,          // 20 tools on the menu, no scoping
+  tcScoped: 0.02,       // 4-5 tools relevant to this phase only
+  statePenalty: 0.08,   // re-deriving facts from the transcript instead of reading state
+  pDeclare: 0.30,       // chance per step the agent decides it is done, unprompted
+  ctx0: 1800,           // system prompt + task + tool schemas
+  obsTokens: 420,       // one observation appended per step
+  wrongTokens: 900,     // a failed attempt also dumps a stack trace in
+  ctxCap: 5200,         // what compaction holds the transcript to
+  budgetSteps: 12,      // step budget before escalating to a human
+  hardCap: 24           // the runaway ceiling when nothing stops it
+};
+
+C.nlGuards = [
+  { id: 'verify',  n: 'Verification gate',
+    s: 'replace "looks good?" with "did the tests pass?"',
+    d: 'A model asked to grade its own work says yes. Ground truth is a command with an exit code — tests, a type check, a schema validation, a diff that applies. Without one the loop terminates on vibes.' },
+  { id: 'scope',   n: 'Scoped tools',
+    s: 'bind only the tools this phase can legally use',
+    d: 'Twenty tools in the prompt is twenty chances to pick the wrong one, resent on every single step. Bind four. Swap the set when the phase changes.' },
+  { id: 'compact', n: 'Context compaction',
+    s: 'summarise old observations, drop the raw dumps',
+    d: 'The transcript is resent in full every step, so an unbounded transcript is both a quadratic bill and a falling accuracy curve. Keep the decisions, drop the 400-line stack traces.' },
+  { id: 'state',   n: 'Structured state',
+    s: 'write findings to a state object, not into the chat',
+    d: 'If the file path lives in a typed field, the agent reads it. If it only exists in message 14, the agent re-derives it — wrongly, eventually.' },
+  { id: 'budget',  n: 'Step budget + escalate',
+    s: 'hard cap, then hand it to a human',
+    d: 'Not a safety net — a product decision. An agent that says "I could not do this, here is what I tried" at step 12 is worth more than one still burning tokens at step 40.' }
+];
+
+/* the naive flowchart, laid out for SVG. `bad` nodes are the ones that
+   only exist because nothing is checking the loop. */
+C.nlNodes = [
+  { id: 'start',   t: 'Start task',        x: 60,  y: 30,  w: 108, h: 40 },
+  { id: 'gen',     t: 'Generate',          x: 60,  y: 108, w: 108, h: 40 },
+  { id: 'check',   t: 'Looks good?',       x: 232, y: 108, w: 118, h: 40, dia: true },
+  { id: 'declare', t: 'Declare done',      x: 424, y: 108, w: 112, h: 40 },
+  { id: 'ship',    t: 'Hidden bugs ship',  x: 596, y: 108, w: 128, h: 40, bad: true },
+  { id: 'fix',     t: 'Try a random fix',  x: 232, y: 196, w: 118, h: 40, bad: true },
+  { id: 'grow',    t: 'Context grows',     x: 60,  y: 264, w: 108, h: 40, bad: true },
+  { id: 'hall',    t: 'Hallucinations up', x: 232, y: 264, w: 130, h: 40, bad: true },
+  { id: 'worse',   t: 'More wrong fixes',  x: 424, y: 264, w: 124, h: 40, bad: true }
+];
+
+C.nlEdges = [
+  { a: 'start',   b: 'gen' },
+  { a: 'gen',     b: 'check' },
+  { a: 'check',   b: 'declare', l: 'yes' },
+  { a: 'declare', b: 'ship' },
+  { a: 'check',   b: 'fix',   l: 'no' },
+  { a: 'fix',     b: 'gen' },
+  { a: 'fix',     b: 'grow' },
+  { a: 'grow',    b: 'hall' },
+  { a: 'hall',    b: 'worse' },
+  { a: 'worse',   b: 'grow' }
+];
+
+C.nlOutcomes = {
+  done:      { n: 'Task actually finished',        c: 'var(--green)',
+               d: 'Ground truth agreed. This is the only outcome worth counting.' },
+  shipped:   { n: 'Declared done — bugs shipped',  c: 'var(--red)',
+               d: 'The agent graded its own homework and passed itself. Nobody finds out until production does.' },
+  escalated: { n: 'Budget hit — escalated',        c: 'var(--amber)',
+               d: 'Not a success, but a cheap, legible failure that a human can pick up. Vastly better than the alternative.' },
+  runaway:   { n: 'Runaway — hit the hard cap',    c: 'var(--red)',
+               d: 'Twenty-four steps of an ever-growing transcript, each one resent in full. This is the bill people post screenshots of.' }
+};
+
+C.nlCode = [
+  { t: 'naive', code:
+`# The loop everyone writes first. It is not wrong, it is unbounded.
+while True:
+    reply = llm.chat(messages, tools=ALL_TOOLS)   # every tool, every turn
+    messages.append(reply)                        # transcript only grows
+
+    if reply.tool_calls:
+        for call in reply.tool_calls:
+            out = dispatch(call)                  # any tool, any phase
+            messages.append(tool_msg(call, out))  # raw output, all of it
+        continue
+
+    break        # <- the model decided it was finished. That is the exit condition.
+
+# Three bugs, none of them visible at 5 steps:
+#   1. no step cap        -> cost is unbounded
+#   2. no verification    -> "done" means "the model said done"
+#   3. no context control -> step 20 resends everything from steps 1-19`
+  },
+  { t: 'controlled', code:
+`MAX_STEPS = 12
+
+def run(task):
+    state = State(task=task, findings={}, phase="research")
+    for step in range(MAX_STEPS):
+        # 1. scoped tools: the phase decides what is even callable
+        tools = TOOLS_FOR[state.phase]
+
+        # 2. compaction: full recent turns, summary of everything older
+        messages = build_context(state, budget_tokens=5_200)
+
+        reply = llm.chat(messages, tools=tools)
+        for call in reply.tool_calls:
+            # 3. structured state, not chat archaeology
+            state.apply(dispatch(call))
+
+        # 4. verification: ground truth, not self-assessment
+        if state.phase == "verify":
+            result = run_tests()
+            if result.ok:
+                return Done(state)
+            state.findings["failures"] = result.failures[:3]
+
+        state.phase = next_phase(state)
+
+    # 5. budget exhausted -> a legible handoff, not a silent stop
+    return Escalate(state, tried=state.history)`
+  },
+  { t: 'the exit condition', code:
+`# The single highest-leverage line in any agent is the one that decides
+# when to stop. Rank them from worst to best:
+
+# worst: the model decides
+if not reply.tool_calls:
+    return reply.content
+
+# better: the model decides, but you cap it
+if not reply.tool_calls or step >= MAX_STEPS:
+    return reply.content
+
+# better still: a cheap deterministic check
+if not reply.tool_calls and json_schema_valid(reply.content):
+    return reply.content
+
+# best: something outside the model has to agree
+result = run_tests()                 # exit code, not an opinion
+if result.ok:
+    return Done(...)
+if step >= MAX_STEPS:
+    return Escalate(...)             # explicit failure beats a quiet wrong answer
+
+# Everything else in this chapter is downstream of this choice.`
+  }
+];
+
+/* ---------- tool scoping ---------- */
+C.tsModel = {
+  tokensPerTool: 115,   // a JSON schema for one tool, resent on every step
+  baseAcc: 0.97,        // picking correctly from a 4-tool menu
+  decay: 0.11,          // accuracy lost per doubling of the menu
+  floor: 0.25,
+  steps: 8              // steps in a typical run
+};
+
+C.tsTools = [
+  { n: 'search_docs',     ph: 'research' },
+  { n: 'read_file',       ph: 'research' },
+  { n: 'grep_repo',       ph: 'research' },
+  { n: 'list_dir',        ph: 'research' },
+  { n: 'apply_patch',     ph: 'act' },
+  { n: 'write_file',      ph: 'act' },
+  { n: 'run_tests',       ph: 'act' },
+  { n: 'run_lint',        ph: 'act' },
+  { n: 'open_pr',         ph: 'finish' },
+  { n: 'post_summary',    ph: 'finish' },
+  { n: 'notify_channel',  ph: 'finish' },
+  { n: 'query_db',        ph: 'other' },
+  { n: 'fetch_metrics',   ph: 'other' },
+  { n: 'create_ticket',   ph: 'other' },
+  { n: 'send_email',      ph: 'other' },
+  { n: 'restart_service', ph: 'other' },
+  { n: 'refund_charge',   ph: 'other' },
+  { n: 'deploy_prod',     ph: 'other' },
+  { n: 'delete_branch',   ph: 'other' },
+  { n: 'page_oncall',     ph: 'other' }
+];
+
+C.tsPhases = [
+  { id: 'research', n: 'Research', d: 'read the code, find the failing case' },
+  { id: 'act',      n: 'Act',      d: 'change it, then prove the change' },
+  { id: 'finish',   n: 'Finish',   d: 'hand the work off' }
+];
+
+C.nlLessons = [
+  ['The exit condition is the design', 'Everything else is decoration. "The model stopped calling tools" is not a completion criterion — it is a coin flip you are paying for.'],
+  ['Context is a budget, not a bucket', 'The transcript is resent every step, so cost is quadratic in steps and accuracy falls as it grows. Compaction is not an optimisation, it is the load-bearing wall.'],
+  ['Tools are a menu, not a toolbox', 'Every tool in the prompt is a wrong turn the model can take, priced per step. Bind the four this phase needs.'],
+  ['State beats transcript', 'A typed field the agent reads is reliable. A fact buried in message 14 that it has to re-derive is not.'],
+  ['Failing loudly is a feature', 'An agent that escalates at step 12 with a list of what it tried is worth more than one that is still going at step 40.']
 ];
