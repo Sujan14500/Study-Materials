@@ -48,7 +48,7 @@ C.plain = {
   operate:    ['Normal software keeps working. AI software rots.', 'The world changes, people change, fraudsters adapt, and the system quietly gets worse without ever throwing an error. So "how will we notice, and what do we do then" is part of the design, not a follow-up ticket.'],
   patterns:   ['Fifteen problems that come up so often that somebody gave each one a name.', 'None of them are clever. They are the shapes code keeps landing in: one shared thing everyone borrows, one simple door into a messy subsystem, a line of handlers passing work along until one of them deals with it. Learning the names means a design conversation takes a sentence instead of a whiteboard.'],
   redis:      ['One extra box that holds a little data in memory, so the slow parts get asked far less often.', 'It is a shared scratchpad every server can reach in well under a millisecond. Four jobs cover almost everything people use it for: remember an answer you already worked out, keep a running scoreboard, make sure only one worker picks up a job, and find the things nearest to you.'],
-  quiz:       ['Fourteen questions, and an explanation after every one.', 'Nothing here is new — every question is about something you already pushed a slider on. Getting one wrong is useful information rather than a problem: the explanation tells you which chapter to go back to, and you can retake it as many times as you like.']
+  quiz:       ['Twenty-nine questions, and an explanation after every one.', 'Nothing here is new — every question is about something you already pushed a slider on. Getting one wrong is useful information rather than a problem: the explanation tells you which chapter to go back to, and you can retake it as many times as you like.']
 };
 
 /* ============================================================
@@ -1075,3 +1075,376 @@ C.patternDia = {
   template:  { kind: 'steps', items: ['load()', 'split()', 'fit()', 'register()'], override: 2 },
   chain:     { kind: 'flow', nodes: ['Small', 'Large', 'Human'] }
 };
+
+/* ============================================================
+   Ch19 - caching layers
+   ============================================================ */
+C.cacheLadder = [
+  { id: 'none', n: 'No cache', hit: 0, lat: 2400, cost: 1.00, risk: 0,
+    what: 'Every request goes to the model.',
+    lay: 'Asking the chef to cook the same omelette from scratch four hundred times an hour.',
+    when: 'Prototypes, and any request whose answer is genuinely unique - a summary of THIS document, a reply in THIS conversation.',
+    trap: 'It is also the honest default. A cache that returns a wrong answer fast is worse than no cache.' },
+  { id: 'exact', n: 'Exact match', hit: 0.04, lat: 3, cost: 0.00, risk: 0,
+    what: 'Key = hash of the exact prompt string.',
+    lay: 'A sticky note that only matches if the question is typed character for character.',
+    when: 'Machine-generated prompts, batch jobs, retries, idempotent tool calls.',
+    trap: 'On human traffic this hits almost nothing. "How do I reset my password?" and "how do i reset my password" are different keys.' },
+  { id: 'norm', n: 'Normalised key', hit: 0.11, lat: 4, cost: 0.00, risk: 0.01,
+    what: 'Lowercase, strip punctuation and stopwords, sort nothing, collapse whitespace, then hash.',
+    lay: 'The same sticky note, but you ignore capital letters and question marks.',
+    when: 'Free. Do it before you build anything clever - it roughly doubles or triples exact-match hit rate for one afternoon of work.',
+    trap: 'Over-normalising merges different questions. Stripping "not" is the classic disaster.' },
+  { id: 'semantic', n: 'Semantic cache', hit: 0.38, lat: 32, cost: 0.002, risk: 0.06,
+    what: 'Embed the question, search a vector index of past questions, and reuse the answer if similarity clears a threshold.',
+    lay: 'A librarian who recognises that "when does my refund arrive" and "how long till I get my money back" are the same question.',
+    when: 'High-volume support, FAQ, search-style products - anywhere thousands of people ask the same twenty things in their own words.',
+    trap: 'This is the one that can serve a WRONG answer. The threshold is a precision/recall dial with a real cost on both sides.' },
+  { id: 'prefix', n: 'Prompt / prefix cache', hit: 0.85, lat: 0, cost: 0.10, risk: 0,
+    what: 'The provider keeps the KV cache for a stable prompt prefix, so prefill for those tokens is skipped.',
+    lay: 'The chef keeps the sauce base warm. Only your specific order gets cooked fresh.',
+    when: 'Long system prompts, few-shot blocks, tool schemas, a document you ask twenty questions about. Nearly free money.',
+    trap: 'Only a PREFIX. One changed character near the top - a timestamp, a user name, a shuffled tool list - invalidates everything after it.' }
+];
+C.cacheQueries = [
+  { q: 'how long do refunds take?',                    intent: 'refund-time',  sim: 1.00 },
+  { q: 'How long do refunds take',                     intent: 'refund-time',  sim: 0.99 },
+  { q: 'when will i get my money back',                intent: 'refund-time',  sim: 0.91 },
+  { q: 'refund processing time?',                      intent: 'refund-time',  sim: 0.94 },
+  { q: 'how many days until the refund arrives',       intent: 'refund-time',  sim: 0.93 },
+  { q: 'my refund is taking forever, how long is normal', intent: 'refund-time', sim: 0.87 },
+  { q: 'time to refund',                               intent: 'refund-time',  sim: 0.90 },
+  { q: 'refund timeline for bank transfer',            intent: 'refund-time-transfer', sim: 0.89 },
+  { q: 'how long do refunds take for a lost card',     intent: 'refund-time-lost',     sim: 0.88 },
+  { q: 'how do i request a refund',                    intent: 'refund-how',   sim: 0.86 },
+  { q: 'can i get a refund after 40 days',             intent: 'refund-window', sim: 0.84 },
+  { q: 'why was my refund declined',                   intent: 'refund-fail',  sim: 0.83 },
+  { q: 'do refunds take a long time for subscriptions', intent: 'refund-sub',  sim: 0.85 },
+  { q: 'how long does shipping take',                  intent: 'shipping-time', sim: 0.79 },
+  { q: 'how long do refunds NOT take',                 intent: 'nonsense',     sim: 0.95 },
+  { q: 'what is your address',                         intent: 'contact',      sim: 0.31 }
+];
+C.cacheCached = { q: 'how long do refunds take?', intent: 'refund-time', a: 'Card refunds settle in 5 to 10 business days; bank transfers in 2.' };
+C.cachePathologies = [
+  { id: 'penetration', n: 'Cache penetration', icon: '&#129517;',
+    lay: 'Someone keeps asking for a customer id that does not exist. The cache never has it, so every single request goes straight through to your database.',
+    tech: 'Requests for keys that are absent from BOTH cache and backing store. The cache offers zero protection because there is nothing to store, so the miss path runs every time. Trivially weaponised: generate random ids and you have a database denial-of-service.',
+    fixes: [
+      'Cache the negative result too, with a short TTL (30-120s). "Not found" is an answer worth remembering.',
+      'Put a Bloom filter in front. It answers "definitely absent" in microseconds with a small false-positive rate and no false negatives.',
+      'Validate the key shape before you look anything up. A 40-character id in a 12-character id space never needed a query.',
+      'Rate limit per caller on miss rate, not on request rate.'
+    ],
+    llm: 'The LLM version: a user pastes a fresh random string into every question. Your semantic cache misses forever and every request pays full inference cost. Detect it with a per-caller miss-rate alarm, not a QPS alarm.' },
+  { id: 'stampede', n: 'Stampede / dogpile', icon: '&#128046;',
+    lay: 'One popular answer expires. Two thousand requests arrive in the same second, all miss, and all call the model at once.',
+    tech: 'Also called thundering herd. A single hot key expiring converts a 100% hit rate into a 100% miss rate for the duration of one regeneration.',
+    fixes: [
+      'Single-flight: the first miss takes a lock and regenerates; everyone else waits for that one result.',
+      'Serve stale while revalidating in the background. Users get a slightly old answer instantly instead of a fresh answer in eight seconds.',
+      'Jitter the TTL, so ten thousand entries written together do not expire together.',
+      'Refresh ahead of expiry for known-hot keys.'
+    ],
+    llm: 'Costs more with an LLM than with a database, because the regeneration is seconds long and dollars expensive rather than milliseconds and free.' },
+  { id: 'avalanche', n: 'Avalanche', icon: '&#127956;',
+    lay: 'The whole cache restarts, or every key was given the same one-hour TTL at deploy time. Everything expires at once.',
+    tech: 'Mass simultaneous invalidation. The backing system receives its entire traffic unbuffered and usually falls over, which then prevents the cache from refilling.',
+    fixes: [
+      'Randomised TTLs - base plus up to 20% jitter.',
+      'Warm the cache on deploy from the top-N query log before taking traffic.',
+      'A circuit breaker and a degraded mode: serve a cheaper model or a canned answer rather than nothing.',
+      'Replicate the cache so one node dying is not a cold start.'
+    ],
+    llm: 'For prompt caches this happens every time you edit the system prompt. Roll prompt changes out gradually and expect a cost spike.' },
+  { id: 'hotkey', n: 'Hot key', icon: '&#128293;',
+    lay: 'One question is 40% of your traffic. Sharding spreads keys, not the traffic to a single key, so one node carries it all.',
+    tech: 'A single key exceeds one node\'s throughput. Adding shards does not help because the key hashes to exactly one of them.',
+    fixes: [
+      'Replicate the hot key across nodes and read from a random replica.',
+      'A tiny in-process LRU in front of the shared cache. One hop saved on the hottest 1% is most of the win.',
+      'Key splitting: key#1..key#N, write to all, read from one at random.'
+    ],
+    llm: 'Detect it by logging the top 20 normalised questions daily. In most support products the top 20 are 30-50% of volume - which is exactly why caching works at all.' },
+  { id: 'poison', n: 'Cache poisoning', icon: '&#9760;',
+    lay: 'One bad answer gets cached and then served confidently to ten thousand people.',
+    tech: 'A single low-quality, hallucinated or prompt-injected generation is written to the cache and amplified. With a semantic cache the blast radius is every paraphrase of that question.',
+    fixes: [
+      'Only cache answers that passed your validation - schema, citation ids that exist, no refusal string.',
+      'Never cache a response generated in a degraded path (fallback model, truncated context, retry after timeout).',
+      'Version the cache key with the prompt version, model version and index version. A prompt change must not inherit old answers.',
+      'Keep a kill switch that purges by key prefix, and a thumbs-down handler that evicts immediately.'
+    ],
+    llm: 'This is the LLM-specific one that classic caching literature does not warn you about, and it is the most damaging.' },
+  { id: 'stale', n: 'Staleness', icon: '&#128337;',
+    lay: 'The policy changed on Monday. The cache is still confidently quoting Friday.',
+    tech: 'Correctness decays with TTL. In a RAG system the answer depends on the index, so the cache must be invalidated by document change, not only by clock.',
+    fixes: [
+      'Include a content version in the cache key: hash of the retrieved chunk ids plus their versions. Change a document and its answers stop matching automatically.',
+      'Event-driven purge: the ingestion pipeline emits "document 42 changed" and you evict every cached answer whose key mentions chunk 42.',
+      'Short TTL for volatile intents (pricing, availability, status), long TTL for stable ones (policy, definitions). TTL by intent class, not one global number.',
+      'Show the answer\'s age when it matters, and give the user a "get a fresh answer" button.'
+    ],
+    llm: 'The version-in-the-key trick is the single highest-leverage idea in this chapter. It converts an invalidation problem into a naming problem.' }
+];
+C.cacheCompare = {
+  cols: ['Exact / normalised', 'Semantic cache', 'Prompt (prefix) cache'],
+  rows: [
+    ['What is the key',   'hash of the (normalised) prompt',      'embedding of the question',                'the literal token prefix'],
+    ['What is saved',     'the whole call',                        'the whole call',                          'prefill only - you still decode'],
+    ['Typical hit rate',  '4-12% on human traffic',                '25-50% on FAQ-shaped traffic',            '70-90% if your prefix is stable'],
+    ['Latency of a hit',  'about 3 ms',                            '20-40 ms (an embed plus a vector search)', 'no hop - it changes time-to-first-token'],
+    ['Can serve a wrong answer', 'no',                             'YES - this is the whole risk',            'no'],
+    ['Who runs it',       'you',                                   'you',                                     'the model provider'],
+    ['Main failure mode', 'hits almost nothing',                   'threshold too low, wrong answers served',  'one changed character at the top invalidates all of it'],
+    ['Cost to add',       'an afternoon',                          'a week plus a vector store',              'reorder your prompt - an hour']
+  ],
+  verdict: 'They are layers, not alternatives. A serious system runs all three: prefix caching always, normalised exact in front of it, and a semantic layer on top with a threshold you tuned against labelled paraphrases.'
+};
+C.cacheKeyRecipe = `# The cache key is the whole design. Put everything that changes the answer in it.
+key = sha256("|".join([
+    normalise(question),        # lowercased, punctuation stripped, whitespace collapsed
+    tenant_id,                  # NEVER share a cache across tenants
+    locale,                     # "5-10 days" is not the answer in every region
+    prompt_version,             # bump this and every old answer stops matching
+    model_id,                   # gpt-4o-mini and gpt-4o are different answers
+    retrieved_version,          # hash of chunk ids + their doc versions -> free invalidation
+    str(user_tier),             # if the answer differs by plan, the key must too
+]))
+
+# and the negative-cache guard against penetration
+if key in NEGATIVE_CACHE:      # short TTL, e.g. 60s
+    return NOT_FOUND
+`;
+
+/* ============================================================
+   Ch20 - sharding and parallelism
+   ============================================================ */
+C.parModels = [
+  { n: 'Llama-3 8B',   params: 8.03e9,  layers: 32, d: 4096, heads: 32, kvHeads: 8,  ffn: 14336 },
+  { n: 'Llama-3 70B',  params: 70.6e9,  layers: 80, d: 8192, heads: 64, kvHeads: 8,  ffn: 28672 },
+  { n: 'Mixtral 8x7B', params: 46.7e9,  layers: 32, d: 4096, heads: 32, kvHeads: 8,  ffn: 14336, experts: 8, active: 2 },
+  { n: '405B dense',   params: 405e9,   layers: 126, d: 16384, heads: 128, kvHeads: 8, ffn: 53248 }
+];
+C.parGpus = [
+  { n: 'A100 40GB',  vram: 40,  link: 'NVLink 600 GB/s' },
+  { n: 'A100 80GB',  vram: 80,  link: 'NVLink 600 GB/s' },
+  { n: 'H100 80GB',  vram: 80,  link: 'NVLink 900 GB/s' },
+  { n: 'L4 24GB',    vram: 24,  link: 'PCIe 64 GB/s' }
+];
+C.parStrategies = [
+  { id: 'none', n: 'Single GPU', icon: '&#127918;',
+    what: 'The whole model on one device.',
+    lay: 'One chef, one kitchen. Nothing to coordinate.',
+    split: 'nothing is split',
+    comm: 'none',
+    good: 'Always the first choice if it fits. Zero communication overhead, simplest possible failure mode.',
+    bad: 'Hard ceiling at one card\'s memory.' },
+  { id: 'data', n: 'Data parallel', icon: '&#128202;',
+    what: 'A full copy of the model on every GPU; each processes a different batch.',
+    lay: 'Four identical chefs, each cooking a different table\'s order.',
+    split: 'the batch, not the model',
+    comm: 'gradients all-reduced once per training step; nothing at inference',
+    good: 'Throughput. The default for training when the model already fits, and for serving when you just need more QPS.',
+    bad: 'Does nothing for a model that does not fit - every GPU still needs the whole thing.' },
+  { id: 'tensor', n: 'Tensor parallel', icon: '&#9986;',
+    what: 'Every weight matrix is cut across GPUs. Attention heads split by head; the feed-forward splits by column then row.',
+    lay: 'Four chefs each cook a quarter of the SAME dish and combine it at every step.',
+    split: 'inside every layer',
+    comm: 'two all-reduces per transformer layer, on the critical path of every token',
+    good: 'The standard way to fit and speed up one large model. Cuts both memory and per-token latency.',
+    bad: 'Communication-bound. Needs NVLink inside a node; across PCIe or across nodes it collapses. Rarely worth going above 8-way.' },
+  { id: 'pipeline', n: 'Pipeline parallel', icon: '&#128678;',
+    what: 'Layers 1-20 on GPU 0, 21-40 on GPU 1, and so on. Activations are passed forward.',
+    lay: 'An assembly line. Each chef owns a few stations and hands the plate along.',
+    split: 'by layer, across depth',
+    comm: 'one activation tensor per stage boundary - small',
+    good: 'Cheap communication, so it works ACROSS nodes where tensor parallel cannot. How models are spread over many machines.',
+    bad: 'The pipeline bubble: with one request in flight, every GPU but one is idle. Needs many micro-batches in flight to be efficient, which raises latency.' },
+  { id: 'expert', n: 'Expert parallel (MoE)', icon: '&#127917;',
+    what: 'Each GPU holds a different subset of the experts. A router sends each token to its top-k experts.',
+    lay: 'Eight specialist chefs. Every order goes to the two who know that dish.',
+    split: 'by expert',
+    comm: 'two all-to-alls per MoE layer - tokens out to their experts, results back',
+    good: 'Huge total parameter count at a small ACTIVE cost. Mixtral 8x7B holds 46.7B parameters and activates about 12.9B per token.',
+    bad: 'You pay memory for ALL experts while computing only a couple. Load imbalance is the operational nightmare - one popular expert becomes the bottleneck.' },
+  { id: 'zero', n: 'ZeRO / FSDP sharding', icon: '&#129527;',
+    what: 'Training only. Shard optimiser state (stage 1), then gradients (stage 2), then the parameters themselves (stage 3) across data-parallel ranks.',
+    lay: 'Every chef keeps only a slice of the recipe book and borrows the rest of the page just before they need it.',
+    split: 'optimiser state, gradients, then parameters',
+    comm: 'all-gather parameters just in time, reduce-scatter gradients',
+    good: 'The reason full fine-tuning of a large model is possible at all. Stage 3 cuts memory roughly by the number of ranks.',
+    bad: 'Much more communication, so it needs fast interconnect. It is a training technique - it does not help you serve.' }
+];
+C.parCompare = {
+  cols: ['Tensor parallel', 'Pipeline parallel', 'Data parallel', 'Expert parallel'],
+  rows: [
+    ['What gets split',    'every weight matrix, within a layer', 'whole layers, across depth',        'the batch (model is replicated)', 'the experts of an MoE layer'],
+    ['Cuts memory per GPU','yes, roughly by N',                   'yes, roughly by N',                 'no - every GPU holds it all',     'yes, but you still hold all experts somewhere'],
+    ['Cuts latency',       'yes',                                 'no (it adds a bubble)',             'no',                              'no'],
+    ['Cuts cost per token','no',                                  'no',                                'no',                              'yes - only k of N experts compute'],
+    ['Communication',      'two all-reduces per layer, per token','one activation per stage boundary', 'one gradient all-reduce per step','two all-to-alls per MoE layer'],
+    ['Needs NVLink',       'yes, badly',                          'no - works across nodes',           'no',                              'yes'],
+    ['Sensible degree',    '2-8, inside one node',                'as many nodes as you have',         'as many replicas as you need QPS','equal to the expert count'],
+    ['Breaks when',        'you cross a slow link',               'you have too few micro-batches',    'the model stops fitting',         'one expert gets all the traffic']
+  ],
+  verdict: 'Real deployments compose them. A 405B model is typically tensor-parallel 8 inside each node, pipeline-parallel across nodes, and data-parallel across the whole cluster for throughput. The order matters: put the chattiest dimension (tensor) inside the fastest link.'
+};
+C.pagedNote = [
+  ['The problem', 'A naive server reserves KV cache for max_tokens on every request, because it cannot know how long the answer will be. A request that generates 40 tokens against a 2048 reservation wastes 98% of the memory it is holding. That wasted memory is the reason your batch size is small, and batch size is the reason your GPU is idle.'],
+  ['PagedAttention', 'Borrowed straight from operating-system virtual memory. The KV cache is stored in fixed-size blocks (typically 16 tokens) with a block table mapping logical positions to physical blocks. A sequence grows by allocating one more block, so waste is bounded by the block size instead of by max_tokens. vLLM reported roughly 4x throughput from this alone.'],
+  ['The bonus nobody mentions', 'Blocks can be SHARED. Beam search branches, parallel samples and - most usefully - a common system-prompt prefix across concurrent users all point at the same physical blocks with copy-on-write. That is prefix caching implemented in the memory manager.'],
+  ['Continuous batching', 'The scheduling half. Static batching waits for every sequence in a batch to finish, so one long generation holds seven short ones hostage. Continuous (in-flight) batching evicts a finished sequence and admits a waiting one at every decode step. Together with PagedAttention this is what modern inference servers actually are.']
+];
+C.pagedSim = { blockSize: 16, maxTokens: 2048,
+  reqs: [40, 512, 96, 1200, 64, 180, 32, 900, 48, 256] };
+
+/* ============================================================
+   Ch21 - lexical search and Elasticsearch
+   ============================================================ */
+C.lexCorpus = [
+  { id: 'd1', t: 'Card refunds settle in 5 to 10 business days. The delay is on the issuing bank.' },
+  { id: 'd2', t: 'Bank transfer refunds settle in 2 business days.' },
+  { id: 'd3', t: 'Error E-4055 means the issuing bank declined the refund because the card was reported lost.' },
+  { id: 'd4', t: 'Error E-4021 is a gateway timeout. Retry the refund once; the gateway is idempotent.' },
+  { id: 'd5', t: 'Digital goods that have already been downloaded are not refundable.' },
+  { id: 'd6', t: 'Subscription refunds are prorated from the cancellation date.' },
+  { id: 'd7', t: 'To request a refund, open the order and choose Refund. Refunds go to the original payment method.' },
+  { id: 'd8', t: 'Shipping costs are refunded only when the item arrived damaged.' }
+];
+C.lexQueries = [
+  { q: 'E-4055', why: 'An exact error code. An embedding of "E-4055" sits near every other error code in the space - dense retrieval cannot tell them apart. BM25 treats it as a rare term with enormous IDF and nails it.' },
+  { q: 'issuing bank refund delay', why: 'Multiple mid-frequency terms. Both lanes do well here; this is the boring middle where hybrid search adds least.' },
+  { q: 'business days', why: 'A common phrase in several documents. Watch how document length normalisation decides the ranking - the short document wins.' },
+  { q: 'downloaded digital goods', why: 'Exact vocabulary match. Lexical search is perfect when the user happens to use the corpus\'s own words.' },
+  { q: 'how soon will i receive my money', why: 'Not one term in common with the answer document. BM25 scores everything zero. THIS is the query that proves you need a dense lane.' }
+];
+C.lexEsConcepts = [
+  ['Index', 'The logical collection, roughly a table. It has a mapping (the schema) that decides how each field is analysed - and you cannot change a field\'s analyser without reindexing.'],
+  ['Shard', 'An index is split into primary shards, each a self-contained Lucene index. Shard count is fixed at creation; getting it wrong is the most common Elasticsearch mistake. Aim for 10-50 GB per shard.'],
+  ['Replica', 'A copy of a shard on another node. Replicas give availability AND read throughput, and can be changed live.'],
+  ['Segment', 'Shards are made of immutable segments. Writes create new segments; deletes are tombstones. Merging compacts them, which is why your disk IO spikes for no obvious reason.'],
+  ['Refresh interval', 'Near real time, not real time. A document is searchable after the next refresh - one second by default. Set it to 30s during bulk loads and you will index several times faster.'],
+  ['Analyzer', 'The chain that turns text into terms: character filters, tokenizer, token filters (lowercase, stop, stemming, synonyms, ASCII folding). The SAME chain must run on the query, or nothing matches.'],
+  ['Query vs filter', 'Query context scores and is not cached. Filter context answers yes/no, is cached in a bitset, and is dramatically faster. Every tenant id, date range and permission check belongs in a filter.'],
+  ['Aggregations', 'Faceting, histograms, cardinality, percentiles - computed over the matching set. This is a whole class of question a vector database simply cannot answer.'],
+  ['kNN and hybrid', 'Modern Elasticsearch and OpenSearch also store dense vectors and can combine BM25 with kNN using reciprocal rank fusion, so "Elasticsearch or a vector DB" is increasingly a false choice.']
+];
+C.lexCompare = {
+  cols: ['BM25 / Elasticsearch', 'Dense vector search', 'Hybrid'],
+  rows: [
+    ['Matches on',        'the words themselves',                  'meaning, not words',                    'both, fused by rank'],
+    ['Exact ids, codes, SKUs', 'excellent - rare terms get huge IDF','poor - all codes look alike',         'excellent'],
+    ['Paraphrase, synonyms',   'fails unless you curate synonyms',  'excellent',                            'excellent'],
+    ['Negation and numbers',   'literal, so "not refundable" matches','weak - "5 days" and "50 days" embed almost identically','still weak; use filters'],
+    ['New jargon on day one',  'works immediately',                  'needs the term to be in training data','works'],
+    ['Filters and facets',     'first-class, cached bitsets',        'usually bolted on, often slow',        'use the lexical engine for it'],
+    ['Explainability',         'you can print the exact score maths','a cosine you cannot justify',         'partly'],
+    ['Index freshness',        'near real time, about 1s',           'must re-embed to update',              'limited by the slower lane'],
+    ['Cost to run',            'CPU and disk',                       'memory-hungry ANN index',              'both']
+  ],
+  verdict: 'The interview answer to "why is semantic search not enough": it cannot do exact identifiers, it is weak on negation and numbers, it is blind to jargon coined last week, it cannot filter or aggregate cheaply, and it cannot explain itself. Hybrid plus a reranker is the production default, and lexical search is usually the half that saves you.'
+};
+C.bm25 = { k1: 1.2, b: 0.75 };
+
+/* ============================================================
+   Ch22 - big files, small memory
+   ============================================================ */
+C.streamMeanings = [
+  { n: 'Token streaming', d: 'The model returns tokens as it generates them (server-sent events). Changes time-to-first-token and nothing else - the total time and the total cost are identical.', where: 'LLM APIs' },
+  { n: 'Data streaming', d: 'Process a file or a queue one record or one chunk at a time so peak memory is bounded by the chunk, not by the dataset.', where: 'the 5 GB CSV question' },
+  { n: 'Weight streaming / offload', d: 'The model does not fit in VRAM, so layers are held in CPU RAM or on NVMe and moved in as needed. Works, and is brutally slow.', where: 'running a 70B model on a laptop' },
+  { n: 'Stream processing', d: 'A continuous unbounded pipeline - Kafka, Flink, Spark Structured Streaming - with windows and watermarks.', where: 'real-time analytics' }
+];
+C.bigStrategies = [
+  { id: 'naive', n: 'pandas.read_csv(whole file)', peakMult: 5.0, speed: 1.0, oom: true,
+    lay: 'Trying to carry the entire filing cabinet up the stairs in one go.',
+    tech: 'Parses the whole file into memory. A 5 GB CSV typically becomes 10-25 GB of Python objects - object dtype for strings, int64 for everything numeric, plus a copy during parsing.',
+    code: `# what crashes\nimport pandas as pd\ndf = pd.read_csv("events.csv")   # 5 GB on disk -> ~15 GB in RAM -> MemoryError` },
+  { id: 'stdlib', n: 'csv module, row at a time', peakMult: 0.0001, speed: 0.55, oom: false,
+    lay: 'Carrying one folder at a time. Slow, but you will never drop the cabinet.',
+    tech: 'A generator over lines. Peak memory is one row plus whatever you accumulate. Zero dependencies, works on any machine, and is the answer that gets you the job.',
+    code: `import csv\nfrom collections import defaultdict\n\ntotals = defaultdict(float)          # bounded by the number of KEYS, not rows\nwith open("events.csv", newline="") as f:\n    for row in csv.DictReader(f):    # streams; never holds the file\n        totals[row["country"]] += float(row["amount"])\n\n# the only thing that can still blow up is totals itself.\n# If cardinality is huge, spill it: partition by hash(key) % 64 into 64 files,\n# then aggregate each partition separately. That is external group-by.` },
+  { id: 'chunks', n: 'pandas chunksize', peakMult: 0.12, speed: 0.85, oom: false,
+    lay: 'Carrying one drawer at a time, and keeping only the summary of each.',
+    tech: 'read_csv(chunksize=N) returns an iterator of DataFrames. You keep vectorised pandas speed with bounded memory. Reduce inside the loop - never append chunks to a list, which recreates the original problem.',
+    code: `import pandas as pd\n\nagg = None\nfor chunk in pd.read_csv("events.csv", chunksize=200_000,\n                         usecols=["country", "amount"],      # read fewer columns\n                         dtype={"country": "category"}):     # and smaller ones\n    part = chunk.groupby("country", observed=True)["amount"].sum()\n    agg = part if agg is None else agg.add(part, fill_value=0)\n\n# WRONG, and extremely common:\n# frames = [c for c in pd.read_csv(..., chunksize=200_000)]\n# df = pd.concat(frames)     <- you have just loaded the whole file again` },
+  { id: 'lazy', n: 'Polars / DuckDB, out of core', peakMult: 0.20, speed: 3.2, oom: false,
+    lay: 'Handing the whole job to a professional mover who knows which drawers you actually asked about.',
+    tech: 'A query engine reads the file in a streaming pipeline, pushes down projections and filters, and spills to disk when it must. DuckDB will query a 5 GB CSV in place with a few hundred MB of RAM.',
+    code: `import duckdb\nduckdb.sql("""\n    SELECT country, sum(amount) AS total\n    FROM read_csv_auto('events.csv')\n    WHERE event_date >= DATE '2026-01-01'\n    GROUP BY country ORDER BY total DESC\n""").show()\n\n# or Polars lazy, which streams the same way\nimport polars as pl\n(pl.scan_csv("events.csv")\n   .filter(pl.col("event_date") >= pl.date(2026, 1, 1))\n   .group_by("country").agg(pl.col("amount").sum())\n   .collect(engine="streaming"))` },
+  { id: 'columnar', n: 'Convert once to Parquet', peakMult: 0.08, speed: 9.0, oom: false,
+    lay: 'Unpacking the cabinet once into labelled boxes, so every future trip only carries the box you need.',
+    tech: 'Convert the CSV to Parquet in one streaming pass, then every subsequent query reads only the columns and row groups it needs. Typically 5-10x smaller on disk and far faster, because CSV parsing was most of the cost all along.',
+    code: `# one streaming pass, bounded memory\nimport pyarrow.csv as pv, pyarrow.parquet as pq\n\nwriter = None\nwith pv.open_csv("events.csv") as reader:\n    for batch in reader:\n        table = pa.Table.from_batches([batch])\n        writer = writer or pq.ParquetWriter("events.parquet", table.schema,\n                                            compression="zstd")\n        writer.write_table(table)\nwriter.close()\n\n# every query after this is cheap, and columnar means you pay only for\n# the columns you touch` },
+  { id: 'dask', n: 'Dask / Spark cluster', peakMult: 0.25, speed: 6.0, oom: false,
+    lay: 'Hiring ten movers with ten vans.',
+    tech: 'Partition the file across workers, each holding one partition at a time. The right answer when the data genuinely exceeds one machine, or when the job must finish in minutes rather than an hour.',
+    code: `import dask.dataframe as dd\ndf = dd.read_csv("events-*.csv", blocksize="128MB")\nresult = df.groupby("country").amount.sum().compute()\n\n# Real talk: for a single 5 GB file on one box, DuckDB or Polars will\n# usually beat Dask and needs no cluster. Reach for Dask when you have\n# 500 GB and many machines - not to look sophisticated in an interview.` }
+];
+C.bigPrinciples = [
+  ['Bound the memory, not the file', 'The question is never "how big is the file". It is "what is the largest thing I must hold at once". Streaming turns O(file) into O(row) plus O(state), and the state is usually the part that will actually kill you.'],
+  ['Reduce inside the loop', 'Sum, count, min, max, top-k with a heap, HyperLogLog for distinct counts, reservoir sampling for a sample - all bounded. Appending chunks to a list is not reducing; it is loading the file with extra steps.'],
+  ['Read fewer bytes before you read faster', 'usecols, dtype=category, parse only the columns in the query. Halving the columns halves everything downstream for free.'],
+  ['When the state does not fit, partition it', 'External merge sort and external group-by: hash each key into one of N spill files, then process each file independently. This is how databases have always done it, and it is a fifteen-line implementation.'],
+  ['Convert once, query many times', 'If you will run more than about two queries, spend one streaming pass converting CSV to Parquet. Every query afterwards is cheaper by an order of magnitude.'],
+  ['Say the magic words in the interview', 'Generators, bounded memory, backpressure, chunked aggregation, spill to disk, columnar formats, and "I would check the cardinality of the group-by key before choosing". That last one is what separates a senior answer from a junior one.']
+];
+
+/* ---------- plain-English summaries for the four new chapters ---------- */
+C.plain.caching = ['Four thousand people ask the same question, and no two of them type it the same way.',
+  'Remembering the answer only works if you can tell that "when do I get my money back" and "how long do refunds take" are the same question. That recognising step is the clever part, and it is also the only part that can hand somebody the wrong answer, so it gets the most care.'];
+C.plain.parallel = ['The model is bigger than the machine, so you cut it up. There are four different ways to cut.',
+  'You can give each machine a slice of every layer, or a few whole layers each, or a complete copy so they can serve different people at once, or split it by speciality. Each way sends a different amount of chatter between machines, and chatter is what actually decides whether it goes faster.'];
+C.plain.lexical = ['The oldest kind of search still beats the clever kind at several things, and you need both.',
+  'Matching by meaning is wonderful for "when do I get my money back". It is useless for an error code, because every error code means roughly the same thing to it. Matching by the actual words handles codes, names and brand-new jargon on day one, and it can show you exactly why it ranked something first.'];
+C.plain.bigdata = ['The file is bigger than the memory. Do not pick the file up.',
+  'Read one line, add it to a running total, throw the line away, repeat. Then the interesting follow-up: what if the running total itself gets too big to hold? Then you split the work into buckets and do one bucket at a time, which is what every database has quietly always done.'];
+
+/* ---------- quiz additions for chapters 19-22 ---------- */
+C.quiz = C.quiz.concat([
+  { q: 'Your support bot gets the same twenty questions all day, phrased a thousand ways. Exact-match caching hits 4%. What is the next move?',
+    o: ['Raise the TTL', 'Normalise the key, then add a semantic cache tuned against labelled paraphrases', 'Buy a bigger cache', 'Cache nothing and scale the model'], a: 1,
+    e: 'Normalisation is an afternoon of work and multiplies exact hits. The semantic layer is what actually captures paraphrases - but it is also the only layer that can serve a WRONG answer, so its threshold is tuned against labelled intents, never against a hit-rate target.' },
+  { q: 'What is cache penetration?',
+    o: ['An attacker reads other users cached data', 'Requests for keys that exist in neither the cache nor the database, so every one falls through', 'The cache filling up', 'Two writers racing on one key'], a: 1,
+    e: 'There is nothing to cache, so the cache offers zero protection and every request reaches the store. Fix it with negative caching on a short TTL, a Bloom filter, and key-shape validation - then rate limit on miss rate rather than on request rate.' },
+  { q: 'One popular cached answer expires and two thousand requests miss simultaneously. What is this, and what fixes it?',
+    o: ['Penetration; use a Bloom filter', 'Stampede; single-flight regeneration plus serve-stale-while-revalidate and TTL jitter', 'Avalanche; restart the cache', 'Hot key; add shards'], a: 1,
+    e: 'Also called dogpile or thundering herd. It costs far more with an LLM than with a database, because regeneration takes seconds and dollars rather than milliseconds and nothing.' },
+  { q: 'Which cache-key component makes RAG invalidation almost free?',
+    o: ['The user id', 'A hash of the retrieved chunk ids plus their document versions', 'A timestamp', 'The model temperature'], a: 1,
+    e: 'Change a document and its version changes, so the key changes, so old answers simply stop matching. Invalidation becomes naming, and naming is easy.' },
+  { q: 'A 70B model in fp16 will not fit one 80GB GPU. Which split cuts BOTH memory and per-token latency?',
+    o: ['Data parallel', 'Tensor parallel', 'Pipeline parallel', 'Expert parallel'], a: 1,
+    e: 'Tensor parallel cuts every weight matrix across GPUs, so memory and compute per device both fall. It pays with two all-reduces per layer on the critical path, which is why it wants NVLink and rarely goes above 8-way.' },
+  { q: 'Why is pipeline parallelism the one you use ACROSS machines?',
+    o: ['It is faster', 'It passes only one activation tensor per stage boundary, so it tolerates a slow link', 'It needs less memory', 'It has no bubble'], a: 1,
+    e: 'Tensor parallel all-reduces on every layer and collapses over a slow interconnect. Pipeline sends far less, so it survives crossing nodes - at the cost of a bubble only many in-flight micro-batches can fill.' },
+  { q: 'Data parallelism does NOT help you when...',
+    o: ['You need more throughput', 'The model does not fit on one GPU', 'You have plenty of GPUs', 'Your batch is large'], a: 1,
+    e: 'Every data-parallel replica holds the entire model. Replication buys queries per second, never capacity.' },
+  { q: 'PagedAttention improves throughput mainly because...',
+    o: ['It compresses the KV cache', 'It stops the server reserving max_tokens per request, so bounded waste means far larger batches', 'It skips attention for old tokens', 'It quantises the weights'], a: 1,
+    e: 'Reserving max_tokens for a 40-token answer wastes 98% of that allocation. Fixed 16-token blocks bound the waste to under one block, batches get much larger, and the GPU stops idling. Shared blocks give prefix caching for free on top.' },
+  { q: 'Continuous batching differs from static batching because...',
+    o: ['It uses bigger batches', 'A finished sequence is evicted and a waiting one admitted at every decode step, instead of waiting for the whole batch', 'It runs on CPU', 'It disables the KV cache'], a: 1,
+    e: 'With static batching one long generation holds seven short ones hostage until it finishes. In-flight batching is the scheduling half of what a modern inference server does.' },
+  { q: 'Which part of BM25 stops a document that repeats "refund" ninety times from winning?',
+    o: ['Inverse document frequency', 'The k1 saturation term in the denominator', 'The b length parameter', 'The query length'], a: 1,
+    e: 'tf x (k1+1) / (tf + k1 x ...) saturates, so the fiftieth mention adds almost nothing. That saturation is the difference between BM25 and naive TF-IDF, and it is why BM25 won.' },
+  { q: 'A user searches for error code E-4055 and dense retrieval returns unrelated errors. Why?',
+    o: ['The index is stale', 'Identifiers carry almost no semantic signal, so every code embeds into roughly the same region', 'The reranker is broken', 'The chunk size is wrong'], a: 1,
+    e: 'This single fact is the strongest argument for keeping a lexical lane. To BM25 a rare exact code has enormous inverse document frequency and is trivially found; to an embedding model it is noise that looks like every other code.' },
+  { q: 'In Elasticsearch, which of these belongs in FILTER context rather than query context?',
+    o: ['The search phrase the user typed', 'tenant_id, date range and permission checks', 'A fuzzy match', 'A phrase boost'], a: 1,
+    e: 'Filter context answers yes or no, is cached as a bitset and computes no score. Putting the tenant id in query context is both slower and, if you ever forget it, a cross-tenant data leak.' },
+  { q: 'A 5 GB CSV must be processed on a 2 GB machine. What is the first thing you say?',
+    o: ['Buy more RAM', 'Stream it - read a row at a time and reduce as you go, so peak memory is bounded by the row plus the running state rather than by the file', 'Split it into 100 files first', 'Use a Spark cluster'], a: 1,
+    e: 'The file size is never the constraint; the largest live object is. Say that, then name the running state as the thing that can still blow up.' },
+  { q: 'You streamed the file perfectly and the process still died on a group-by with 50 million distinct keys. What now?',
+    o: ['Stream harder', 'Partition by hash of the key into N spill files, then aggregate each file independently', 'Increase the chunk size', 'Sort the file first'], a: 1,
+    e: 'External group-by. Streaming bounded the FILE and did nothing for the STATE. Equal keys hash to the same partition, so each partition aggregates independently in memory. Fifteen lines, and it always works.' },
+  { q: 'Which of these is the most common way engineers accidentally undo chunked reading?',
+    o: ['Setting the chunk size too small', 'Appending every chunk to a list and concatenating at the end', 'Using usecols', 'Reading a column as the category dtype'], a: 1,
+    e: 'Concatenating the chunks loads the whole file with extra steps. Reduce inside the loop or you have not streamed anything.' }
+]);

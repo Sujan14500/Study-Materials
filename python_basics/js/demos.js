@@ -822,11 +822,199 @@ function initQuiz() {
   renderG('');
 }
 
+/* ============================================================
+   Ch10 — the data stack
+   ============================================================ */
+
+/* Three panels are the same card, so they share one renderer. */
+function techCards(sel, items) {
+  const root = $(sel); if (!root) return;
+  root.innerHTML = '';
+  items.forEach(t => root.appendChild(el('div', 'tech reveal',
+    '<h5>' + t.name + (t.tag ? ' <span class="pill">' + t.tag + '</span>' : '') + '</h5>' +
+    '<p>' + t.what + '</p>' +
+    (t.code ? '<pre class="code">' + esc(t.code) + '</pre>' : '') +
+    (t.why ? '<p class="pcard-desc">' + t.why + '</p>' : ''))));
+}
+
+function initDataStack() { techCards('#data-stack', C.dataStack); }
+
+function initVec() {
+  const root = $('#vec-demo'); if (!root) return;
+  const V = C.vecDemo;
+  root.innerHTML =
+    '<div class="lab-panes">' +
+      '<div><div class="lab-pane-title">a list, and a Python loop</div>' +
+        '<pre class="code">' + esc(V.loop) + '</pre>' +
+        '<div class="score-wrap"><span class="mono" id="vec-loop-n">0</span>' +
+        '<div class="score-bar"><div class="score-fill" id="vec-loop-b" style="background:var(--amber)"></div></div></div></div>' +
+      '<div><div class="lab-pane-title">a NumPy array</div>' +
+        '<pre class="code">' + esc(V.vec) + '</pre>' +
+        '<div class="score-wrap"><span class="mono" id="vec-arr-n">0</span>' +
+        '<div class="score-bar"><div class="score-fill" id="vec-arr-b" style="background:var(--green)"></div></div></div></div>' +
+    '</div>' +
+    '<div class="btn-row"><button class="btn" id="vec-run">▶ Run both</button></div>' +
+    '<div class="stepper-say" id="vec-say">' + V.caution + '</div>';
+
+  const num = n => n.toLocaleString('en-US') + ' Python-level op' + (n === 1 ? '' : 's');
+  const loopN = $('#vec-loop-n', root), loopB = $('#vec-loop-b', root);
+  const arrN = $('#vec-arr-n', root), arrB = $('#vec-arr-b', root);
+  let timer = null;
+
+  $('#vec-run', root).onclick = () => {
+    clearInterval(timer);
+    loopB.style.width = arrB.style.width = '0%';
+    loopN.textContent = arrN.textContent = num(0);
+    $('#vec-say', root).innerHTML = V.caution;
+
+    /* the array finishes before you can read the sentence — that is the point */
+    setTimeout(() => { arrB.style.width = '100%'; arrN.textContent = num(V.vecOps); }, 60);
+
+    const ticks = reduced() ? 1 : 60;
+    let k = 0;
+    timer = setInterval(() => {
+      k++;
+      loopB.style.width = (k / ticks * 100) + '%';
+      loopN.textContent = num(Math.round(V.loopOps * k / ticks));
+      if (k >= ticks) {
+        clearInterval(timer);
+        $('#vec-say', root).innerHTML = V.why + '<br><br>' + V.caution;
+        xp(4, '⚡ vectorise instead of looping');
+      }
+    }, reduced() ? 1 : 45);
+  };
+}
+
+function initPandas() {
+  const tabs = $('#pd-tabs'), body = $('#pd-body'); if (!tabs) return;
+  C.pandasOps.forEach((op, i) => {
+    const b = el('button', 'chip mono' + (i ? '' : ' active'), op.label);
+    b.onclick = () => {
+      $$('.chip', tabs).forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      show(op);
+    };
+    tabs.appendChild(b);
+  });
+
+  function show(op) {
+    body.innerHTML =
+      '<div class="two-up">' +
+        '<div><div class="lab-pane-title">code</div><pre class="code">' + esc(op.code) + '</pre></div>' +
+        '<div><div class="lab-pane-title">output</div><pre class="code">' +
+          (op.out == null ? '<span class="dim">no output — it writes a file, or returns a new frame</span>' : esc(op.out)) +
+        '</pre></div>' +
+      '</div><div class="stepper-say">' + op.why + '</div>';
+    xp(1);
+  }
+  show(C.pandasOps[0]);
+}
+
+/* ============================================================
+   Ch11 — scikit-learn
+   ============================================================ */
+function initSkApi() { techCards('#sk-api', C.sklearnApi); }
+
+function initMlPipe() {
+  const root = $('#ml-pipe'); if (!root) return;
+  root.innerHTML =
+    '<div class="rag-pipe" id="mp-strip"></div>' +
+    '<pre class="code" id="mp-code"></pre>' +
+    '<div class="btn-row"><button class="btn" id="mp-play">▶ Run</button>' +
+      '<button class="btn btn-ghost" id="mp-prev">&larr; prev</button>' +
+      '<button class="btn btn-ghost" id="mp-next">next &rarr;</button>' +
+      '<span class="dim mono" id="mp-pos"></span></div>' +
+    '<div class="stepper-say" id="mp-say"></div>';
+
+  const strip = $('#mp-strip', root);
+  C.mlPipeline.forEach((s, i) => {
+    const d = el('div', 'rp', '<b>' + s.n + '</b><small>' + s.small + '</small>');
+    d.onclick = () => { step.stop(); step.go(i); };
+    strip.appendChild(d);
+  });
+  const boxes = $$('.rp', strip);
+  let reached = 0;
+
+  const step = stepper(C.mlPipeline.length, render, 3000);
+  step.onstate = on => $('#mp-play', root).innerHTML = on ? '❚❚ Pause' : '▶ Run';
+  $('#mp-play', root).onclick = () => step.play();
+  $('#mp-next', root).onclick = () => { step.stop(); step.next(); };
+  $('#mp-prev', root).onclick = () => { step.stop(); step.prev(); };
+
+  function render(i) {
+    const s = C.mlPipeline[i];
+    boxes.forEach((b, bi) => {
+      b.classList.toggle('lit', bi === i);
+      b.classList.toggle('done', bi < i);
+    });
+    $('#mp-code', root).textContent = s.code;
+    $('#mp-say', root).innerHTML = s.say;
+    $('#mp-pos', root).textContent = 'step ' + (i + 1) + ' / ' + C.mlPipeline.length;
+    if (i > reached) { reached = i; xp(2, i === C.mlPipeline.length - 1 ? '🔬 that is a whole ML project' : null); }
+  }
+  render(0);
+}
+
+function initModelPicks() {
+  const root = $('#model-picks'); if (!root) return;
+  const done = new Set();
+  C.modelPicks.forEach((t, i) => {
+    const card = el('div', 'ct-card reveal',
+      '<div class="ct-ask">' + t.ask + '</div><div class="ct-opts"></div><div class="ct-body"></div>');
+    const opts = $('.ct-opts', card), body = $('.ct-body', card);
+    C.modelOptions.forEach(k => {
+      const b = el('button', 'qopt ct-opt', k);
+      b.onclick = () => {
+        if (card.classList.contains('answered')) return;
+        card.classList.add('answered');
+        $$('.ct-opt', opts).forEach(x => { x.disabled = true; if (x.textContent === t.pick) x.classList.add('correct'); });
+        if (k !== t.pick) b.classList.add('incorrect');
+        body.innerHTML =
+          '<div class="ct-two"><div><div class="ct-tag good">reach for this</div><pre class="code">' + esc(t.good) + '</pre></div>' +
+          '<div><div class="ct-tag bad">not this</div><pre class="code">' + esc(t.bad) + '</pre></div></div>' +
+          '<div class="ct-why">' + t.why + '</div>';
+        body.classList.add('show');
+        done.add(i);
+        xp(k === t.pick ? 4 : 1, done.size === C.modelPicks.length ? '🎯 you can pick an estimator on purpose' : null);
+      };
+      opts.appendChild(b);
+    });
+    root.appendChild(card);
+  });
+}
+
+function initTraps() {
+  const root = $('#ml-traps'); if (!root) return;
+  C.mlTraps.forEach(t => root.appendChild(el('div', 'pcard reveal',
+    '<h3>' + t.t + '</h3>' +
+    '<div class="ct-tag bad">what people write</div><pre class="code">' + esc(t.bad) + '</pre>' +
+    '<div class="ct-tag good">what to write instead</div><pre class="code">' + esc(t.good) + '</pre>' +
+    '<p class="pcard-desc">' + t.why + '</p>')));
+}
+
+function initEco() {
+  const tabs = $('#eco-tabs'); if (!tabs) return;
+  const groups = ['everything'];
+  C.mlEcosystem.forEach(e => { if (!groups.includes(e.g)) groups.push(e.g); });
+  groups.forEach((g, i) => {
+    const b = el('button', 'chip' + (i ? '' : ' active'), g);
+    b.onclick = () => {
+      $$('.chip', tabs).forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      techCards('#ml-eco', i ? C.mlEcosystem.filter(e => e.g === g) : C.mlEcosystem);
+      xp(1);
+    };
+    tabs.appendChild(b);
+  });
+  techCards('#ml-eco', C.mlEcosystem);
+}
+
 /* ---------- boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   [initBackground, initTypes, initBind, initStrings, initSlice, initFstrings,
    initCollRace, initCollTable, initCollTasks, initTrace, initFuncs, initMutDefault,
    initErrors, initTryPatterns, initComp, initFiles, initEnv, initClass,
-   initGotchas, initQuiz].forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
+   initDataStack, initVec, initPandas, initSkApi, initMlPipe, initModelPicks,
+   initTraps, initEco, initGotchas, initQuiz].forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 });
 })();

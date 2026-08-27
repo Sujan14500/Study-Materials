@@ -269,6 +269,117 @@ C.quiz.forEach((q, i) => {
 C.glossary.forEach(t => assert(t.length === 2 && t[0] && t[1], `glossary entry ${t[0]} is malformed`));
 
 /* ---------------------------------------------------------------
+   Ch10 — the data stack, and every pandas output recomputed from
+   the one source table. If a cell is wrong, this fails.
+   --------------------------------------------------------------- */
+C.dataStack.forEach(p => {
+  assert(p.name && p.what && p.code && p.why, `data stack card "${p.name}" is missing a field`);
+  assert(/^pip install /.test(p.tag), `data stack card "${p.name}" should carry its pip install line`);
+});
+['NumPy', 'pandas'].forEach(n =>
+  assert(C.dataStack.some(p => p.name === n), `the data stack must cover ${n}`));
+
+assert(C.vecDemo.loopOps > C.vecDemo.vecOps * 1000,
+  'the vectorised side must be at least three orders of magnitude fewer Python-level operations');
+assert(/for /.test(C.vecDemo.loop) && !/for /.test(C.vecDemo.vec),
+  'the loop side must loop in Python and the array side must not');
+assert(/not measuring/.test(C.vecDemo.caution),
+  'the widget must say it is not measuring wall-clock time, because it is not');
+
+/* pandas prints a frame as: index column, then each column right-aligned to
+   max(header, widest value), joined by two spaces. Recompute, do not trust. */
+function pdTable(cols, rows, idx) {
+  const w = cols.map((c, ci) => Math.max(String(c).length, ...rows.map(r => String(r[ci]).length)));
+  const line = (lead, cells) =>
+    String(lead).padStart(String(Math.max(...idx)).length) +
+    cells.map((v, ci) => '  ' + String(v).padStart(w[ci])).join('');
+  return [line('', cols)].concat(rows.map((r, ri) => line(idx[ri], r))).join('\n');
+}
+/* and a Series as: optional index name, then index left-aligned, value right-aligned */
+function pdSeries(pairs, opt) {
+  const iw = Math.max(...pairs.map(p => String(p[0]).length));
+  const vw = Math.max(...pairs.map(p => String(p[1]).length));
+  const body = pairs.map(p => String(p[0]).padEnd(iw) + String(p[1]).padStart(vw + 4));
+  return (opt.index ? [opt.index] : []).concat(body, [opt.foot]).join('\n');
+}
+
+const PD = C.pandasDF, PCOLS = PD.cols, PROWS = PD.rows;
+const col = n => PCOLS.indexOf(n);
+const withIdx = pairs => ({ rows: pairs.map(p => p[1]), idx: pairs.map(p => p[0]) });
+
+const salary = col('salary'), years = col('years'), dept = col('dept');
+const rich = withIdx(PROWS.map((r, i) => [i, r]).filter(p => p[1][salary] > 90000));
+const sorted = withIdx(PROWS.map((r, i) => [i, r]).slice().sort((a, b) => b[1][salary] - a[1][salary]));
+const means = {};
+PROWS.forEach(r => (means[r[dept]] = means[r[dept]] || []).push(r[salary]));
+const counts = {};
+PROWS.forEach(r => counts[r[dept]] = (counts[r[dept]] || 0) + 1);
+
+const pandasTruth = {
+  load: () => `(${PROWS.length}, ${PCOLS.length})`,
+  head: () => pdTable(PCOLS, PROWS.slice(0, 3), [0, 1, 2]),
+  select: () => pdTable(['name', 'salary'], PROWS.map(r => [r[col('name')], r[salary]]), PROWS.map((_, i) => i)),
+  filter: () => pdTable(PCOLS, rich.rows, rich.idx),
+  sort: () => pdTable(PCOLS, sorted.rows, sorted.idx),
+  assign: () => pdTable(PCOLS.concat('senior'),
+    PROWS.map(r => r.concat(r[years] >= 5 ? 'True' : 'False')), PROWS.map((_, i) => i)),
+  group: () => pdSeries(
+    Object.keys(means).sort().map(d => [d, (means[d].reduce((a, b) => a + b, 0) / means[d].length).toFixed(1)]),
+    { index: 'dept', foot: 'Name: salary, dtype: float64' }),
+  counts: () => pdSeries(
+    Object.keys(counts).sort().map(d => [d, counts[d]]).sort((a, b) => b[1] - a[1]),
+    { index: 'dept', foot: 'Name: count, dtype: int64' }),
+  missing: () => pdSeries(PCOLS.map(c => [c, 0]), { foot: 'dtype: int64' })
+};
+C.pandasOps.forEach(op => {
+  assert(op.code && op.why, `pandas op "${op.id}" is incomplete`);
+  const want = pandasTruth[op.id];
+  if (!want) { assert.strictEqual(op.out, null, `pandas op "${op.id}" shows output nothing here recomputes`); return; }
+  assert.strictEqual(op.out, want(), `pandas op "${op.id}" prints\n${op.out}\nbut the data gives\n${want()}`);
+});
+// the filter example is only a lesson if it actually drops rows and keeps the original index
+assert(rich.rows.length < PROWS.length && rich.idx.join(',') !== '0,1,2',
+  'the filter example must drop rows and leave a gapped index');
+
+/* ---------------------------------------------------------------
+   Ch11 — the scikit-learn API, and the pipeline that must never
+   let the test set in early
+   --------------------------------------------------------------- */
+C.sklearnApi.forEach(m => assert(m.name && m.what && m.code && m.why, `sklearn API card "${m.name}" is incomplete`));
+['fit(X, y)', 'predict(X)', 'transform(X)'].forEach(n =>
+  assert(C.sklearnApi.some(m => m.name === n), `the API panel must explain ${n}`));
+
+C.mlPipeline.forEach(s => assert(s.n && s.small && s.code && s.say, `pipeline step "${s.n}" is incomplete`));
+const stepNames = C.mlPipeline.map(s => s.n);
+assert.strictEqual(stepNames[0], 'split', 'the pipeline must split before anything else');
+const evalAt = stepNames.indexOf('evaluate');
+assert(evalAt > stepNames.indexOf('fit'), 'evaluation must come after fitting');
+C.mlPipeline.forEach((s, i) => {
+  if (i === 0 || i >= evalAt) return;    // the split creates it; evaluate is allowed to use it
+  assert(!/X_test|y_test/.test(s.code),
+    `pipeline step "${s.n}" touches the test set before the evaluate step — that is the leak the chapter warns about`);
+});
+assert(C.mlPipeline.some(s => s.code.includes('Pipeline(')), 'the walkthrough must build an actual Pipeline');
+
+C.modelPicks.forEach(t => {
+  assert(C.modelOptions.includes(t.pick), `model task "${t.ask}" picks unknown option "${t.pick}"`);
+  assert(t.good && t.bad && t.why, `model task "${t.ask}" is missing a field`);
+  assert.notStrictEqual(t.good, t.bad, `model task "${t.ask}" shows the same code twice`);
+});
+const mpicked = new Set(C.modelPicks.map(t => t.pick));
+C.modelOptions.forEach(o => assert(mpicked.has(o), `no task ever answers "${o}" — it is a dead option`));
+
+C.mlTraps.forEach(t => {
+  assert(t.t && t.bad && t.good && t.why, `ML trap "${t.t}" is incomplete`);
+  assert.notStrictEqual(t.bad, t.good, `ML trap "${t.t}" shows the same code twice`);
+});
+C.mlEcosystem.forEach(e => assert(e.g && e.name && e.what && e.code, `ecosystem entry "${e.name}" is incomplete`));
+assert(new Set(C.mlEcosystem.map(e => e.g)).size >= 3, 'the ecosystem panel needs its groups to filter by');
+assert(C.mlEcosystem.some(e => /scikit-learn/.test(e.code)),
+  'the ecosystem panel must show that the package is scikit-learn even though the import is sklearn');
+
+
+/* ---------------------------------------------------------------
    Wiring — every id the demos reach for must exist somewhere
    --------------------------------------------------------------- */
 const demos = fs.readFileSync('js/demos.js', 'utf8');

@@ -1137,11 +1137,145 @@ function initToolScope() {
   render();
 }
 
+
+/* ============================================================
+   Ch15 — harness engineering
+   ============================================================ */
+function initHarness() {
+  const host = $('#hn-diagram'); if (!host) return;
+  const L = C.harnessLayers;
+  const COL = ['var(--violet)', 'var(--cyan)', 'var(--green)', 'var(--amber)', 'var(--pink)', 'var(--red)'];
+
+  function draw(sel) {
+    host.innerHTML =
+      '<div class="hn-wrap">' +
+      '<div class="hn-side hn-model"><b>the model</b><small>tokens in, tokens out.<br>no memory, no hands,<br>no idea when to stop</small></div>' +
+      '<div class="hn-layers">' + L.map((l, i) =>
+        '<button class="hn-layer' + (sel === l.id ? ' sel' : '') + '" data-id="' + l.id + '" style="--hc:' + COL[i] + '">' +
+        '<span class="hn-ico">' + l.icon + '</span>' +
+        '<span class="hn-body"><b>' + l.n + '</b><small>' + l.q + '</small></span>' +
+        '<span class="hn-w"><i style="width:' + (l.weight / 0.24 * 100) + '%"></i></span>' +
+        '</button>').join('') + '</div>' +
+      '<div class="hn-side hn-world"><b>the world</b><small>tools, databases,<br>APIs, humans,<br>money moving</small></div>' +
+      '</div>';
+    $$('.hn-layer', host).forEach(b => b.onclick = () => {
+      const l = L.filter(x => x.id === b.dataset.id)[0];
+      draw(l.id);
+      $('#hn-detail').innerHTML =
+        '<h4>' + l.icon + ' ' + l.n + '</h4><p><b>Decides:</b> ' + l.q + '</p>' +
+        '<div class="knob-lay"><span>plain English</span>' + l.lay + '</div>' +
+        '<div class="knob-tech"><span>technically</span>' + l.tech + '</div>' +
+        '<div class="cc-bad"><b>Weak version</b> ' + l.bad + '</div>' +
+        '<div class="cc-good"><b>Strong version</b> ' + l.good + '</div>';
+      xp(2);
+    });
+  }
+  draw(null);
+  $('#hn-detail').innerHTML = '<p class="dim">Click a layer. The bars are how much each one moves quality in practice &mdash; note that "prompt" is not on this list at all.</p>';
+
+  const T = C.harnessTwins;
+  $('#hn-twins-intro').textContent = T.intro;
+  let revealed = 0;
+  function twins() {
+    $('#hn-twins').innerHTML =
+      '<div class="tw-head"><span></span><b class="tw-a">Agent A &mdash; 38%</b><b class="tw-b">Agent B &mdash; 71%</b></div>' +
+      T.rows.map((r, i) =>
+        '<div class="tw-row' + (i < revealed ? ' shown' : '') + '" data-i="' + i + '">' +
+        '<span class="tw-layer">' + r.layer + '</span>' +
+        '<code class="tw-a">' + r.a + '</code>' +
+        '<code class="tw-b">' + r.b + '</code>' +
+        '<div class="tw-why">' + r.why + '</div></div>').join('') +
+      '<div class="btn-row"><button class="btn" id="tw-next">' +
+      (revealed >= T.rows.length ? 'Show them again' : 'Reveal the next difference &rarr;') + '</button></div>';
+    $('#tw-next').onclick = () => {
+      revealed = revealed >= T.rows.length ? 0 : revealed + 1;
+      twins();
+      if (revealed === T.rows.length) xp(6, 'Six code changes, zero prompt changes');
+    };
+    $$('#hn-twins .tw-row').forEach(r => r.onclick = () => r.classList.toggle('shown'));
+  }
+  twins();
+  $('#hn-twins-verdict').innerHTML = '<b>Verdict.</b> ' + T.verdict;
+
+  $('#hn-patterns').innerHTML = C.harnessPatterns.map(p =>
+    '<div class="hp"><b>' + p.n + '</b><span class="hp-d">' + p.d + '</span>' +
+    '<span class="hp-w"><i>use it when</i> ' + p.when + '</span></div>').join('');
+  $('#hn-def').innerHTML = C.harnessDef.map(d => '<dt>' + d[0] + '</dt><dd>' + d[1] + '</dd>').join('');
+}
+
+/* ============================================================
+   Ch16 — the failure playbook
+   ============================================================ */
+function initPlaybook() {
+  const grid = $('#pb-grid'); if (!grid) return;
+  grid.innerHTML = C.playbook.map(p =>
+    '<button class="pb" data-id="' + p.id + '"><span class="pb-sev ' + p.sev + '">' + p.sev + '</span>' +
+    '<span class="pb-ico">' + p.icon + '</span><b>' + p.n + '</b>' +
+    '<span class="pb-sym">' + p.sym + '</span></button>').join('');
+  $$('.pb', grid).forEach(b => b.onclick = () => {
+    const p = C.playbook.filter(x => x.id === b.dataset.id)[0];
+    $$('.pb', grid).forEach(x => x.classList.toggle('active', x === b));
+    $('#pb-detail').innerHTML =
+      '<h4>' + p.icon + ' ' + p.n + ' <span class="pb-sev ' + p.sev + '">' + p.sev + '</span></h4>' +
+      '<div class="knob-tech"><span>what you see</span>' + p.sym + '</div>' +
+      '<div class="cc-bad"><b>What people do</b> ' + p.wrong + '</div>' +
+      '<div class="lab-pane-title" style="margin-top:12px">What to do instead</div>' +
+      '<ol class="steps">' + p.right.map(r => '<li>' + r + '</li>').join('') + '</ol>' +
+      '<div class="cc-param"><b>watch this number</b> ' + p.metric + '</div>';
+    xp(2);
+  });
+  $('#pb-detail').innerHTML = '<p class="dim">Click a failure. Each one has a detection, one cheap recovery, an honest degradation, and a number to alarm on.</p>';
+
+  /* ---- context rot ---- */
+  const R = C.contextRot;
+  $('#rot-intro').textContent = R.intro;
+  $('#rot-causes').innerHTML = R.causes.map((c, i) =>
+    '<button class="mlc" data-i="' + i + '"><b>' + c.n + '</b>' +
+    '<div class="mini-bar"><i style="width:' + (c.share / 0.42 * 100) + '%"></i></div>' +
+    '<span>' + Math.round(c.share * 100) + '% of real cases</span></button>').join('');
+  $$('#rot-causes .mlc').forEach(b => b.onclick = () => {
+    const c = R.causes[+b.dataset.i];
+    $$('#rot-causes .mlc').forEach(x => x.classList.toggle('active', x === b));
+    $('#rot-detail').innerHTML = '<h4>' + c.n + '</h4><p>' + c.d + '</p>' +
+      '<div class="cc-good"><b>Fix</b> ' + c.fix + '</div>';
+    xp(2);
+  });
+  $('#rot-detail').innerHTML = '<p class="dim">Click a cause. Nearly half the time it is the first one, and it happens without an error.</p>';
+
+  /* ---- the context budget ---- */
+  const COL = ['var(--violet)', 'var(--pink)', 'var(--cyan)', 'var(--green)', 'var(--amber)', 'rgba(255,255,255,.22)'];
+  function budget() {
+    const w = +$('#rot-w').value;
+    $('#rot-wv').textContent = w.toLocaleString() + ' tokens';
+    $('#rot-budget').innerHTML =
+      '<div class="bud-bar">' + R.budget.map((b, i) =>
+        '<div class="bud-seg" data-i="' + i + '" style="width:' + b.pct + '%;--sc:' + COL[i] + '">' +
+        '<span>' + b.pct + '%</span></div>').join('') + '</div>' +
+      '<div class="bud-key">' + R.budget.map((b, i) =>
+        '<button class="bud-k" data-i="' + i + '" style="--sc:' + COL[i] + '">' +
+        '<i></i><span><b>' + b.n + '</b>' + Math.round(w * b.pct / 100).toLocaleString() + ' tokens</span></button>').join('') + '</div>';
+    const show = i => {
+      const b = R.budget[i];
+      $$('#rot-budget .bud-seg,#rot-budget .bud-k').forEach(x => x.classList.toggle('sel', +x.dataset.i === i));
+      $('#rot-budget-detail').innerHTML = '<h4>' + b.n + ' <span class="dim">' + b.pct + '% &middot; ' +
+        Math.round(w * b.pct / 100).toLocaleString() + ' tokens</span></h4><p><b>Policy:</b> ' + b.policy + '</p>';
+    };
+    $$('#rot-budget .bud-seg,#rot-budget .bud-k').forEach(x => {
+      x.onmouseenter = () => show(+x.dataset.i);
+      x.onclick = () => { show(+x.dataset.i); xp(1); };
+    });
+  }
+  $('#rot-w').oninput = budget;
+  $('#rot-budget-detail').innerHTML = '<p class="dim">Hover a band. Note the last one: reserving headroom for the ANSWER is what stops a truncated reply that looks like a model failure.</p>';
+  budget();
+  $('#pb-principles').innerHTML = C.playbookPrinciples.map(p => '<dt>' + p[0] + '</dt><dd>' + p[1] + '</dd>').join('');
+}
+
 /* ---------- boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   [initBackground, initAgency, initLoop, initTools, initReact, initPlan, initMemory,
    initReflect, initTopo, initGuard, initReliability, initEval, initShip, initMcp,
-   initNaiveLoop, initToolScope, initQuiz]
+   initNaiveLoop, initToolScope, initHarness, initPlaybook, initQuiz]
     .forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 });
 })();

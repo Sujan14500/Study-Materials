@@ -58,8 +58,9 @@
     <div class="hero-tag">interactive course · no signup · no install</div>
     <h1 class="hero-title">Learn <span class="grad">Python</span><br>by watching it run</h1>
     <p class="hero-sub">
-      Eleven chapters. Every idea is something you can <b>touch</b> — step a program line by line,
-      watch two names point at one list, race a list against a set.
+      Thirteen chapters, from a variable to a fitted model. Every idea is something you can <b>touch</b> —
+      step a program line by line, watch two names point at one list, race a list against a set,
+      then walk a scikit-learn pipeline stage by stage.
       Syntax is the easy half; this course is about the model underneath it.
     </p>
 
@@ -77,7 +78,7 @@
         <circle r="4" fill="#7c5cff"><animateMotion dur="4s" begin="2.6s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
       </svg>
       <div class="hero-flow-labels">
-        <span>values</span><span>names</span><span>containers</span><span>flow</span><span>working code</span>
+        <span>values</span><span>names</span><span>containers</span><span>flow</span><span>data</span><span>models</span>
       </div>
     </div>
 
@@ -85,6 +86,7 @@
       <div class="hcard"><div class="hcard-ico">▶</div><h4>Step it</h4><p>A tracer that runs programs one line at a time, showing every variable as it changes.</p></div>
       <div class="hcard"><div class="hcard-ico">🔗</div><h4>See the arrows</h4><p>Names point at objects. Once you can see that, aliasing stops being magic.</p></div>
       <div class="hcard"><div class="hcard-ico">🐛</div><h4>Read the error</h4><p>Seven tracebacks you <i>will</i> hit, decoded bottom-up with the fix beside them.</p></div>
+      <div class="hcard"><div class="hcard-ico">🤖</div><h4>Then the packages</h4><p>NumPy, pandas and scikit-learn — the stack every Python data job is actually made of.</p></div>
     </div>
 
     <button class="btn btn-lg" data-goto="next">Start the course <span class="arr">&rarr;</span></button>
@@ -641,11 +643,114 @@ if __name__ == "__main__":
 </section>
 
 <!-- ============================================================= -->
-<!-- 10. GOTCHAS                                                   -->
+<!-- 10. THE DATA STACK                                            -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="datastack" data-title="The data stack" data-icon="10" data-group="Data &amp; ML">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 10 · Data &amp; ML</div>
+    <h2>NumPy, pandas and the <span class="grad">data stack</span></h2>
+    <p class="lead">Plain Python takes you a long way, and then someone hands you a two-million-row CSV. Everything from here is the same language with better containers underneath: one array type that holds numbers efficiently, and one table type built on top of it.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📦 Five packages, one job each</h3></div>
+    <p class="panel-sub">None of these ship with Python. <span class="mono">python -m pip install numpy pandas matplotlib seaborn scipy</span> — inside the venv from the last chapter, which is exactly what that chapter was for.</p>
+    <div class="tech-grid" id="data-stack"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⚡ Why an array beats a list</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Same sum, two containers. Press run and watch how much work each one asks Python to do.</p>
+    <div id="vec-demo"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🧭</div>
+    <div><b>An array is not a list.</b> A list holds pointers to objects of any type and grows freely. An array is one block of memory, one dtype, fixed size — that constraint is what makes <span class="mono">arr.mean()</span> fast and <span class="mono">arr.append()</span> not a thing. Reach for a list while you are collecting; convert once, at the end.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🐼 pandas, the operations you will actually use</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">One tiny staff table, eleven operations. Click one to see the code, the real output and why it matters.</p>
+    <div class="chip-row" id="pd-tabs"></div>
+    <div id="pd-body"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>NumPy is the foundation: one dtype, one flat buffer, whole-array maths. Everything else stores its numbers there.</li>
+      <li>Whole columns at a time, never <span class="mono">iterrows()</span>. If you are writing a loop over a DataFrame, there is a shorter and faster expression.</li>
+      <li><span class="mono">df.shape</span>, <span class="mono">df.info()</span>, <span class="mono">value_counts()</span> — run all three the moment data lands, before you believe anything about it.</li>
+      <li>pandas methods return new frames. Assign the result; <span class="mono">inplace=True</span> saves nothing and hides bugs.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 11. SCIKIT-LEARN                                              -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="sklearn" data-title="scikit-learn &amp; ML" data-icon="11" data-group="Data &amp; ML">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 11 · Data &amp; ML</div>
+    <h2>scikit-learn, and <span class="grad">everything around it</span></h2>
+    <p class="lead">Machine learning in Python is mostly one small API repeated: <span class="mono">fit</span>, <span class="mono">predict</span>, <span class="mono">transform</span>. Learn those three verbs and a hundred different models become the same object with a different name.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">📦</div>
+    <div><b>Install and import differ.</b> <span class="mono">python -m pip install scikit-learn</span>, then <span class="mono">import sklearn</span>. Same trap as <span class="mono">pip install pillow</span> / <span class="mono">import PIL</span> and <span class="mono">pip install opencv-python</span> / <span class="mono">import cv2</span>. When an import fails, check the package name before you doubt the install.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧩 One API, every model</h3></div>
+    <p class="panel-sub">Five methods. A linear regression, a random forest and a text vectoriser all answer to the same ones.</p>
+    <div class="tech-grid" id="sk-api"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔬 A real project, step by step</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Predicting churn from a table. Step through it — the order is the lesson, especially where the test set is allowed to appear.</p>
+    <div id="ml-pipe"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Pick the estimator</h3><span class="panel-tag">quiz</span></div>
+    <p class="panel-sub">Six jobs. Choose before you look — the reasoning underneath is the part worth keeping.</p>
+    <div id="model-picks"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🩹 Six ways to fool yourself</h3></div>
+    <p class="panel-sub">Every one of these produces a great score and a model that does nothing in production.</p>
+    <div class="three-up" id="ml-traps"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🌍 Beyond scikit-learn</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The rest of the ecosystem, by the job it does. Filter by area.</p>
+    <div class="chip-row" id="eco-tabs"></div>
+    <div class="tech-grid" id="ml-eco"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Split first, and touch the test set exactly once, at the end. Everything else happens inside the training data.</li>
+      <li>Put preprocessing in a <span class="mono">Pipeline</span>. It is not tidiness — it is what makes leakage impossible to write.</li>
+      <li>Start with the boring model. A logistic regression that ships beats a neural net that is still being tuned.</li>
+      <li>Accuracy is rarely the metric. Pick the one that matches the cost of being wrong, before you see any number.</li>
+      <li>Tabular data → scikit-learn or gradient boosting. Images, audio, free text → PyTorch and a pretrained model.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 12. GOTCHAS                                                   -->
 <!-- ============================================================= -->
 <section class="chapter" data-id="gotchas" data-title="Gotchas" data-icon="🪤" data-group="Finish line">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 10 · Finish line</div>
+    <div class="ch-kicker">Chapter 12 · Finish line</div>
     <h2>Nine things that will <span class="grad">catch you</span> once</h2>
     <p class="lead">Every one of these has cost a real person a real afternoon. Guess before you look — the ones you get wrong are the ones worth remembering.</p>
   </header>
@@ -692,13 +797,13 @@ items = [i for i in items if not bad(i)]</pre>
 </section>
 
 <!-- ============================================================= -->
-<!-- 11. QUIZ                                                      -->
+<!-- 13. QUIZ                                                      -->
 <!-- ============================================================= -->
 <section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Finish line">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 11 · Finish line</div>
+    <div class="ch-kicker">Chapter 13 · Finish line</div>
     <h2>Prove it to <span class="grad">yourself</span></h2>
-    <p class="lead">Fifteen questions covering everything above. No time limit, instant explanations, and you can retake it.</p>
+    <p class="lead">Twenty-one questions covering everything above. No time limit, instant explanations, and you can retake it.</p>
   </header>
 
   <div class="panel">

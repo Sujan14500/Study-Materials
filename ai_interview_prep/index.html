@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Interview Prep — GenAI &amp; AI Engineer</title>
+<meta name="description" content="500+ GenAI and AI Engineer interview questions with layman and technical answers, comparison tables, flashcards, a quiz and a timed mock interview.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<canvas id="bg-particles" class="bg-particles" aria-hidden="true"></canvas>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark"><span>◆</span></div>
+    <div>
+      <div class="brand-name">Interview Prep</div>
+      <div class="brand-sub">genai &amp; ai engineer</div>
+    </div>
+  </div>
+
+  <div class="progress-block">
+    <div class="progress-top"><span>Mastered</span><span id="progress-label">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="xp-row">
+      <span class="xp-badge" id="xp-badge">0 XP</span>
+      <button class="reset-btn" id="reset-btn" title="Clear saved progress">reset</button>
+    </div>
+  </div>
+
+  <nav class="mode-nav" id="mode-nav" aria-label="Modes">
+    <button class="nav-item active" data-mode="study"><span class="nav-num">📚</span><span>Study</span></button>
+    <button class="nav-item" data-mode="cards"><span class="nav-num">🃏</span><span>Flashcards</span></button>
+    <button class="nav-item" data-mode="quiz"><span class="nav-num">✅</span><span>Quiz</span></button>
+    <button class="nav-item" data-mode="mock"><span class="nav-num">🎙️</span><span>Mock interview</span></button>
+    <button class="nav-item" data-mode="progress"><span class="nav-num">📈</span><span>Progress</span></button>
+    <button class="nav-item" data-mode="paths"><span class="nav-num">🗺️</span><span>Study paths</span></button>
+  </nav>
+
+  <div class="topic-nav" id="topic-nav" aria-label="Topics"></div>
+
+  <div class="sidebar-foot">
+    <kbd>/</kbd> search · <kbd>j</kbd><kbd>k</kbd> move · <kbd>space</kbd> reveal
+  </div>
+</aside>
+
+<button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+
+<!-- ============ MAIN ============ -->
+<main class="main" id="main">
+<div class="stage">
+
+<!-- ---------------- STUDY ---------------- -->
+<section class="mode" id="mode-study">
+  <header class="ch-head">
+    <div class="ch-kicker">Study mode</div>
+    <h2>Every question, <span class="grad">answered twice</span></h2>
+    <p class="lead">Once in plain English so it sticks, once at interview depth so it survives a follow-up. Filter by topic and level, search anything, and mark what you already know so the flashcards and mock interview stop showing it to you.</p>
+  </header>
+
+  <div class="toolbar">
+    <input type="search" id="q-search" class="input-line" placeholder="Search 500+ questions — try &quot;KV cache&quot;, &quot;LoRA&quot;, &quot;cache penetration&quot;…" autocomplete="off">
+    <div class="tool-row">
+      <div class="seg" id="level-filter" role="group" aria-label="Difficulty">
+        <button class="seg-b active" data-level="all">All levels</button>
+        <button class="seg-b" data-level="1">Junior</button>
+        <button class="seg-b" data-level="2">Mid</button>
+        <button class="seg-b" data-level="3">Senior</button>
+      </div>
+      <div class="seg" id="known-filter" role="group" aria-label="Status">
+        <button class="seg-b active" data-known="all">All</button>
+        <button class="seg-b" data-known="new">Not yet learned</button>
+        <button class="seg-b" data-known="known">Marked known</button>
+        <button class="seg-b" data-known="star">Starred</button>
+      </div>
+      <button class="btn btn-ghost" id="expand-all">Expand all</button>
+    </div>
+    <div class="result-count" id="result-count"></div>
+  </div>
+
+  <div id="q-list" class="q-list"></div>
+  <div class="load-more"><button class="btn btn-ghost" id="load-more">Show more questions</button></div>
+</section>
+
+<!-- ---------------- FLASHCARDS ---------------- -->
+<section class="mode" id="mode-cards" hidden>
+  <header class="ch-head">
+    <div class="ch-kicker">Flashcards</div>
+    <h2>Recall, not <span class="grad">recognition</span></h2>
+    <p class="lead">Reading an answer feels like learning and is not. Say the answer out loud first, then flip. Cards you rate badly come back sooner — the schedule is stored in your browser, so a card you nailed today will not waste your time tomorrow.</p>
+  </header>
+
+  <div class="toolbar">
+    <div class="tool-row">
+      <select id="card-topic" class="select"></select>
+      <select id="card-level" class="select">
+        <option value="all">All levels</option><option value="1">Junior</option>
+        <option value="2">Mid</option><option value="3">Senior</option>
+      </select>
+      <button class="btn" id="card-start">Start a session</button>
+      <button class="btn btn-ghost" id="card-shuffle">Shuffle deck</button>
+    </div>
+    <div class="result-count" id="card-count"></div>
+  </div>
+
+  <div class="card-stage" id="card-stage"></div>
+  <div class="card-controls" id="card-controls" hidden>
+    <button class="rate again" data-rate="0">Again<small>&lt; 1 min</small></button>
+    <button class="rate hard"  data-rate="1">Hard<small>10 min</small></button>
+    <button class="rate good"  data-rate="2">Good<small>1 day</small></button>
+    <button class="rate easy"  data-rate="3">Easy<small>4 days</small></button>
+  </div>
+</section>
+
+<!-- ---------------- QUIZ ---------------- -->
+<section class="mode" id="mode-quiz" hidden>
+  <header class="ch-head">
+    <div class="ch-kicker">Quiz</div>
+    <h2>Multiple choice, <span class="grad">no mercy</span></h2>
+    <p class="lead">Every wrong option here is a real misconception someone said in a real interview. The explanation after each question tells you why the tempting answer is wrong, which is the part worth remembering.</p>
+  </header>
+
+  <div class="toolbar" id="quiz-setup">
+    <div class="tool-row">
+      <select id="quiz-topic" class="select"></select>
+      <select id="quiz-len" class="select">
+        <option value="10">10 questions</option>
+        <option value="20" selected>20 questions</option>
+        <option value="40">40 questions</option>
+        <option value="0">Everything</option>
+      </select>
+      <label class="toggle" id="quiz-timed"><span class="toggle-box">&#10003;</span><span>Timed (60s per question)</span></label>
+      <button class="btn" id="quiz-start">Start quiz</button>
+    </div>
+    <div class="result-count" id="quiz-count"></div>
+  </div>
+
+  <div id="quiz-stage" class="quiz-stage"></div>
+</section>
+
+<!-- ---------------- MOCK INTERVIEW ---------------- -->
+<section class="mode" id="mode-mock" hidden>
+  <header class="ch-head">
+    <div class="ch-kicker">Mock interview</div>
+    <h2>A real round, <span class="grad">on the clock</span></h2>
+    <p class="lead">Questions arrive one at a time with a timer. Answer <b>out loud</b> before you reveal anything — the gap between "I know this" and "I can say this in ninety seconds" is the entire reason people fail interviews they were qualified for.</p>
+  </header>
+
+  <div class="toolbar" id="mock-setup">
+    <div class="tool-row">
+      <select id="mock-role" class="select">
+        <option value="genai">GenAI Engineer</option>
+        <option value="aieng">AI Engineer (production/platform)</option>
+        <option value="rag">RAG / Search specialist</option>
+        <option value="agent">Agent engineer</option>
+        <option value="mlops">LLMOps / Inference</option>
+        <option value="mixed" selected>Mixed — full loop</option>
+      </select>
+      <select id="mock-level" class="select">
+        <option value="1">Junior round</option>
+        <option value="2" selected>Mid round</option>
+        <option value="3">Senior / staff round</option>
+      </select>
+      <select id="mock-len" class="select">
+        <option value="8">8 questions (~15 min)</option>
+        <option value="12" selected>12 questions (~25 min)</option>
+        <option value="20">20 questions (~45 min)</option>
+      </select>
+      <button class="btn" id="mock-start">Begin the round</button>
+    </div>
+  </div>
+
+  <div id="mock-stage" class="mock-stage"></div>
+</section>
+
+<!-- ---------------- PROGRESS ---------------- -->
+<section class="mode" id="mode-progress" hidden>
+  <header class="ch-head">
+    <div class="ch-kicker">Progress</div>
+    <h2>Where you are <span class="grad">weak</span></h2>
+    <p class="lead">Mastery is per topic, not overall. An average of 70% hides the one topic at 20% that will be the question you get asked.</p>
+  </header>
+  <div class="stat-row" id="prog-stats"></div>
+  <div class="panel">
+    <div class="panel-head"><h3>📊 Mastery by topic</h3></div>
+    <div id="prog-topics"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 What to do next</h3></div>
+    <div id="prog-advice"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🕑 Quiz history</h3></div>
+    <div id="prog-history"></div>
+  </div>
+</section>
+
+<!-- ---------------- STUDY PATHS ---------------- -->
+<section class="mode" id="mode-paths" hidden>
+  <header class="ch-head">
+    <div class="ch-kicker">Study paths</div>
+    <h2>What to learn, <span class="grad">in what order</span></h2>
+    <p class="lead">Pick the path that matches the job you are interviewing for. Each stage lists the topics to cover here and the interactive course that teaches the underlying idea properly.</p>
+  </header>
+  <div id="paths"></div>
+</section>
+
+</div><!-- /stage -->
+<div class="toast" id="toast"></div>
+</main>
+
+<script src="js/bank-foundations.js"></script>
+<script src="js/bank-transformers.js"></script>
+<script src="js/bank-training.js"></script>
+<script src="js/bank-inference.js"></script>
+<script src="js/bank-prompting.js"></script>
+<script src="js/bank-rag.js"></script>
+<script src="js/bank-vectors.js"></script>
+<script src="js/bank-agents.js"></script>
+<script src="js/bank-eval.js"></script>
+<script src="js/bank-safety.js"></script>
+<script src="js/bank-production.js"></script>
+<script src="js/bank-data.js"></script>
+<script src="js/bank-sysdesign.js"></script>
+<script src="js/bank-behavioural.js"></script>
+<script src="js/mcq.js"></script>
+<script src="js/paths.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1285,6 +1285,430 @@ SUMX(Sales,
 </section>
 
 <!-- ============================================================= -->
+<!-- 18. ONE TRANSFORMER BLOCK                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="blocks" data-title="One transformer block" data-icon="18" data-group="Deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 18 &middot; Deep dives</div>
+    <h2>Inside <span class="grad">one block</span>, with real numbers</h2>
+    <p class="lead">Chapter 4 showed you attention as an idea. This chapter runs an actual transformer &mdash; four dimensions wide, one head, one block &mdash; and shows you every number it computes. It is small enough to read and real enough to be honest: nothing on this page is a mock-up.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#127968;</div>
+    <div><b>The layman version.</b> A block is a two-part committee meeting. <b>Part one (attention)</b>: everyone at the table looks around and copies notes from whoever seems relevant &mdash; the verb looks for its subject. <b>Part two (feed-forward)</b>: everyone then goes back to their desk alone and consults their own memory &mdash; "a cat that just sat is probably sitting <i>somewhere</i>". Nobody talks in part two. Stack that meeting 32 times and you have GPT.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127959; The architecture, clickable</h3><span class="panel-tag">interactive diagram</span></div>
+    <p class="panel-sub">Click any box to see what it does, what shape the data has there, and what breaks if you delete it. The pulse follows the residual stream &mdash; the thing every block writes into.</p>
+    <div id="tf-arch"></div>
+    <div id="tf-arch-detail" class="arch-detail"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128300; Step the block, one operation at a time</h3><span class="panel-tag">live maths</span></div>
+    <p class="panel-sub">Pick a prompt, then walk the ten steps. Every matrix, score and probability below is computed in your browser from the weights in <span class="mono">content.js</span> &mdash; change a weight and these numbers change.</p>
+    <div class="chip-row" id="tf-prompts"></div>
+    <div class="tf-stepbar" id="tf-steps"></div>
+    <div class="tf-stage" id="tf-stage"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="tf-prev">&larr; Previous step</button>
+      <button class="btn" id="tf-next">Next step &rarr;</button>
+      <button class="btn btn-ghost" id="tf-auto">&#9654; Play the whole block</button>
+    </div>
+    <div class="tf-note" id="tf-note"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129504; Proof that the feed-forward is where the knowledge lives</h3><span class="panel-tag">the money shot</span></div>
+    <p class="panel-sub">Same prompt, same attention, one toggle. With the feed-forward switched off the model can only echo what it just looked at. Switch it on and neuron&nbsp;5 &mdash; the one that fires on <i>animate + action</i> &mdash; writes "a place is coming next" into the stream and the prediction changes completely.</p>
+    <label class="toggle" id="tf-ffn-toggle"><span class="toggle-box">&#10003;</span><span>Feed-forward layer enabled</span></label>
+    <div class="tf-ffn-out">
+      <div>
+        <div class="lab-pane-title">Next-token probabilities</div>
+        <div id="tf-probs" class="tf-probs"></div>
+      </div>
+      <div>
+        <div class="lab-pane-title">Feed-forward neurons at the last position</div>
+        <div id="tf-neurons" class="tf-neurons"></div>
+      </div>
+    </div>
+    <div class="tf-verdict" id="tf-verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9878; Attention vs feed-forward</h3><span class="panel-tag">comparison</span></div>
+    <p class="panel-sub">The two halves of every block, side by side. If you remember one row, remember the first.</p>
+    <div id="tf-compare"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="pcard reveal">
+      <div class="pcard-badge">why not one token per word</div>
+      <h3>The tokenizer question</h3>
+      <p class="pcard-desc">"Why not just give every word its own id?" is a favourite interview opener. Three options, one survivor.</p>
+      <div id="tok-why"></div>
+    </div>
+    <div class="pcard reveal">
+      <div class="pcard-badge">say this out loud</div>
+      <h3>Four things people get wrong</h3>
+      <dl class="deflist" id="tf-myths"></dl>
+    </div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>Attention moves information between positions. The feed-forward adds knowledge to one position.</b> That single sentence answers most transformer interview questions.</li>
+      <li><b>Two thirds of the parameters are in the feed-forward.</b> If you thought attention was the big part, you had it backwards.</li>
+      <li><b>The residual stream is the protagonist.</b> Each block reads it, computes a small edit, and adds the edit back. Nothing is ever overwritten.</li>
+      <li><b>Only the last position produces the next token.</b> Every other position is computed so the last one has something to attend to &mdash; which is exactly why a KV cache works.</li>
+      <li><b>Causal masking is what makes it a language model.</b> Set the upper triangle to minus infinity and the model physically cannot read the future.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 19. DECODING CONTROLS                                          -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="decoding" data-title="Decoding controls" data-icon="19" data-group="Deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 19 &middot; Deep dives</div>
+    <h2>Every knob on the <span class="grad">sampling</span> API</h2>
+    <p class="lead">The model hands you a probability for every token in its vocabulary. Everything else &mdash; temperature, top-k, top-p, penalties, stop sequences &mdash; is post-processing you control. This chapter applies each transform to one real distribution so you can watch exactly which tokens each knob kills.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#127866;</div>
+    <div><b>The layman version.</b> The model is a bartender with twelve bottles and an opinion about each. <b>Temperature</b> is how adventurous it feels. <b>Top-k</b> is "only these five bottles are on the shelf". <b>Top-p</b> is "keep the bottles until they cover 90% of what I usually pour". <b>Repetition penalty</b> is "you already served that one". <b>Stop sequence</b> is last orders. <b>Max tokens</b> is the bouncer.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127914; The sampling pipeline</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">One real distribution over twelve candidates. Move a slider and watch the bars change and the killed candidates grey out &mdash; in the exact order a real inference server applies them: penalties &rarr; temperature &rarr; top-k &rarr; top-p &rarr; renormalise &rarr; sample.</p>
+    <div class="dec-ctx" id="dec-ctx"></div>
+    <div class="dec-grid">
+      <div class="dec-controls" id="dec-controls"></div>
+      <div>
+        <div class="lab-pane-title">Candidate pool <span class="dim">(survivors keep their colour)</span></div>
+        <div id="dec-bars" class="dec-bars"></div>
+        <div class="stat-row" id="dec-stats"></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="dec-sample">&#127922; Sample 20 times</button>
+      <button class="btn btn-ghost" id="dec-reset">Reset to defaults</button>
+    </div>
+    <div id="dec-draws" class="dec-draws"></div>
+    <div class="dec-note" id="dec-note"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128290; What each knob actually does</h3></div>
+    <div class="knob-grid" id="dec-knobs"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128203; Copy-paste settings by job</h3><span class="panel-tag">click to load</span></div>
+    <p class="panel-sub">Click a recipe to load it into the sliders above and see what it does to the distribution.</p>
+    <div id="dec-recipes" class="recipe-grid"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9888; Four traps</h3></div>
+    <dl class="deflist" id="dec-traps"></dl>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>Order matters.</b> Penalties are applied to logits, then temperature divides, then k and p filter, then it renormalises. Reasoning about them out of order is how people get confused.</li>
+      <li><b>Top-p adapts, top-k does not.</b> That is the whole argument for nucleus sampling: the survivor set is small when the model is confident and large when it is not.</li>
+      <li><b>Temperature 0 is greedy, not deterministic.</b> Pin a seed too, and assert on parsed fields rather than exact strings.</li>
+      <li><b>Max tokens truncates; it does not summarise.</b> Ask for brevity in the prompt and keep max tokens as the circuit breaker.</li>
+      <li><b>Stop sequences are a correctness feature in agents.</b> Stopping at <span class="mono">Observation:</span> is what stops a model hallucinating its own tool results.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 20. CHUNKING                                                   -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="chunking" data-title="Chunking" data-icon="20" data-group="Deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 20 &middot; Deep dives</div>
+    <h2>Six ways to <span class="grad">cut a document</span></h2>
+    <p class="lead">Chunking is the least glamorous part of RAG and the most common cause of bad answers. The right chunk is small enough to retrieve precisely and large enough to answer completely &mdash; and those two goals fight each other. Here are the six strategies, run live on one document.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#127859;</div>
+    <div><b>The layman version.</b> You are photocopying a cookbook to hand out one page at a time. Cut every 300 characters and half your recipes end mid-ingredient. Cut at chapter headings and each page makes sense on its own. Cut at "where the topic changes" and you get the best pages but you had to read the whole book first. That is fixed vs document-aware vs semantic chunking.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9986; The chunker, live</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">One refund policy, six splitters. Click a strategy to re-cut the document; the question below asks something whose answer sits <b>right on a boundary</b>, so you can see which strategies survive it.</p>
+    <div class="chip-row" id="chunk-tabs"></div>
+    <div class="chunk-grid">
+      <div>
+        <div class="lab-pane-title">The document, chunked</div>
+        <div id="chunk-doc" class="chunk-doc"></div>
+      </div>
+      <div>
+        <div class="lab-pane-title">Diagnostics</div>
+        <div class="stat-row" id="chunk-stats"></div>
+        <div class="chunk-card" id="chunk-detail"></div>
+      </div>
+    </div>
+    <div class="chunk-probe" id="chunk-probe"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9878; All six, side by side</h3><span class="panel-tag">comparison</span></div>
+    <div id="chunk-compare"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128104;&#8205;&#128102; Parent-child, drawn</h3><span class="panel-tag">interactive diagram</span></div>
+    <p class="panel-sub">The strategy that usually wins. Hover a child to see which parent it returns. Search precision comes from the small vector; answer quality comes from the big text.</p>
+    <div id="chunk-pc"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#10024; Four things that beat a better splitter</h3></div>
+    <dl class="deflist" id="chunk-extras"></dl>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>Default to recursive with 10-20% overlap</b> and move on. It is right often enough that the argument is not worth having on day one.</li>
+      <li><b>Upgrade to document-aware the moment your corpus has structure.</b> Prepending the heading path to each chunk is a one-line change with an outsized effect.</li>
+      <li><b>Parent-child is the quality answer</b> when you can afford two stores: retrieve on small, answer on big.</li>
+      <li><b>Contextual retrieval beats every splitter choice</b> if you can spend one cheap LLM call per chunk at index time.</li>
+      <li><b>Never let a chunk lose its metadata.</b> Source, section, version, timestamp, permissions. Filters beat cleverness.</li>
+      <li><b>Chunk size is measured, not argued.</b> Sweep it against an eval set and read recall@10.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 21. FINE-TUNING MENU                                           -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="tuning" data-title="Fine-tuning menu" data-icon="21" data-group="Deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 21 &middot; Deep dives</div>
+    <h2>SFT, LoRA, QLoRA, DPO, RLHF, GRPO, <span class="grad">distillation</span></h2>
+    <p class="lead">Nine ways to change a model's behaviour, in one place, with the numbers that actually decide between them. The rule that survives every interview: <b>fine-tuning teaches form, RAG supplies facts.</b> Most teams reach for the first when they needed the second.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#127891;</div>
+    <div><b>The layman version.</b> <b>Prompting</b> is telling a new hire what you want. <b>RAG</b> is giving them the handbook. <b>SFT</b> is sending them back to university. <b>LoRA</b> is clipping specialist glasses onto them &mdash; cheap, removable, one pair per client. <b>QLoRA</b> is the same glasses after you compressed the textbook so it fits in a backpack. <b>DPO</b> is showing two drafts and pointing at the better one. <b>RLHF</b> is hiring a panel of judges. <b>GRPO</b> is marking eight attempts at the same problem and rewarding whatever beat the class average. <b>Distillation</b> is the professor writing ten thousand worked solutions for a student to learn from.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129518; Which one do I actually need?</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Four questions. The recommendation updates as you answer, and it tells you <b>why</b> &mdash; including when the answer is "do not fine-tune anything".</p>
+    <div id="ft-quiz" class="ft-quiz"></div>
+    <div id="ft-verdict" class="ft-verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9878; LoRA vs QLoRA</h3><span class="panel-tag">comparison</span></div>
+    <p class="panel-sub">The single most-asked comparison in this space, and the one people fumble. They are not competing algorithms.</p>
+    <div id="lq-compare"></div>
+    <div class="hyb-ok" id="lq-verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129518; LoRA, drawn</h3><span class="panel-tag">interactive diagram</span></div>
+    <p class="panel-sub">Drag the rank. The frozen matrix never changes; the two thin matrices beside it are everything you train and everything you ship.</p>
+    <div id="lora-diagram"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128290; The parameter arithmetic</h3><span class="panel-tag">live calculator</span></div>
+    <p class="panel-sub">Exact counts, not vibes. Pick a model, a rank and which matrices you adapt, and see how little of the model you are actually training.</p>
+    <div class="lora-calc" id="lora-calc"></div>
+    <div class="stat-row" id="lora-stats"></div>
+    <div class="dec-note" id="lora-note"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128202; All nine methods</h3><span class="panel-tag">click a card</span></div>
+    <div class="ft-grid" id="ft-grid"></div>
+    <div class="ft-detail" id="ft-detail"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>Prompt &rarr; RAG &rarr; LoRA &rarr; everything else.</b> Walk the ladder. Every rung you skip costs a month.</li>
+      <li><b>Fine-tuning teaches form; RAG supplies facts.</b> Tuning a model on your docs to make it "know" them is the most expensive way to build a bad search engine.</li>
+      <li><b>LoRA is the default, QLoRA is LoRA when it does not fit.</b> Same algorithm, one memory trick on the frozen part.</li>
+      <li><b>DPO replaced RLHF for almost everyone.</b> No reward model, no PPO loop, most of the benefit.</li>
+      <li><b>GRPO needs a verifiable reward.</b> Maths, tests passing, output parsing. If a human has to judge it, you want DPO.</li>
+      <li><b>Distillation is a cost project, not a quality project.</b> The student inherits every mistake the teacher makes.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 22. LLM AS A JUDGE                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="judge" data-title="LLM as a judge" data-icon="22" data-group="Deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 22 &middot; Deep dives</div>
+    <h2>Why trust a <span class="grad">hallucinating model</span> to grade one?</h2>
+    <p class="lead">It is the sharpest question in evaluation, and it has a real answer: <b>judging is a much easier task than generating</b>, and you can measure whether the judge is any good. This chapter runs a judge bench with the biases switched on, then lets you fix them one at a time and watch agreement with human labels climb.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#127916;</div>
+    <div><b>The layman version.</b> You would not ask a film student to direct a masterpiece, but you would happily ask them which of two films is better &mdash; and they would usually be right. Recognising quality is easier than producing it. The catch is that this particular critic has known quirks: they favour whichever film they watched first, they mistake "long" for "deep", and they love their own work. So you show the films in both orders, hand them a written scoring guide, and check their verdicts against a panel of real viewers before you print the review.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9878; The judging bench</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Eight real answer pairs with human verdicts already recorded. The judge starts naive &mdash; no rubric, no swap, no reference. <b>Switch mitigations on</b> and watch agreement with the humans move. Each row shows what the judge said and whether it matched.</p>
+    <div class="judge-grid">
+      <div class="judge-mit" id="judge-mits"></div>
+      <div>
+        <div class="stat-row" id="judge-stats"></div>
+        <div class="judge-rows" id="judge-rows"></div>
+      </div>
+    </div>
+    <div class="judge-note" id="judge-note"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128027; The six biases, and what kills each</h3><span class="panel-tag">interactive diagram</span></div>
+    <p class="panel-sub">Click a bias to see which mitigation removes it and what it looks like in your logs.</p>
+    <div id="judge-bias-map"></div>
+    <div class="arch-detail" id="judge-bias-detail"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128202; Seven ways to evaluate, compared</h3><span class="panel-tag">comparison</span></div>
+    <p class="panel-sub">Cost, coverage and trustworthiness are a triangle: you never get all three from one method. That is why a real eval suite uses four of these at once.</p>
+    <div id="eval-methods"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128208; The eval pyramid</h3><span class="panel-tag">interactive diagram</span></div>
+    <p class="panel-sub">What a production eval suite is actually made of. Hover a layer. Note how little of it is LLM-judged &mdash; the judge is the top of the pyramid, never the base.</p>
+    <div id="eval-pyramid"></div>
+    <div class="arch-detail" id="eval-pyramid-detail"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9989; Making a judge you can actually trust</h3></div>
+    <ul class="fact-list" id="judge-golden"></ul>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>Judging is easier than generating.</b> That asymmetry is the entire justification, and it is a real one.</li>
+      <li><b>An unmeasured judge is worthless.</b> Label 100 cases by hand and report agreement. Below about 0.6 kappa, throw it out.</li>
+      <li><b>Position swap is the highest-value fix</b> and costs exactly 2x. Do it before anything clever.</li>
+      <li><b>Pairwise beats absolute scoring.</b> "Which is better" is a question models answer reliably; "score this 7.5" is not.</li>
+      <li><b>Freeze the judge model and prompt.</b> A moving ruler measures nothing.</li>
+      <li><b>Put deterministic assertions underneath.</b> Schema, citation ids, refusal strings, latency. They catch most regressions for free.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 23. BEYOND RAG                                                 -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="beyondrag" data-title="Beyond RAG" data-icon="23" data-group="Deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 23 &middot; Deep dives</div>
+    <h2>Long context, agentic RAG, graphs and <span class="grad">knowledge fabric</span></h2>
+    <p class="lead">"The window is a million tokens now &mdash; is RAG dead?" is the interview question of the moment. The answer is arithmetic, not opinion, so this chapter computes it. Then it lays the five architectures side by side, including the one people mean when they say OKF.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#128218;</div>
+    <div><b>The layman version.</b> A million-token window is a very large desk. RAG is a librarian. Having a bigger desk does not make the librarian useless &mdash; it means the librarian can bring you ten books instead of three. And you still cannot fit the library on the desk, you still pay by the page every single time you read, and you still would not want an intern who can see every confidential file just because they have the space.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128176; Long context vs RAG, calculated</h3><span class="panel-tag">live calculator</span></div>
+    <p class="panel-sub">Put in your own corpus size, price and traffic. Everything below is arithmetic on your numbers &mdash; cost per question, time to first token, and the accuracy penalty from burying the answer in the middle of a huge prompt.</p>
+    <div class="lc-calc" id="lc-calc"></div>
+    <div class="lc-out">
+      <div>
+        <div class="lab-pane-title">Stuff the whole corpus in</div>
+        <div class="stat-row" id="lc-long"></div>
+      </div>
+      <div>
+        <div class="lab-pane-title">Retrieve, then answer</div>
+        <div class="stat-row" id="lc-rag"></div>
+      </div>
+    </div>
+    <div id="lc-curve"></div>
+    <div class="lc-verdict" id="lc-verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9878; Long window vs RAG</h3><span class="panel-tag">comparison</span></div>
+    <div id="lc-compare"></div>
+    <div class="hyb-ok" id="lc-compare-verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128373; Classic RAG vs Agentic RAG</h3><span class="panel-tag">interactive diagram</span></div>
+    <p class="panel-sub">The same question through both pipelines. Press play and watch where they diverge &mdash; agentic RAG earns its cost on the second question, not the first.</p>
+    <div class="chip-row" id="arag-qs"></div>
+    <div id="arag-diagram"></div>
+    <div class="btn-row">
+      <button class="btn" id="arag-play">&#9654; Run both</button>
+      <button class="btn btn-ghost" id="arag-reset">Reset</button>
+    </div>
+    <div class="arch-detail" id="arag-verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127760; Five retrieval architectures</h3><span class="panel-tag">click a card</span></div>
+    <div class="rv-grid" id="rv-grid"></div>
+    <div class="ft-detail" id="rv-detail"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127963; OKF &mdash; read this before you answer it</h3></div>
+    <dl class="deflist" id="okf-note"></dl>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127758; When retrieval works in English and dies in Arabic</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">A real debugging scenario. Six candidate causes; click each to see the evidence that confirms it and the fix. The bar shows roughly how often each one is the actual culprit.</p>
+    <div class="ml-grid">
+      <div id="ml-causes"></div>
+      <div class="ml-detail" id="ml-detail"></div>
+    </div>
+    <div class="lab-pane-title" style="margin-top:18px">Debug in this order</div>
+    <ol class="steps" id="ml-debug"></ol>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>A big window makes RAG cheaper to build, not unnecessary.</b> Cost, latency, permissions, freshness and citations all still point at retrieval.</li>
+      <li><b>You pay for every token, every request.</b> That is the number that ends the argument in most rooms.</li>
+      <li><b>Agentic RAG buys recovery, and pays in variance.</b> Budget the steps and the money, or it will loop.</li>
+      <li><b>GraphRAG answers questions no chunk contains</b> &mdash; themes, relationships, "what changed across the corpus".</li>
+      <li><b>A knowledge fabric is governance, not retrieval.</b> Different layer, different problem, and no reranker substitutes for it.</li>
+      <li><b>Multilingual failure is usually the embedding model.</b> Test one document-question pair with a cosine before you touch anything else.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
 <!-- 16. QUIZ                                                      -->
 <!-- ============================================================= -->
 <section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Finish line">

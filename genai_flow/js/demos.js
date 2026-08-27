@@ -2033,10 +2033,1009 @@ function initRagEval() {
   tabs($('#rev-code-tabs'), $('#rev-codeblk'), C.arEvalCode);
 }
 
+
+/* ============================================================
+   Shared helpers for the deep-dive chapters
+   ============================================================ */
+function cmpTable(host, spec) {
+  if (!host) return;
+  host.innerHTML =
+    '<div class="cmp-wrap"><table class="cmp">' +
+    '<thead><tr><th></th>' + spec.cols.map(c => '<th>' + c + '</th>').join('') + '</tr></thead>' +
+    '<tbody>' + spec.rows.map(r =>
+      '<tr><th scope="row">' + r[0] + '</th>' +
+      r.slice(1).map((c, i) => '<td class="c' + i + '">' + c + '</td>').join('') + '</tr>').join('') +
+    '</tbody></table></div>';
+}
+const bar = (frac, cls) =>
+  '<div class="mini-bar ' + (cls || '') + '"><i style="width:' + Math.max(0, Math.min(100, frac * 100)) + '%"></i></div>';
+const dots = (n, max) => {
+  let s = '';
+  for (let i = 0; i < (max || 5); i++) s += '<i class="' + (i < n ? 'on' : '') + '"></i>';
+  return '<span class="dotscale">' + s + '</span>';
+};
+/* stable per-string pseudo-random in [-1,1] so demos never flicker between renders */
+function seeded(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) / 4294967295) * 2 - 1;
+}
+
+/* ============================================================
+   Ch18 — one transformer block, computed live
+   ============================================================ */
+const TF = {
+  mv: (x, M) => M[0].map((_, j) => x.reduce((s, xi, i) => s + xi * M[i][j], 0)),
+  add: (a, b) => a.map((v, i) => v + b[i]),
+  ln: x => {
+    const m = x.reduce((a, b) => a + b, 0) / x.length;
+    const v = x.reduce((a, b) => a + (b - m) * (b - m), 0) / x.length;
+    const s = Math.sqrt(v + 1e-5);
+    return x.map(e => (e - m) / s);
+  },
+  gelu: z => 0.5 * z * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (z + 0.044715 * z * z * z))),
+  softmax: a => {
+    const m = Math.max.apply(null, a.filter(v => isFinite(v)));
+    const e = a.map(v => isFinite(v) ? Math.exp(v - m) : 0);
+    const s = e.reduce((x, y) => x + y, 0);
+    return e.map(v => v / s);
+  }
+};
+function tfForward(tokens, useFFN) {
+  const M = C.tf, d = 4, n = tokens.length;
+  const emb = tokens.map(t => M.vocab[t]);
+  const X0 = emb.map((e, i) => TF.add(e, M.pos[i]));
+  const Xn = X0.map(TF.ln);
+  const Q = Xn.map(x => TF.mv(x, M.Wq));
+  const K = Xn.map(x => TF.mv(x, M.Wk));
+  const V = Xn.map(x => TF.mv(x, M.Wv));
+  const raw = [], A = [];
+  for (let i = 0; i < n; i++) {
+    const r = [];
+    for (let j = 0; j < n; j++) {
+      r.push(j <= i ? Q[i].reduce((s, q, k) => s + q * K[j][k], 0) / Math.sqrt(d) : -Infinity);
+    }
+    raw.push(r); A.push(TF.softmax(r));
+  }
+  const ctx = A.map(row => row.reduce((acc, w, j) => w > 0 ? TF.add(acc, V[j].map(v => v * w)) : acc, [0, 0, 0, 0]));
+  const attnOut = ctx.map(c => TF.mv(c, M.Wo));
+  const X1 = X0.map((x, i) => TF.add(x, attnOut[i]));
+  let H = null, ffnOut = null, X2 = X1;
+  if (useFFN) {
+    H = X1.map(x => TF.mv(TF.ln(x), M.W1).map((v, j) => TF.gelu(v + M.b1[j])));
+    ffnOut = H.map(h => TF.mv(h, M.W2));
+    X2 = X1.map((x, i) => TF.add(x, ffnOut[i]));
+  }
+  const finalLn = TF.ln(X2[n - 1]);
+  const words = Object.keys(M.vocab);
+  const logits = words.map(w => finalLn.reduce((s, f, i) => s + f * M.vocab[w][i], 0) * M.logitGain);
+  const probs = TF.softmax(logits);
+  return { emb, X0, Xn, Q, K, V, raw, A, ctx, attnOut, X1, H, ffnOut, X2, finalLn, words, logits, probs };
+}
+function initTfBlock() {
+  const archHost = $('#tf-arch'); if (!archHost) return;
+  const M = C.tf;
+  let promptIdx = 0, step = 0, ffn = true, timer = null;
+
+  /* ---- clickable architecture diagram ---- */
+  const ARCH = [
+    { id: 'in',   n: 'token ids',   sub: '[the, cat, sat]', x: 20,  w: 108, c: 'var(--txt-3)',
+      d: 'Text has already been tokenized. From here the model never sees characters again - only integers indexing a 30k-200k row embedding table.', shape: '3 integers', kill: 'Nothing to embed. This is the boundary between your text and the model.' },
+    { id: 'emb',  n: 'embed + pos',  sub: 'lookup + add',   x: 148, w: 108, c: 'var(--violet)',
+      d: 'Each id looks up a row of the embedding matrix, then a position code is ADDED (not concatenated). Modern models rotate position into Q and K instead, at every layer - that is RoPE.', shape: '3 x 4 matrix', kill: 'Without position codes, "cat sat" and "sat cat" are literally the same input. Attention is order-blind by construction.' },
+    { id: 'ln1',  n: 'LayerNorm',    sub: 'stabilise',      x: 276, w: 92,  c: 'var(--txt-2)',
+      d: 'Re-centre to mean 0 and re-scale to variance 1, per vector. Pre-norm (normalise before the sublayer) is what lets you stack 100 blocks without the gradients exploding.', shape: '3 x 4, unchanged', kill: 'Deep stacks stop training. It is not glamorous, it is load-bearing.' },
+    { id: 'attn', n: 'self-attention', sub: 'Q · K -> softmax -> V', x: 388, w: 168, c: 'var(--cyan)',
+      d: 'The only step where information crosses between positions. Each token forms a Query, every token advertises a Key, the dot products become weights, and the Values are averaged with those weights.', shape: '3 x 3 attention + 3 x 4 out', kill: 'Words stop being able to refer to each other. You have a per-token MLP with no context - a bag of words.' },
+    { id: 'r1',   n: '+ residual',   sub: 'x = x + attn(x)', x: 576, w: 108, c: 'var(--green)',
+      d: 'Add the attention output back onto the input. The block EDITS a running document (the residual stream) instead of replacing it, which is why you can delete a middle layer of a big model and it still mostly works.', shape: '3 x 4', kill: 'Gradients die in deep stacks, and every layer has to re-derive everything from scratch.' },
+    { id: 'ln2',  n: 'LayerNorm',    sub: 'stabilise',      x: 20,  y: 120, w: 92, c: 'var(--txt-2)',
+      d: 'Same operation as before, applied to the updated stream before the feed-forward sublayer.', shape: '3 x 4', kill: 'Same as the first one: training instability at depth.' },
+    { id: 'ffn',  n: 'feed-forward', sub: 'up 4x -> GELU -> down', x: 132, y: 120, w: 168, c: 'var(--amber)',
+      d: 'Two linear layers with a non-linearity between them, run independently on every position. Roughly two thirds of the model parameters live here, and this is where factual associations are stored.', shape: '3 x 4 -> 3 x 16 -> 3 x 4', kill: 'The model can route information but knows nothing. The demo below shows exactly this.' },
+    { id: 'r2',   n: '+ residual',   sub: 'x = x + ffn(x)', x: 320, y: 120, w: 108, c: 'var(--green)',
+      d: 'The second residual add. The block is now complete - and a real model repeats this whole picture 32 to 96 times.', shape: '3 x 4', kill: 'Same as the first residual.' },
+    { id: 'rep',  n: 'x N blocks',   sub: '32 - 96 times',  x: 448, y: 120, w: 108, c: 'var(--pink)',
+      d: 'Stacking is where capability comes from. Early layers do syntax and token identity; middle layers do entities and relations; late layers assemble the answer.', shape: 'unchanged shape, richer content', kill: 'One block is a shallow model. Depth is most of what separates a toy from GPT.' },
+    { id: 'head', n: 'unembed',      sub: 'last position only', x: 576, y: 120, w: 128, c: 'var(--violet)',
+      d: 'Take the FINAL position\'s vector, dot it with every row of the vocabulary matrix (often the embedding matrix reused), softmax, and you have a probability for every possible next token.', shape: '4 -> vocab size', kill: 'No output. Note that only the last position is used - all the others were computed purely to be attended to, which is exactly what the KV cache reuses.' }
+  ];
+  function drawArch(sel) {
+    archHost.innerHTML =
+      '<svg viewBox="0 0 720 190" class="arch-svg" id="tf-arch-svg">' +
+      '<defs><marker id="ah" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">' +
+      '<path d="M0,0 L7,3.5 L0,7 z" fill="rgba(255,255,255,.3)"/></marker></defs>' +
+      ARCH.map((b, i) => {
+        const y = b.y || 12, x = b.x;
+        const next = ARCH[i + 1];
+        let line = '';
+        if (next) {
+          const ny = next.y || 12;
+          line = ny === y
+            ? '<line x1="' + (x + b.w) + '" y1="' + (y + 26) + '" x2="' + (next.x - 3) + '" y2="' + (ny + 26) + '" stroke="rgba(255,255,255,.3)" stroke-width="1.4" marker-end="url(#ah)"/>'
+            : '<path d="M' + (x + b.w / 2) + ',' + (y + 52) + ' L' + (x + b.w / 2) + ',' + (y + 74) + ' L' + (next.x + next.w / 2) + ',' + (ny - 22) + ' L' + (next.x + next.w / 2) + ',' + (ny - 3) + '" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="1.4" marker-end="url(#ah)"/>';
+        }
+        return line +
+          '<g class="arch-box' + (sel === b.id ? ' sel' : '') + '" data-id="' + b.id + '" style="--bc:' + b.c + '">' +
+          '<rect x="' + x + '" y="' + y + '" width="' + b.w + '" height="52" rx="11"/>' +
+          '<text x="' + (x + b.w / 2) + '" y="' + (y + 23) + '" class="arch-n">' + b.n + '</text>' +
+          '<text x="' + (x + b.w / 2) + '" y="' + (y + 39) + '" class="arch-s">' + b.sub + '</text></g>';
+      }).join('') + '</svg>';
+    $$('.arch-box', archHost).forEach(g => g.onclick = () => {
+      const b = ARCH.filter(a => a.id === g.dataset.id)[0];
+      drawArch(b.id);
+      $('#tf-arch-detail').innerHTML =
+        '<h4>' + b.n + '</h4><p>' + b.d + '</p>' +
+        '<div class="arch-meta"><span><b>shape here</b> ' + b.shape + '</span></div>' +
+        '<div class="arch-kill"><b>Delete it and:</b> ' + b.kill + '</div>';
+    });
+  }
+  drawArch(null);
+  $('#tf-arch-detail').innerHTML = '<p class="dim">Click any box above.</p>';
+
+  /* ---- prompt chips + step bar ---- */
+  const chips = $('#tf-prompts');
+  M.prompts.forEach((p, i) => {
+    const c = el('button', 'chip' + (i === 0 ? ' active' : ''), p.t.join(' '));
+    c.onclick = () => { promptIdx = i; step = 0; paint(); };
+    chips.appendChild(c);
+  });
+  const stepBar = $('#tf-steps');
+  M.steps.forEach((s, i) => {
+    const b = el('button', 'tf-step', '<b>' + (i + 1) + '</b><span>' + s.n.split(' - ')[1] + '</span>');
+    b.onclick = () => { step = i; paint(); };
+    stepBar.appendChild(b);
+  });
+  const num = (v, p) => (v >= 0 ? ' ' : '') + v.toFixed(p == null ? 2 : p);
+  function matrix(rows, rowLabels, colLabels, hi) {
+    return '<div class="mat"><table><thead><tr><th></th>' +
+      colLabels.map(c => '<th>' + c + '</th>').join('') + '</tr></thead><tbody>' +
+      rows.map((r, i) => '<tr class="' + (hi === i ? 'hi' : '') + '"><th>' + rowLabels[i] + '</th>' +
+        r.map(v => '<td>' + (isFinite(v) ? num(v) : '-inf') + '</td>').join('') + '</tr>').join('') +
+      '</tbody></table></div>';
+  }
+  function paint() {
+    $$('.chip', chips).forEach((c, i) => c.classList.toggle('active', i === promptIdx));
+    $$('.tf-step', stepBar).forEach((b, i) => {
+      b.classList.toggle('active', i === step);
+      b.classList.toggle('done', i < step);
+    });
+    const toks = M.prompts[promptIdx].t;
+    const f = tfForward(toks, true);
+    const s = M.steps[step], D = M.dims, last = toks.length - 1;
+    let body = '';
+    if (s.k === 'embed') {
+      body = '<div class="tf-two">' +
+        matrix(f.emb, toks, D) +
+        matrix(f.X0, toks, D) + '</div>' +
+        '<p class="tf-cap">Left: raw embeddings. Right: after adding the position code. Row ' + (last + 1) +
+        ' is the position that will produce the next token.</p>';
+    } else if (s.k === 'ln1') {
+      body = matrix(f.Xn, toks, D) +
+        '<p class="tf-cap">Each row now has mean 0 and variance 1. Notice no row changed because of any other row - LayerNorm is per-token.</p>';
+    } else if (s.k === 'qkv') {
+      body = '<div class="tf-three">' +
+        '<div><div class="tf-lbl">Q &mdash; what am I looking for</div>' + matrix(f.Q, toks, ['q0','q1','q2','q3'], last) + '</div>' +
+        '<div><div class="tf-lbl">K &mdash; what do I advertise</div>' + matrix(f.K, toks, ['k0','k1','k2','k3']) + '</div>' +
+        '<div><div class="tf-lbl">V &mdash; what I hand over</div>' + matrix(f.V, toks, ['v0','v1','v2','v3']) + '</div></div>' +
+        '<p class="tf-cap">In this toy, Wq reads "how action-like am I" into q0 and Wk reads "how animate are you" into k0. So a verb\'s query lines up with a noun\'s key - that is a verb looking for its subject, and nobody programmed it.</p>';
+    } else if (s.k === 'scores') {
+      body = matrix(f.raw, toks, toks, last) +
+        '<p class="tf-cap">Row i, column j = how much token i wants token j, scaled by 1/sqrt(4). The upper triangle is minus infinity: the causal mask. That single detail is what makes this a language model rather than an encoder.</p>';
+    } else if (s.k === 'softmax') {
+      body = matrix(f.A, toks, toks, last) +
+        '<p class="tf-cap">Every row sums to exactly 1.00. Read row "' + toks[2 % toks.length] + '" and you can see where its attention went.</p>' +
+        '<div class="tf-attnbars">' + f.A[last].map((w, j) =>
+          '<div class="tf-ab"><span>' + toks[j] + '</span>' + bar(w) + '<b>' + (w * 100).toFixed(0) + '%</b></div>').join('') + '</div>';
+    } else if (s.k === 'mix') {
+      body = matrix(f.ctx, toks, D, last) +
+        '<p class="tf-cap">Each row is the attention-weighted average of the V rows. <b>This is the only place in the whole block where information moves between positions.</b></p>';
+    } else if (s.k === 'res1') {
+      body = '<div class="tf-two">' + matrix(f.X0, toks, D) + matrix(f.X1, toks, D, last) + '</div>' +
+        '<p class="tf-cap">Before and after. The attention output was ADDED, not substituted - the original token identity is still in there.</p>';
+    } else if (s.k === 'ffn') {
+      body = '<div class="tf-neurons">' + f.H[last].map((h, i) =>
+        '<div class="tf-neuron' + (h > 0.3 ? ' fire' : '') + '"><b>' + C.tf.neurons[i].n + '</b>' +
+        bar(Math.max(0, h) / 1.6) + '<span>' + h.toFixed(2) + '</span>' +
+        '<small>' + C.tf.neurons[i].d + '</small></div>').join('') + '</div>' +
+        '<p class="tf-cap">Hidden units at the last position. Anything above about 0.3 has fired. Each firing neuron then writes its stored pattern back into the stream - that is what "knowledge" physically is.</p>' +
+        matrix([f.ffnOut[last]], ['written'], D);
+    } else if (s.k === 'res2') {
+      body = '<div class="tf-two">' + matrix(f.X1, toks, D) + matrix(f.X2, toks, D, last) + '</div>' +
+        '<p class="tf-cap">The block is finished. In a real model this output is the input to the next block, 31 more times.</p>';
+    } else if (s.k === 'logits') {
+      const order = f.words.map((w, i) => ({ w: w, p: f.probs[i], l: f.logits[i] })).sort((a, b) => b.p - a.p);
+      body = matrix([f.finalLn], ['final'], D) +
+        '<div class="tf-probs">' + order.map(o =>
+          '<div class="tf-prob"><span>' + o.w + '</span>' + bar(o.p) + '<b>' + (o.p * 100).toFixed(1) + '%</b></div>').join('') + '</div>' +
+        '<p class="tf-cap">Only the last row mattered. Every other position was computed so that this one had something to attend to - which is precisely what a KV cache lets you skip recomputing.</p>';
+    }
+    $('#tf-stage').innerHTML = '<div class="tf-stepname">' + s.n + '</div><p class="tf-stepdesc">' + s.d + '</p>' + body;
+    $('#tf-note').innerHTML = '<b>This prompt:</b> ' + M.prompts[promptIdx].note;
+    paintFfn();
+  }
+  $('#tf-next').onclick = () => { step = Math.min(M.steps.length - 1, step + 1); paint(); if (step === M.steps.length - 1) xp(6, 'You just hand-ran a transformer block'); };
+  $('#tf-prev').onclick = () => { step = Math.max(0, step - 1); paint(); };
+  $('#tf-auto').onclick = function () {
+    if (timer) { clearInterval(timer); timer = null; this.innerHTML = '&#9654; Play the whole block'; return; }
+    step = 0; paint(); this.innerHTML = '&#10073;&#10073; Pause';
+    const btn = this;
+    timer = setInterval(() => {
+      if (step >= M.steps.length - 1) { clearInterval(timer); timer = null; btn.innerHTML = '&#9654; Play the whole block'; xp(6, 'You just hand-ran a transformer block'); return; }
+      step++; paint();
+    }, 1700);
+  };
+
+  /* ---- the FFN on/off proof ---- */
+  const tog = $('#tf-ffn-toggle');
+  tog.onclick = () => { ffn = !ffn; tog.classList.toggle('off', !ffn); paintFfn(); if (!ffn) xp(4, 'Knowledge removed - watch the prediction collapse'); };
+  function paintFfn() {
+    const toks = M.prompts[promptIdx].t;
+    const f = tfForward(toks, ffn), last = toks.length - 1;
+    const order = f.words.map((w, i) => ({ w: w, p: f.probs[i] })).sort((a, b) => b.p - a.p);
+    $('#tf-probs').innerHTML = order.map(o =>
+      '<div class="tf-prob' + (o.p > 0.1 ? ' top' : '') + '"><span>' + o.w + '</span>' + bar(o.p) +
+      '<b>' + (o.p * 100).toFixed(1) + '%</b></div>').join('');
+    $('#tf-neurons').innerHTML = ffn
+      ? f.H[last].map((h, i) => '<div class="tf-neuron' + (h > 0.3 ? ' fire' : '') + '"><b>' + M.neurons[i].n + '</b>' +
+          bar(Math.max(0, h) / 1.6) + '<span>' + h.toFixed(2) + '</span><small>' + M.neurons[i].d + '</small></div>').join('')
+      : '<div class="hyb-empty">Feed-forward disabled - no neurons, no stored knowledge, nothing written back into the stream.</div>';
+    const top = order[0];
+    $('#tf-verdict').innerHTML = ffn
+      ? '<b class="ok">Feed-forward ON &rarr; "' + top.w + '" at ' + (top.p * 100).toFixed(0) + '%.</b> Neuron 5 fired on <i>animate + action</i> and wrote "a place is coming" into the residual stream. That is a stored fact, not a copy of anything in the prompt.'
+      : '<b class="warn">Feed-forward OFF &rarr; "' + top.w + '" at ' + (top.p * 100).toFixed(0) + '%.</b> With only attention, the model can do nothing but echo back what it just looked at. It has routing and no knowledge.';
+  }
+  cmpTable($('#tf-compare'), C.tfCompare);
+  $('#tf-myths').innerHTML = C.tfMyths.map(m => '<dt>' + m[0] + '</dt><dd>' + m[1] + '</dd>').join('');
+  $('#tok-why').innerHTML = C.tokVocabWhy.map(t =>
+    '<div class="tokwhy ' + t.verdict + '"><b>' + t.n + '</b>' +
+    '<div class="tw-pro">+ ' + t.pro + '</div><div class="tw-con">- ' + t.con + '</div></div>').join('');
+  paint();
+}
+
+/* ============================================================
+   Ch19 — decoding controls
+   ============================================================ */
+function applyDecoding(cands, o) {
+  const ctxWords = C.decodeDist.ctx.toLowerCase().split(/\W+/);
+  let rows = cands.map(c => {
+    const seen = ctxWords.indexOf(c.w) >= 0;
+    return { w: c.w, l0: c.l, seen: seen, l: c.l - (seen ? o.rep : 0), killed: null };
+  });
+  if (o.t <= 0) {                                  // greedy
+    let bi = 0; rows.forEach((r, i) => { if (r.l > rows[bi].l) bi = i; });
+    rows.forEach((r, i) => { r.p = i === bi ? 1 : 0; if (i !== bi) r.killed = 'greedy (T=0)'; });
+    return rows;
+  }
+  const scaled = rows.map(r => r.l / o.t);
+  const mx = Math.max.apply(null, scaled);
+  const ex = scaled.map(v => Math.exp(v - mx));
+  const sum = ex.reduce((a, b) => a + b, 0);
+  rows.forEach((r, i) => { r.p = ex[i] / sum; });
+  const order = rows.slice().sort((a, b) => b.p - a.p);
+  if (o.k > 0) order.forEach((r, i) => { if (i >= o.k) r.killed = 'top-k'; });
+  let cum = 0, cut = false;
+  order.forEach(r => {
+    if (r.killed) return;
+    if (cut) { r.killed = 'top-p'; return; }
+    cum += r.p;
+    if (cum >= o.p) cut = true;                    // this token is the last one kept
+  });
+  const alive = rows.filter(r => !r.killed);
+  const z = alive.reduce((a, r) => a + r.p, 0);
+  rows.forEach(r => { r.pf = r.killed ? 0 : r.p / z; });
+  return rows;
+}
+function initDecoding() {
+  const host = $('#dec-controls'); if (!host) return;
+  const D = { t: 0.7, k: 0, p: 0.95, rep: 0.0, maxtok: 300 };
+  let o = Object.assign({}, D);
+  $('#dec-ctx').innerHTML = '<span class="dim">prompt</span> ' + C.decodeDist.ctx + ' <span class="gg-blank"></span>';
+  const SL = [
+    { k: 't',   n: 'temperature', min: 0, max: 2,  step: 0.05, fmt: v => v.toFixed(2) },
+    { k: 'k',   n: 'top-k',       min: 0, max: 12, step: 1,    fmt: v => v === 0 ? 'off' : v },
+    { k: 'p',   n: 'top-p',       min: 0.1, max: 1, step: 0.01, fmt: v => v.toFixed(2) + (v >= 1 ? ' (off)' : '') },
+    { k: 'rep', n: 'repetition penalty', min: 0, max: 2, step: 0.05, fmt: v => v.toFixed(2) }
+  ];
+  host.innerHTML = SL.map(s =>
+    '<div class="ctrl"><label>' + s.n + ' <span class="val" id="dv-' + s.k + '"></span></label>' +
+    '<input type="range" id="ds-' + s.k + '" min="' + s.min + '" max="' + s.max + '" step="' + s.step + '" value="' + o[s.k] + '">' +
+    '</div>').join('') +
+    '<div class="ctrl"><label>max tokens <span class="val" id="dv-maxtok"></span></label>' +
+    '<input type="range" id="ds-maxtok" min="16" max="2048" step="16" value="300"></div>' +
+    '<div class="ctrl"><label>stop sequence</label>' +
+    '<input class="input-line" id="ds-stop" value="\\n\\nUser:" spellcheck="false"></div>';
+  SL.concat([{ k: 'maxtok', fmt: v => v }]).forEach(s => {
+    const inp = $('#ds-' + s.k);
+    inp.oninput = () => { o[s.k] = parseFloat(inp.value); paint(); };
+  });
+  function paint() {
+    SL.forEach(s => $('#dv-' + s.k).textContent = s.fmt(o[s.k]));
+    $('#dv-maxtok').textContent = o.maxtok;
+    const rows = applyDecoding(C.decodeDist.cands, o);
+    const sorted = rows.slice().sort((a, b) => (b.pf || 0) - (a.pf || 0) || b.p - a.p);
+    $('#dec-bars').innerHTML = sorted.map(r =>
+      '<div class="dec-bar' + (r.killed ? ' dead' : '') + '">' +
+      '<span class="dec-w">' + r.w + (r.seen && o.rep > 0 ? ' <i class="dec-pen">penalised</i>' : '') + '</span>' +
+      '<div class="dec-track"><i style="width:' + ((r.pf || 0) * 100).toFixed(1) + '%"></i>' +
+      '<u style="width:' + ((r.p || 0) * 100).toFixed(1) + '%"></u></div>' +
+      '<b>' + (r.killed ? r.killed : ((r.pf || 0) * 100).toFixed(1) + '%') + '</b></div>').join('');
+    const alive = rows.filter(r => !r.killed);
+    const H = -alive.reduce((a, r) => a + (r.pf > 0 ? r.pf * Math.log2(r.pf) : 0), 0);
+    const top = alive.slice().sort((a, b) => b.pf - a.pf)[0] || { w: '-', pf: 0 };
+    $('#dec-stats').innerHTML =
+      '<div class="stat"><div class="stat-v">' + alive.length + '</div><div class="stat-k">survivors</div></div>' +
+      '<div class="stat"><div class="stat-v">' + (top.pf * 100).toFixed(0) + '%</div><div class="stat-k">top token</div></div>' +
+      '<div class="stat"><div class="stat-v">' + H.toFixed(2) + '</div><div class="stat-k">entropy (bits)</div></div>' +
+      '<div class="stat"><div class="stat-v">' + Math.pow(2, H).toFixed(1) + '</div><div class="stat-k">effective choices</div></div>';
+    let note;
+    if (o.t <= 0) note = '<b>Greedy.</b> One survivor, always the same token. Correct for extraction and SQL; disastrous for anything you wanted variety from - and it makes self-consistency voting impossible, because all five samples are identical.';
+    else if (o.t >= 1.5) note = '<b>Very hot.</b> Look at the tail: "weather", "poem" and "banana" now have real probability. This is exactly how a model ends up writing something fluent and completely untethered.';
+    else if (o.k > 0 && o.k <= 3) note = '<b>Tight top-k.</b> You have hard-capped the pool by rank. Fine here, but on a genuinely uncertain step k=3 throws away good options you needed.';
+    else if (o.p < 0.6) note = '<b>Tight nucleus.</b> Only the tokens covering ' + (o.p * 100).toFixed(0) + '% of the mass survive. The set shrinks by itself when the model is confident - that adaptivity is the whole argument for top-p over top-k.';
+    else if (o.rep >= 1) note = '<b>Heavy repetition penalty.</b> Words already in the prompt are being pushed down hard. Great for stopping loops in prose; ruinous for code and JSON, where repeating a token is the correct behaviour.';
+    else note = '<b>A sane default.</b> Around 12 real candidates collapse to a handful. This is roughly what temperature 0.7 with top-p 0.95 does on every chat request you have ever made.';
+    $('#dec-note').innerHTML = note;
+  }
+  $('#dec-sample').onclick = () => {
+    const rows = applyDecoding(C.decodeDist.cands, o).filter(r => !r.killed);
+    const draws = [];
+    for (let i = 0; i < 20; i++) {
+      let r = Math.random(), acc = 0, pick = rows[rows.length - 1];
+      for (const c of rows) { acc += c.pf; if (r <= acc) { pick = c; break; } }
+      draws.push(pick.w);
+    }
+    const counts = {};
+    draws.forEach(d => counts[d] = (counts[d] || 0) + 1);
+    $('#dec-draws').innerHTML = '<div class="lab-pane-title">20 draws at these settings</div>' +
+      '<div class="dec-draw-row">' + draws.map((d, i) =>
+        '<span class="dec-draw" style="animation-delay:' + (i * 45) + 'ms">' + d + '</span>').join('') + '</div>' +
+      '<div class="dec-uniq">' + Object.keys(counts).length + ' distinct tokens in 20 draws' +
+      (Object.keys(counts).length === 1 ? ' &mdash; the sampler is effectively deterministic here.' : '.') + '</div>';
+    xp(3);
+  };
+  $('#dec-reset').onclick = () => {
+    o = Object.assign({}, D);
+    SL.forEach(s => $('#ds-' + s.k).value = o[s.k]);
+    $('#ds-maxtok').value = o.maxtok;
+    $('#dec-draws').innerHTML = ''; paint();
+  };
+  $('#dec-knobs').innerHTML = C.decodeKnobs.map(k =>
+    '<div class="knob"><b>' + k.n + '</b>' +
+    '<div class="knob-lay"><span>plain English</span>' + k.lay + '</div>' +
+    '<div class="knob-tech"><span>technically</span>' + k.d + '</div>' +
+    '<div class="knob-when"><span>use it</span>' + k.when + '</div></div>').join('');
+  $('#dec-recipes').innerHTML = C.decodeRecipes.map((r, i) =>
+    '<button class="recipe" data-i="' + i + '"><b>' + r.n + '</b>' +
+    '<code>temperature=' + r.t + ' &nbsp; top_p=' + r.p + ' &nbsp; penalty=' + r.rep + '</code>' +
+    '<span>' + r.why + '</span></button>').join('');
+  $$('#dec-recipes .recipe').forEach(b => b.onclick = () => {
+    const r = C.decodeRecipes[+b.dataset.i];
+    o.t = r.t; o.k = r.k; o.p = r.p; o.rep = r.rep;
+    SL.forEach(s => $('#ds-' + s.k).value = o[s.k]);
+    $$('#dec-recipes .recipe').forEach(x => x.classList.toggle('active', x === b));
+    paint(); xp(3);
+  });
+  $('#dec-traps').innerHTML = C.decodeTraps.map(t => '<dt>' + t[0] + '</dt><dd>' + t[1] + '</dd>').join('');
+  paint();
+}
+
+/* ============================================================
+   Ch20 — chunking
+   ============================================================ */
+function sentencesOf(text) {
+  return (text.match(/[^.!?]+[.!?]+/g) || [text]).map(s => s.trim()).filter(Boolean);
+}
+function bow(s) {
+  const m = {};
+  (s.toLowerCase().match(/[a-z]+/g) || []).forEach(w => { if (w.length > 2) m[w] = (m[w] || 0) + 1; });
+  return m;
+}
+function bowCos(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (const k in a) { na += a[k] * a[k]; if (b[k]) dot += a[k] * b[k]; }
+  for (const k in b) nb += b[k] * b[k];
+  return (na && nb) ? dot / Math.sqrt(na * nb) : 0;
+}
+function chunkWith(id) {
+  const doc = C.chunkDoc;
+  const flat = doc.map(d => d.text).join(' ');
+  const out = [];
+  if (id === 'fixed' || id === 'overlap') {
+    const size = 300, ov = id === 'overlap' ? 60 : 0;
+    for (let i = 0; i < flat.length; i += (size - ov)) {
+      out.push({ text: flat.slice(i, i + size), meta: 'chars ' + i + '-' + Math.min(flat.length, i + size) });
+      if (i + size >= flat.length) break;
+    }
+  } else if (id === 'recursive') {
+    let buf = '';
+    doc.forEach(d => {
+      const unit = (d.tag === 'h1' || d.tag === 'h2') ? d.text + '. ' : d.text + ' ';
+      if ((buf + unit).length > 300 && buf) {
+        if (unit.length > 300) {
+          out.push({ text: buf.trim(), meta: 'paragraph split' }); buf = '';
+          sentencesOf(unit).forEach(s => {
+            if ((buf + s).length > 300 && buf) { out.push({ text: buf.trim(), meta: 'sentence split' }); buf = ''; }
+            buf += s + ' ';
+          });
+        } else { out.push({ text: buf.trim(), meta: 'paragraph split' }); buf = unit; }
+      } else buf += unit;
+    });
+    if (buf.trim()) out.push({ text: buf.trim(), meta: 'paragraph split' });
+  } else if (id === 'document' || id === 'parent') {
+    let head = '', cur = null;
+    doc.forEach(d => {
+      if (d.tag === 'h1') { head = d.text; return; }
+      if (d.tag === 'h2') { if (cur) out.push(cur); cur = { text: '', meta: head + ' > ' + d.text, path: head + ' > ' + d.text }; return; }
+      if (!cur) cur = { text: '', meta: head, path: head };
+      cur.text += (cur.text ? ' ' : '') + d.text;
+    });
+    if (cur) out.push(cur);
+    if (id === 'parent') {
+      const kids = [];
+      out.forEach((p, pi) => sentencesOf(p.text).forEach(s =>
+        kids.push({ text: s, meta: 'child of #' + (pi + 1), parent: pi, parentText: p.text, path: p.path })));
+      return { chunks: kids, parents: out };
+    }
+  } else if (id === 'semantic') {
+    const sents = [];
+    doc.forEach(d => { if (d.tag === 'p') sentencesOf(d.text).forEach(s => sents.push(s)); });
+    let cur = [], prev = null;
+    sents.forEach(s => {
+      const v = bow(s);
+      const sim = prev ? bowCos(prev, v) : 1;
+      if (prev && sim < 0.06 && cur.length) { out.push({ text: cur.join(' '), meta: 'topic shift (cos ' + sim.toFixed(2) + ')' }); cur = []; }
+      cur.push(s); prev = v;
+    });
+    if (cur.length) out.push({ text: cur.join(' '), meta: 'final segment' });
+  }
+  return { chunks: out, parents: null };
+}
+function initChunking() {
+  const tabs = $('#chunk-tabs'); if (!tabs) return;
+  let sel = 'recursive';
+  C.chunkStrategies.forEach(s => {
+    const b = el('button', 'chip' + (s.id === sel ? ' active' : ''), s.icon + ' ' + s.n);
+    b.dataset.id = s.id;                       // identify by data, not by DOM position
+    b.onclick = () => { sel = s.id; paint(); xp(2); };
+    tabs.appendChild(b);
+  });
+  /* the probe: an answer that needs BOTH halves of one sentence pair */
+  const NEED = ['5 to 10 business days', 'issuing bank'];
+  function paint() {
+    $$('.chip', tabs).forEach(b => b.classList.toggle('active', b.dataset.id === sel));
+    const S = C.chunkStrategies.filter(s => s.id === sel)[0];
+    const r = chunkWith(sel);
+    const cs = r.chunks;
+    $('#chunk-doc').innerHTML = cs.map((c, i) =>
+      '<div class="chunk" style="animation-delay:' + (i * 60) + 'ms">' +
+      '<div class="chunk-h"><b>chunk ' + (i + 1) + '</b><span>' + c.text.length + ' chars</span></div>' +
+      '<div class="chunk-t">' + c.text + '</div>' +
+      '<div class="chunk-m">' + c.meta + '</div></div>').join('');
+    const lens = cs.map(c => c.text.length);
+    const avg = Math.round(lens.reduce((a, b) => a + b, 0) / lens.length);
+    const broken = cs.filter(c => !/^[A-Z0-9]/.test(c.text.trim())).length;
+    $('#chunk-stats').innerHTML =
+      '<div class="stat"><div class="stat-v">' + cs.length + '</div><div class="stat-k">chunks</div></div>' +
+      '<div class="stat"><div class="stat-v">' + avg + '</div><div class="stat-k">avg chars</div></div>' +
+      '<div class="stat"><div class="stat-v">' + Math.min.apply(null, lens) + '-' + Math.max.apply(null, lens) + '</div><div class="stat-k">min-max</div></div>' +
+      '<div class="stat"><div class="stat-v ' + (broken ? 'bad' : 'good') + '">' + broken + '</div><div class="stat-k">start mid-sentence</div></div>';
+    $('#chunk-detail').innerHTML =
+      '<h4>' + S.icon + ' ' + S.n + '</h4>' +
+      '<div class="knob-lay"><span>plain English</span>' + S.lay + '</div>' +
+      '<div class="knob-tech"><span>technically</span>' + S.tech + '</div>' +
+      '<div class="cc-good"><b>Good for</b> ' + S.good + '</div>' +
+      '<div class="cc-bad"><b>Breaks on</b> ' + S.bad + '</div>' +
+      '<div class="cc-param"><b>typical setting</b> <code>' + S.param + '</code></div>';
+    /* probe */
+    const answering = cs.filter(c => {
+      const t = sel === 'parent' ? c.parentText : c.text;
+      return NEED.every(n => t.indexOf(n) >= 0);
+    });
+    const partial = cs.filter(c => NEED.some(n => c.text.indexOf(n) >= 0)).length;
+    $('#chunk-probe').innerHTML =
+      '<div class="probe-q"><b>Probe question:</b> "How long do card refunds take, and whose fault is the delay?"' +
+      '<small>Needs both "5 to 10 business days" and "issuing bank" in the SAME retrieved unit.</small></div>' +
+      (answering.length
+        ? '<div class="hyb-ok"><b>Answerable.</b> ' + answering.length + ' chunk' + (answering.length > 1 ? 's contain' : ' contains') +
+          ' the whole answer' + (sel === 'parent' ? ' once the parent is expanded - the child that matched is tiny, the parent that is returned is complete.' : '.') + '</div>'
+        : '<div class="hyb-warn"><b>Split.</b> The answer is spread across ' + partial + ' chunks and no single retrieved unit can answer it. ' +
+          'This is the single most common cause of "the model said it did not know" in production RAG.</div>');
+  }
+  /* comparison table built from the strategy list */
+  cmpTable($('#chunk-compare'), {
+    cols: C.chunkStrategies.map(s => s.n),
+    rows: [
+      ['Cuts on'].concat(C.chunkStrategies.map(s => s.param)),
+      ['Index cost'].concat(['lowest', 'low', 'low', 'medium - needs a parser', 'high - one embedding per sentence', 'medium - two stores']),
+      ['Respects meaning'].concat(['no', 'barely', 'punctuation only', 'structure', 'yes', 'via the parent']),
+      ['Best for'].concat(C.chunkStrategies.map(s => s.good.split('.')[0])),
+      ['Main failure'].concat(C.chunkStrategies.map(s => s.bad.split('.')[0]))
+    ]
+  });
+  /* parent-child diagram */
+  const pc = chunkWith('parent');
+  $('#chunk-pc').innerHTML =
+    '<div class="pc-wrap"><div class="pc-col"><div class="pc-lbl">children &mdash; indexed &amp; searched</div>' +
+    pc.chunks.slice(0, 7).map((c, i) =>
+      '<div class="pc-child" data-p="' + c.parent + '">' + c.text.slice(0, 62) + (c.text.length > 62 ? '...' : '') +
+      '<small>' + c.text.length + ' chars</small></div>').join('') + '</div>' +
+    '<div class="pc-arrow">&rarr;<small>return the parent</small></div>' +
+    '<div class="pc-col"><div class="pc-lbl">parents &mdash; stored &amp; returned to the LLM</div>' +
+    pc.parents.map((p, i) =>
+      '<div class="pc-parent" data-i="' + i + '"><b>' + p.path + '</b>' + p.text +
+      '<small>' + p.text.length + ' chars</small></div>').join('') + '</div></div>';
+  $$('#chunk-pc .pc-child').forEach(c => {
+    c.onmouseenter = () => {
+      $$('#chunk-pc .pc-parent').forEach(p => p.classList.toggle('lit', p.dataset.i === c.dataset.p));
+      c.classList.add('lit');
+    };
+    c.onmouseleave = () => {
+      $$('#chunk-pc .pc-parent,#chunk-pc .pc-child').forEach(p => p.classList.remove('lit'));
+    };
+  });
+  $('#chunk-extras').innerHTML = C.chunkExtras.map(e => '<dt>' + e[0] + '</dt><dd>' + e[1] + '</dd>').join('');
+  paint();
+}
+
+/* ============================================================
+   Ch21 — the fine-tuning menu
+   ============================================================ */
+function ftRecommend(a) {
+  const [problem, data, gpu, verif] = a;
+  if (!problem) return null;
+  if (problem === 'facts') return { pick: 'rag', why: 'Wrong facts is a knowledge problem, and fine-tuning is the most expensive way to build a bad search engine. Facts change; weights do not. Retrieve them.', also: ['prompt'] };
+  if (problem === 'cost') return { pick: 'distil', why: 'The behaviour is already right, so nothing needs to be taught - only made cheaper. Capture the expensive pipeline\'s outputs and train a small student on them. Try a smaller model with a better prompt first; it is free.', also: ['prompt'] };
+  if (problem === 'reason') {
+    if (verif === 'verifiable') return { pick: 'grpo', why: 'Multi-step reasoning with an automatic scorer is exactly what GRPO was built for: sample a group of attempts, mark them all, push toward whatever beat the group average. No critic network needed.', also: ['sft'] };
+    return { pick: 'dpo', why: 'Reasoning quality that only a human can judge is a preference problem. Collect (chosen, rejected) pairs and run DPO - far less machinery than PPO for most of the benefit.', also: ['prompt'] };
+  }
+  /* problem === 'form' */
+  if (data === 'tiny') return { pick: 'prompt', why: 'Under 50 examples is not a training set, it is a few-shot prompt. Put your best 5-10 examples in the system prompt and measure. Most "we need a fine-tune" tickets die right here.', also: ['rag'] };
+  if (gpu === 'none') return { pick: 'prompt', why: 'With no training hardware your options are a hosted fine-tuning API or better prompting. Exhaust prompting and RAG first - and if you do use a hosted tune, it is almost certainly LoRA under the hood anyway.', also: ['rag'] };
+  if (data === 'big' && gpu === 'cluster') return { pick: 'sft', why: 'Over 50k clean pairs and a multi-GPU node is the one situation where full supervised fine-tuning genuinely beats LoRA. Even here, run a LoRA baseline first - it is a day of work and it often wins.', also: ['lora'] };
+  if (gpu === 'consumer') return { pick: 'qlora', why: 'One consumer card means the 16-bit base will not fit. Load it in 4-bit NF4 and train adapters on top. This is the difference between "cannot train" and "trains overnight".', also: ['lora'] };
+  return { pick: 'lora', why: 'Form and style, a real but modest dataset, and a proper GPU - this is the default answer in 2024 and later. Adapters are small, swappable per customer, and merge back into the base with zero added inference latency.', also: ['qlora'] };
+}
+function initTuning() {
+  const host = $('#ft-quiz'); if (!host) return;
+  const ans = [null, null, null, null];
+  host.innerHTML = C.ftDecision.map((q, qi) =>
+    '<div class="ftq"><div class="ftq-q">' + (qi + 1) + '. ' + q.q + '</div><div class="ftq-a">' +
+    q.a.map((a, ai) => '<button class="ftq-opt" data-q="' + qi + '" data-v="' + a.v + '">' + a.t + '</button>').join('') +
+    '</div></div>').join('');
+  $$('.ftq-opt', host).forEach(b => b.onclick = () => {
+    const qi = +b.dataset.q;
+    ans[qi] = b.dataset.v;
+    $$('.ftq-opt[data-q="' + qi + '"]', host).forEach(x => x.classList.toggle('active', x === b));
+    verdict();
+  });
+  function verdict() {
+    const r = ftRecommend(ans);
+    if (!r) { $('#ft-verdict').innerHTML = '<p class="dim">Answer question 1 to get a recommendation.</p>'; return; }
+    const m = C.ftMethods.filter(x => x.id === r.pick)[0];
+    const alt = r.also.map(id => C.ftMethods.filter(x => x.id === id)[0]);
+    $('#ft-verdict').innerHTML =
+      '<div class="ftv-head"><span class="ftv-k">recommended</span><b>' + m.n + '</b>' +
+      '<span class="pill ' + (m.fam === 'no training' ? 'good' : 'bad') + '">' + m.fam + '</span></div>' +
+      '<p class="ftv-why">' + r.why + '</p>' +
+      '<div class="ftv-facts"><span><b>data</b> ' + m.data + '</span><span><b>hardware</b> ' + m.gpu +
+      '</span><span><b>time</b> ' + m.time + '</span></div>' +
+      '<div class="ftv-alt"><b>Also consider:</b> ' + alt.map(a => a.n).join(', ') + '</div>' +
+      '<div class="ftv-stop"><b>Stop and reconsider if:</b> ' + m.stop + '</div>';
+    if (ans.every(Boolean)) xp(6, 'Fine-tuning decision: ' + m.n);
+  }
+  verdict();
+
+  cmpTable($('#lq-compare'), C.loraVsQlora);
+  $('#lq-verdict').innerHTML = '<b>Verdict.</b> ' + C.loraVsQlora.verdict;
+
+  /* ---- LoRA diagram with a live rank ---- */
+  function drawLora(r) {
+    const w = Math.max(4, Math.round(r * 1.6));
+    $('#lora-diagram').innerHTML =
+      '<div class="lora-rank"><label>rank r = <b id="lr-val">' + r + '</b></label>' +
+      '<input type="range" id="lr" min="2" max="64" step="2" value="' + r + '"></div>' +
+      '<svg viewBox="0 0 620 210" class="arch-svg lora-svg">' +
+      '<g class="lora-frozen"><rect x="40" y="30" width="120" height="120" rx="8"/>' +
+      '<text x="100" y="85" class="arch-n">W</text><text x="100" y="102" class="arch-s">frozen 4096x4096</text>' +
+      '<text x="100" y="170" class="lora-cap">16.8M params &middot; never updated</text></g>' +
+      '<text x="185" y="95" class="lora-op">+</text>' +
+      '<g class="lora-train"><rect x="215" y="30" width="' + w + '" height="120" rx="4"/>' +
+      '<text x="' + (215 + w / 2) + '" y="170" class="lora-cap">A</text></g>' +
+      '<text x="' + (228 + w) + '" y="95" class="lora-op">x</text>' +
+      '<g class="lora-train"><rect x="' + (248 + w) + '" y="' + (90 - w / 2) + '" width="120" height="' + w + '" rx="4"/>' +
+      '<text x="' + (308 + w) + '" y="170" class="lora-cap">B</text></g>' +
+      '<text x="' + (382 + w) + '" y="95" class="lora-op">=</text>' +
+      '<g class="lora-delta"><rect x="' + (408 + w) + '" y="30" width="120" height="120" rx="8"/>' +
+      '<text x="' + (468 + w) + '" y="85" class="arch-n">&Delta;W</text>' +
+      '<text x="' + (468 + w) + '" y="102" class="arch-s">4096x4096</text>' +
+      '<text x="' + (468 + w) + '" y="170" class="lora-cap">' + ((2 * r * 4096) / 1e6).toFixed(2) + 'M trained &middot; ' +
+      ((2 * r * 4096) / 16777216 * 100).toFixed(2) + '% of W</text></g>' +
+      '<text x="310" y="200" class="lora-note">A is 4096 x r, B is r x 4096. Their product has the full shape of W but only ' +
+      (2 * r * 4096).toLocaleString() + ' free parameters - that is the entire idea.</text>' +
+      '</svg>';
+    $('#lr').oninput = e => drawLora(+e.target.value);
+  }
+  drawLora(16);
+
+  /* ---- exact parameter arithmetic ---- */
+  const P = C.loraMath;
+  const ffnDim = { 'Llama-3 8B': 14336, 'Llama-3 70B': 28672, 'Mistral 7B': 14336 };
+  $('#lora-calc').innerHTML =
+    '<label>model<select id="lc-model">' + P.presets.map((p, i) => '<option value="' + i + '">' + p.n + '</option>').join('') + '</select></label>' +
+    '<label>rank r <span class="val" id="lc-rv">16</span><input type="range" id="lc-r" min="4" max="128" step="4" value="16"></label>' +
+    '<label>adapt<select id="lc-t">' + P.targets.map((t, i) => '<option value="' + i + '">' + t.n + '</option>').join('') + '</select></label>';
+  function calc() {
+    const m = P.presets[+$('#lc-model').value], r = +$('#lc-r').value, t = P.targets[+$('#lc-t').value];
+    $('#lc-rv').textContent = r;
+    const d = m.d, ff = ffnDim[m.n] || d * 4;
+    let per;
+    if (t.id === 'qv') per = 2 * r * 2 * d;
+    else if (t.id === 'qkvo') per = 4 * r * 2 * d;
+    else per = 4 * r * 2 * d + 3 * r * (d + ff);
+    const total = per * m.layers;
+    const pct = total / m.base * 100;
+    const adapterMB = total * 2 / 1048576;
+    const fullVram = m.base * 16 / 1073741824;
+    const loraVram = (m.base * 2 + total * 16) / 1073741824 + 4;
+    const qloraVram = (m.base * 0.55 + total * 16) / 1073741824 + 4;
+    $('#lora-stats').innerHTML =
+      '<div class="stat"><div class="stat-v">' + (total / 1e6).toFixed(1) + 'M</div><div class="stat-k">trainable params</div></div>' +
+      '<div class="stat"><div class="stat-v">' + pct.toFixed(3) + '%</div><div class="stat-k">of the base model</div></div>' +
+      '<div class="stat"><div class="stat-v">' + adapterMB.toFixed(0) + ' MB</div><div class="stat-k">adapter file (fp16)</div></div>' +
+      '<div class="stat"><div class="stat-v">' + fullVram.toFixed(0) + ' GB</div><div class="stat-k">full SFT needs</div></div>' +
+      '<div class="stat"><div class="stat-v">' + loraVram.toFixed(0) + ' GB</div><div class="stat-k">LoRA needs</div></div>' +
+      '<div class="stat"><div class="stat-v good">' + qloraVram.toFixed(0) + ' GB</div><div class="stat-k">QLoRA needs</div></div>';
+    $('#lora-note').innerHTML =
+      '<b>Read that again.</b> You are training <b>' + pct.toFixed(3) + '%</b> of ' + m.n +
+      ' and shipping a <b>' + adapterMB.toFixed(0) + ' MB</b> file instead of a ' + (m.base * 2 / 1e9).toFixed(0) +
+      ' GB one. Full fine-tuning would need about ' + fullVram.toFixed(0) + ' GB of VRAM (weights + gradients + two Adam moments); ' +
+      'QLoRA gets you to roughly ' + qloraVram.toFixed(0) + ' GB. ' +
+      '<span class="dim">Simplifications: grouped-query attention makes k and v projections smaller than shown, activation memory depends on batch and sequence length, and 4 GB is assumed for activations.</span>';
+  }
+  ['#lc-model', '#lc-r', '#lc-t'].forEach(s => { $(s).oninput = calc; $(s).onchange = calc; });
+  calc();
+
+  /* ---- all nine method cards ---- */
+  const famCol = { 'no training': 'var(--green)', training: 'var(--cyan)', preference: 'var(--violet)', compress: 'var(--amber)' };
+  $('#ft-grid').innerHTML = C.ftMethods.map(m =>
+    '<button class="ftcard" data-id="' + m.id + '" style="--fc:' + famCol[m.fam] + '">' +
+    '<span class="ftcard-fam">' + m.fam + '</span><b>' + m.n + '</b>' +
+    '<span class="ftcard-what">' + m.what.split('.')[0] + '.</span>' +
+    '<span class="ftcard-scales">cost ' + dots(m.cost) + ' quality ' + dots(m.quality) + '</span></button>').join('');
+  $$('#ft-grid .ftcard').forEach(b => b.onclick = () => {
+    const m = C.ftMethods.filter(x => x.id === b.dataset.id)[0];
+    $$('#ft-grid .ftcard').forEach(x => x.classList.toggle('active', x === b));
+    $('#ft-detail').innerHTML =
+      '<h4>' + m.n + '</h4>' +
+      '<div class="knob-lay"><span>plain English</span>' + m.lay + '</div>' +
+      '<div class="knob-tech"><span>technically</span>' + m.what + '</div>' +
+      '<div class="ftv-facts"><span><b>data</b> ' + m.data + '</span><span><b>hardware</b> ' + m.gpu +
+      '</span><span><b>time</b> ' + m.time + '</span><span><b>risk</b> ' + dots(m.risk) + '</span></div>' +
+      '<div class="cc-good"><b>Use when</b> ' + m.use + '</div>' +
+      '<div class="cc-bad"><b>Do not use when</b> ' + m.stop + '</div>';
+    xp(2);
+  });
+  $('#ft-detail').innerHTML = '<p class="dim">Click a method above for the full card.</p>';
+}
+
+/* ============================================================
+   Ch22 — LLM as a judge
+   ============================================================ */
+function judgeRun(active) {
+  const on = id => active.indexOf(id) >= 0;
+  let agree = 0;
+  const rows = C.judgeBench.map(c => {
+    const truth = c.better === 'A' ? 1 : c.better === 'B' ? -1 : 0;
+    /* the judge's actual signal - improved by rubric/reference/pairwise/cot */
+    let signalW = 0.35;
+    if (on('rubric')) signalW += 0.30;
+    if (on('reference')) signalW += 0.30;
+    if (on('pairwise')) signalW += 0.25;
+    if (on('cot')) signalW += 0.20;
+    let v = truth * signalW;
+    if (!on('swap')) v += 0.60;                                    // position bias, favours A
+    v += (c.lenA - c.lenB) * (on('lenpen') ? 0.35 : 1.20);         // verbosity bias
+    if (!on('diffjudge')) v += 0.30;                               // self-preference, favours A
+    const noise = seeded(c.id + active.join('')) * (on('consist') ? 0.08 : 0.25);
+    v += noise;
+    if (!on('rubric')) v += seeded(c.id + 'drift') * 0.20;         // scale drift
+    const said = v > 0.18 ? 'A' : v < -0.18 ? 'B' : 'tie';
+    const ok = said === c.better;
+    if (ok) agree++;
+    return { c: c, said: said, ok: ok, v: v };
+  });
+  return { rows: rows, agree: agree / C.judgeBench.length };
+}
+function initJudge() {
+  const host = $('#judge-mits'); if (!host) return;
+  let active = [];
+  host.innerHTML = '<div class="lab-pane-title">Mitigations</div>' + C.judgeConfigs.map(m =>
+    '<label class="toggle judge-mit-row off" data-id="' + m.id + '"><span class="toggle-box">&#10003;</span>' +
+    '<span><b>' + m.n + '</b><small>' + m.d + '</small></span></label>').join('') +
+    '<div class="btn-row"><button class="btn btn-ghost" id="judge-all">Turn everything on</button>' +
+    '<button class="btn btn-ghost" id="judge-none">Naive judge</button></div>';
+  $$('.judge-mit-row', host).forEach(r => r.onclick = () => {
+    const id = r.dataset.id, i = active.indexOf(id);
+    if (i >= 0) active.splice(i, 1); else active.push(id);
+    paint();
+  });
+  $('#judge-all').onclick = () => { active = C.judgeConfigs.map(c => c.id); paint(); xp(5, 'A judge you could actually ship'); };
+  $('#judge-none').onclick = () => { active = []; paint(); };
+  function paint() {
+    $$('.judge-mit-row', host).forEach(r => r.classList.toggle('off', active.indexOf(r.dataset.id) < 0));
+    const r = judgeRun(active);
+    const pct = Math.round(r.agree * 100);
+    /* kappa against a 3-class judgement with the observed marginal - illustrative, computed */
+    const pe = 1 / 3;
+    const kappa = (r.agree - pe) / (1 - pe);
+    const aWins = r.rows.filter(x => x.said === 'A').length;
+    $('#judge-stats').innerHTML =
+      '<div class="stat"><div class="stat-v ' + (pct >= 85 ? 'good' : pct >= 60 ? '' : 'bad') + '">' + pct + '%</div><div class="stat-k">agrees with humans</div></div>' +
+      '<div class="stat"><div class="stat-v ' + (kappa >= 0.6 ? 'good' : 'bad') + '">' + kappa.toFixed(2) + '</div><div class="stat-k">kappa (>0.6 usable)</div></div>' +
+      '<div class="stat"><div class="stat-v">' + aWins + '/8</div><div class="stat-k">picked position A</div></div>' +
+      '<div class="stat"><div class="stat-v">' + active.length + '</div><div class="stat-k">mitigations on</div></div>';
+    $('#judge-rows').innerHTML = r.rows.map(x =>
+      '<div class="jrow ' + (x.ok ? 'ok' : 'bad') + '">' +
+      '<div class="jrow-q">' + x.c.q + '</div>' +
+      '<div class="jrow-v"><span>human</span><b>' + x.c.better + '</b></div>' +
+      '<div class="jrow-v"><span>judge</span><b>' + x.said + '</b></div>' +
+      '<div class="jrow-m">' + (x.ok ? '&#10003;' : '&#10007;') + '</div>' +
+      '<div class="jrow-a"><em>A:</em> ' + x.c.ansA + '<br><em>B:</em> ' + x.c.ansB + '</div></div>').join('');
+    let note;
+    if (!active.length) note = '<b>The naive judge.</b> No rubric, no swap, no reference. It is picking A far more often than it should, it rewards the longer answer, and the same input would score differently tomorrow. This is what "we added an LLM judge" means before anyone measures it.';
+    else if (active.length >= 7) note = '<b>A judge you could defend in a review.</b> Every known bias has a named counter-measure applied. It costs roughly 6x a naive judge - two runs for the swap, three samples for consistency - which is still far cheaper than a human, and now the number means something.';
+    else note = '<b>Getting better.</b> Note which mitigation moved the number most: position swap is usually the biggest single jump, and it is also the easiest to implement.';
+    $('#judge-note').innerHTML = note;
+  }
+
+  /* bias map */
+  $('#judge-bias-map').innerHTML = '<div class="bias-grid">' + C.judgeBiases.map(b =>
+    '<button class="bias" data-id="' + b.id + '"><b>' + b.n + '</b><span>' + b.d + '</span></button>').join('') + '</div>';
+  $$('#judge-bias-map .bias').forEach(b => b.onclick = () => {
+    const bias = C.judgeBiases.filter(x => x.id === b.dataset.id)[0];
+    const fixes = C.judgeConfigs.filter(c => c.fixes.indexOf(bias.id) >= 0);
+    $$('#judge-bias-map .bias').forEach(x => x.classList.toggle('active', x === b));
+    $('#judge-bias-detail').innerHTML =
+      '<h4>' + bias.n + '</h4><p>' + bias.d + '</p>' +
+      '<div class="arch-kill"><b>Kill it with:</b> ' + (fixes.length ? fixes.map(f => '<b>' + f.n + '</b> &mdash; ' + f.d).join('<br>') : 'nothing in this list; escalate to human review') + '</div>';
+    xp(2);
+  });
+  $('#judge-bias-detail').innerHTML = '<p class="dim">Click a bias.</p>';
+
+  /* eval methods comparison */
+  cmpTable($('#eval-methods'), {
+    cols: C.evalMethods.map(m => m.n),
+    rows: [
+      ['In plain English'].concat(C.evalMethods.map(m => m.lay)),
+      ['How'].concat(C.evalMethods.map(m => m.tech)),
+      ['Cost'].concat(C.evalMethods.map(m => dots(m.cost))),
+      ['Covers open-ended'].concat(C.evalMethods.map(m => dots(m.cover))),
+      ['Trust the number'].concat(C.evalMethods.map(m => dots(m.trust))),
+      ['Use for'].concat(C.evalMethods.map(m => m.use)),
+      ['Where it lies'].concat(C.evalMethods.map(m => m.fail))
+    ]
+  });
+
+  /* eval pyramid */
+  const P = C.evalPyramid;
+  $('#eval-pyramid').innerHTML = '<svg viewBox="0 0 460 250" class="arch-svg pyr">' +
+    P.map((l, i) => {
+      const y = 20 + i * 55, wTop = 90 + i * 90, wBot = 90 + (i + 1) * 90;
+      const cx = 230;
+      return '<g class="pyr-l" data-i="' + i + '">' +
+        '<path d="M' + (cx - wTop / 2) + ',' + y + ' L' + (cx + wTop / 2) + ',' + y +
+        ' L' + (cx + wBot / 2) + ',' + (y + 48) + ' L' + (cx - wBot / 2) + ',' + (y + 48) + ' Z"/>' +
+        '<text x="' + cx + '" y="' + (y + 28) + '" class="pyr-t">' + l.n + '</text>' +
+        '<text x="' + cx + '" y="' + (y + 42) + '" class="pyr-s">' + l.pct + '</text></g>';
+    }).join('') + '</svg>';
+  $$('#eval-pyramid .pyr-l').forEach(g => {
+    const show = () => {
+      const l = P[+g.dataset.i];
+      $$('#eval-pyramid .pyr-l').forEach(x => x.classList.toggle('sel', x === g));
+      $('#eval-pyramid-detail').innerHTML = '<h4>' + l.n + ' <span class="dim">' + l.pct + '</span></h4><p>' + l.d + '</p>';
+    };
+    g.onmouseenter = show; g.onclick = show;
+  });
+  $('#eval-pyramid-detail').innerHTML = '<p class="dim">Hover a layer. The judge is the narrow band near the top - never the base.</p>';
+  $('#judge-golden').innerHTML = C.judgeGolden.map(g => '<li>' + g + '</li>').join('');
+  paint();
+}
+
+/* ============================================================
+   Ch23 — beyond RAG
+   ============================================================ */
+function lcCompute(v) {
+  const outTok = 500;
+  const sent = Math.min(v.corpusTokens, v.ctxLimit);
+  const ragTok = v.k * v.chunk + 800;
+  const cost = t => t / 1e6 * v.inPrice + outTok / 1e6 * v.outPrice;
+  /* "lost in the middle": the sag deepens as the context grows */
+  const depth = t => Math.min(0.45, 0.10 + 0.35 * Math.log10(Math.max(1, t / 4000)) / Math.log10(250));
+  const avgAcc = t => 1 - depth(t) * (2 / 3);      // mean of 1 - depth*4x(1-x) over x in [0,1]
+  return {
+    long: { tok: sent, cost: cost(sent), ttft: sent / v.prefillRate, acc: avgAcc(sent), fits: v.corpusTokens <= v.ctxLimit },
+    rag:  { tok: ragTok, cost: cost(ragTok), ttft: ragTok / v.prefillRate + 0.05, acc: avgAcc(ragTok) },
+    depth: depth
+  };
+}
+function initBeyondRag() {
+  const host = $('#lc-calc'); if (!host) return;
+  const v = Object.assign({}, C.longCtx.defaults);
+  const F = [
+    { k: 'corpusTokens', n: 'corpus size (tokens)', min: 100000, max: 20000000, step: 100000, fmt: x => (x / 1e6).toFixed(1) + 'M' },
+    { k: 'ctxLimit', n: 'context window', min: 32000, max: 2000000, step: 32000, fmt: x => (x / 1000).toFixed(0) + 'k' },
+    { k: 'k', n: 'chunks retrieved (k)', min: 1, max: 40, step: 1, fmt: x => x },
+    { k: 'chunk', n: 'tokens per chunk', min: 100, max: 2000, step: 50, fmt: x => x },
+    { k: 'inPrice', n: 'input $ / M tokens', min: 0.1, max: 20, step: 0.1, fmt: x => '$' + x.toFixed(2) },
+    { k: 'qpd', n: 'questions per day', min: 100, max: 500000, step: 100, fmt: x => x.toLocaleString() }
+  ];
+  host.innerHTML = F.map(f =>
+    '<label>' + f.n + ' <span class="val" id="lv-' + f.k + '"></span>' +
+    '<input type="range" id="ls-' + f.k + '" min="' + f.min + '" max="' + f.max + '" step="' + f.step + '" value="' + v[f.k] + '"></label>').join('');
+  F.forEach(f => $('#ls-' + f.k).oninput = e => { v[f.k] = parseFloat(e.target.value); paint(); });
+  function paint() {
+    F.forEach(f => $('#lv-' + f.k).textContent = f.fmt(v[f.k]));
+    const r = lcCompute(v);
+    const money = c => c < 0.01 ? '$' + c.toFixed(4) : '$' + c.toFixed(3);
+    $('#lc-long').innerHTML =
+      '<div class="stat"><div class="stat-v">' + (r.long.tok / 1000).toFixed(0) + 'k</div><div class="stat-k">tokens sent</div></div>' +
+      '<div class="stat"><div class="stat-v bad">' + money(r.long.cost) + '</div><div class="stat-k">per question</div></div>' +
+      '<div class="stat"><div class="stat-v bad">' + r.long.ttft.toFixed(1) + 's</div><div class="stat-k">prefill alone</div></div>' +
+      '<div class="stat"><div class="stat-v">' + (r.long.acc * 100).toFixed(0) + '%</div><div class="stat-k">needle accuracy</div></div>' +
+      '<div class="stat"><div class="stat-v bad">$' + (r.long.cost * v.qpd * 30).toLocaleString(undefined, { maximumFractionDigits: 0 }) + '</div><div class="stat-k">per month</div></div>';
+    $('#lc-rag').innerHTML =
+      '<div class="stat"><div class="stat-v">' + (r.rag.tok / 1000).toFixed(1) + 'k</div><div class="stat-k">tokens sent</div></div>' +
+      '<div class="stat"><div class="stat-v good">' + money(r.rag.cost) + '</div><div class="stat-k">per question</div></div>' +
+      '<div class="stat"><div class="stat-v good">' + r.rag.ttft.toFixed(2) + 's</div><div class="stat-k">search + prefill</div></div>' +
+      '<div class="stat"><div class="stat-v good">' + (r.rag.acc * 100).toFixed(0) + '%</div><div class="stat-k">needle accuracy</div></div>' +
+      '<div class="stat"><div class="stat-v good">$' + (r.rag.cost * v.qpd * 30).toLocaleString(undefined, { maximumFractionDigits: 0 }) + '</div><div class="stat-k">per month</div></div>';
+    /* the lost-in-the-middle curve for the long-context option */
+    const d = r.depth(r.long.tok), pts = [];
+    for (let i = 0; i <= 40; i++) {
+      const x = i / 40, acc = 1 - d * 4 * x * (1 - x);
+      pts.push((30 + x * 400).toFixed(1) + ',' + (130 - (acc - 0.5) * 200).toFixed(1));
+    }
+    $('#lc-curve').innerHTML =
+      '<svg viewBox="0 0 460 160" class="arch-svg lc-curve">' +
+      '<defs><linearGradient id="lcg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#7c5cff"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#34d399"/></linearGradient></defs>' +
+      '<line x1="30" y1="130" x2="430" y2="130" stroke="rgba(255,255,255,.14)"/>' +
+      '<line x1="30" y1="20" x2="30" y2="130" stroke="rgba(255,255,255,.14)"/>' +
+      '<polyline points="' + pts.join(' ') + '" fill="none" stroke="url(#lcg)" stroke-width="2.4"/>' +
+      '<text x="30" y="150" class="arch-s" text-anchor="start">start of context</text>' +
+      '<text x="230" y="150" class="arch-s">middle</text>' +
+      '<text x="430" y="150" class="arch-s" text-anchor="end">end of context</text>' +
+      '<text x="24" y="26" class="arch-s" text-anchor="end">100%</text>' +
+      '<text x="24" y="134" class="arch-s" text-anchor="end">50%</text>' +
+      '<text x="230" y="14" class="arch-s">retrieval accuracy vs where the answer sits in a ' + (r.long.tok / 1000).toFixed(0) + 'k prompt</text>' +
+      '</svg>';
+    const ratio = r.long.cost / r.rag.cost;
+    $('#lc-verdict').innerHTML = !r.long.fits
+      ? '<b class="warn">Your corpus does not fit.</b> ' + (v.corpusTokens / 1e6).toFixed(1) + 'M tokens against a ' +
+        (v.ctxLimit / 1000).toFixed(0) + 'k window. The long-context column above is what you would pay to send only the part that fits - which means silently dropping ' +
+        (100 - v.ctxLimit / v.corpusTokens * 100).toFixed(0) + '% of your knowledge and never knowing which part.'
+      : '<b class="ok">It fits &mdash; and it still costs ' + ratio.toFixed(0) + 'x more per question</b> (' + money(r.long.cost) + ' vs ' + money(r.rag.cost) +
+        '), takes ' + (r.long.ttft / r.rag.ttft).toFixed(0) + 'x longer before the first token appears, and puts your answer somewhere in a ' +
+        (r.long.tok / 1000).toFixed(0) + 'k prompt where accuracy sags to about ' + ((1 - d) * 100).toFixed(0) +
+        '% in the middle. Over a month at ' + v.qpd.toLocaleString() + ' questions a day that is <b>$' +
+        ((r.long.cost - r.rag.cost) * v.qpd * 30).toLocaleString(undefined, { maximumFractionDigits: 0 }) + ' of difference</b>.';
+  }
+  cmpTable($('#lc-compare'), C.ragVsLong);
+  $('#lc-compare-verdict').innerHTML = '<b>Verdict.</b> ' + C.ragVsLong.verdict;
+
+  /* ---- classic vs agentic RAG, animated ---- */
+  const AQ = [
+    { q: 'How long do card refunds take?', hop: 1,
+      classic: [
+        { t: 'embed the question', ok: true },
+        { t: 'search: "card refund time"', ok: true, hit: 'Processing time section' },
+        { t: 'stuff 4 chunks', ok: true },
+        { t: 'answer: "5 to 10 business days"', ok: true }
+      ],
+      agentic: [
+        { t: 'plan: single lookup, one search is enough', ok: true },
+        { t: 'search: "card refund time"', ok: true, hit: 'Processing time section' },
+        { t: 'critique: covers the question', ok: true },
+        { t: 'answer: "5 to 10 business days"', ok: true }
+      ],
+      verdict: 'On a simple lookup, agentic RAG spent two extra LLM calls to arrive at the same answer. Classic RAG wins on cost and latency, and there is no quality difference to buy.' },
+    { q: 'Is my downloaded ebook refundable, and if not what do I tell the customer about their subscription?', hop: 2,
+      classic: [
+        { t: 'embed the whole question', ok: true },
+        { t: 'search: one blended vector', ok: false, hit: 'lands between two sections, retrieves neither well' },
+        { t: 'stuff 4 mediocre chunks', ok: false },
+        { t: 'answer: partially wrong, no subscription rule', ok: false }
+      ],
+      agentic: [
+        { t: 'plan: this is two questions', ok: true },
+        { t: 'search 1: "digital goods refundable"', ok: true, hit: 'Exceptions - not refundable once downloaded' },
+        { t: 'search 2: "subscription refund proration"', ok: true, hit: 'Exceptions - prorated from cancellation' },
+        { t: 'critique: both sub-questions covered', ok: true },
+        { t: 'answer: both rules, correctly attributed', ok: true }
+      ],
+      verdict: 'This is where agentic RAG earns its cost. One embedding of a two-part question sits in the average of two meanings and retrieves neither. Decomposition is not a nice-to-have here - it is the only thing that works.' }
+  ];
+  let aq = 0, playing = false;
+  const chips = $('#arag-qs');
+  AQ.forEach((a, i) => {
+    const b = el('button', 'chip' + (i === 0 ? ' active' : ''), (a.hop === 1 ? 'single-hop: ' : 'multi-hop: ') + a.q.slice(0, 46) + '...');
+    b.onclick = () => { aq = i; drawA(-1); };
+    chips.appendChild(b);
+  });
+  function drawA(upto) {
+    $$('.chip', chips).forEach((c, i) => c.classList.toggle('active', i === aq));
+    const a = AQ[aq];
+    const lane = (name, steps, cls) =>
+      '<div class="ar-lane ' + cls + '"><div class="ar-lane-h"><b>' + name + '</b><small>' +
+      steps.length + ' steps</small></div>' +
+      steps.map((s, i) =>
+        '<div class="ar-step ' + (upto >= i ? (s.ok ? 'on' : 'fail') : 'idle') + '">' +
+        '<i>' + (i + 1) + '</i><span>' + s.t + (s.hit ? '<small>' + s.hit + '</small>' : '') + '</span></div>').join('') +
+      '</div>';
+    $('#arag-diagram').innerHTML = '<div class="ar-wrap">' +
+      lane('Classic RAG', a.classic, 'classic') + lane('Agentic RAG', a.agentic, 'agentic') + '</div>';
+    $('#arag-verdict').innerHTML = upto >= Math.max(a.classic.length, a.agentic.length) - 1
+      ? '<h4>' + (a.hop === 1 ? 'Single-hop verdict' : 'Multi-hop verdict') + '</h4><p>' + a.verdict + '</p>'
+      : '<p class="dim">Press Run both.</p>';
+  }
+  $('#arag-play').onclick = () => {
+    if (playing) return;
+    playing = true;
+    const a = AQ[aq], n = Math.max(a.classic.length, a.agentic.length);
+    let i = -1;
+    const iv = setInterval(() => {
+      i++; drawA(i);
+      if (i >= n - 1) { clearInterval(iv); playing = false; xp(4); }
+    }, 780);
+  };
+  $('#arag-reset').onclick = () => drawA(-1);
+  drawA(-1);
+
+  /* ---- five architectures ---- */
+  $('#rv-grid').innerHTML = C.ragVariants.map(r =>
+    '<button class="rvcard" data-id="' + r.id + '"><span class="rv-ico">' + r.icon + '</span><b>' + r.n + '</b>' +
+    '<span class="rv-flow">' + r.flow.join(' &rarr; ') + '</span>' +
+    '<span class="ftcard-scales">cost ' + dots(r.cost) + ' power ' + dots(r.power) + '</span></button>').join('');
+  $$('#rv-grid .rvcard').forEach(b => b.onclick = () => {
+    const r = C.ragVariants.filter(x => x.id === b.dataset.id)[0];
+    $$('#rv-grid .rvcard').forEach(x => x.classList.toggle('active', x === b));
+    $('#rv-detail').innerHTML =
+      '<h4>' + r.icon + ' ' + r.n + '</h4>' +
+      '<div class="rv-pipe">' + r.flow.map((f, i) => '<span class="rv-pipe-n" style="animation-delay:' + (i * 90) + 'ms">' + f + '</span>').join('<i>&rarr;</i>') + '</div>' +
+      '<div class="knob-tech"><span>who is in control</span>' + r.ctrl + '</div>' +
+      '<div class="ftv-facts"><span><b>latency</b> ' + r.lat + '</span><span><b>cost</b> ' + dots(r.cost) + '</span><span><b>power</b> ' + dots(r.power) + '</span></div>' +
+      '<div class="cc-good"><b>Right choice when</b> ' + r.good + '</div>' +
+      '<div class="cc-bad"><b>Wrong choice when</b> ' + r.bad + '</div>';
+    xp(2);
+  });
+  $('#rv-detail').innerHTML = '<p class="dim">Click an architecture.</p>';
+  $('#okf-note').innerHTML = C.okfNote.map(o => '<dt>' + o[0] + '</dt><dd>' + o[1] + '</dd>').join('');
+
+  /* ---- multilingual debug ---- */
+  const ML = C.multiling;
+  $('#ml-causes').innerHTML = '<div class="ml-symptom"><b>Symptom:</b> ' + ML.symptom + '</div>' +
+    ML.causes.map((c, i) =>
+      '<button class="mlc" data-i="' + i + '"><b>' + c.n + '</b>' + bar(c.weight / 0.35) +
+      '<span>' + Math.round(c.weight * 100) + '% of real cases</span></button>').join('');
+  $$('#ml-causes .mlc').forEach(b => b.onclick = () => {
+    const c = ML.causes[+b.dataset.i];
+    $$('#ml-causes .mlc').forEach(x => x.classList.toggle('active', x === b));
+    $('#ml-detail').innerHTML = '<h4>' + c.n + '</h4><p>' + c.d + '</p>' +
+      '<div class="cc-good"><b>Fix</b> ' + c.fix + '</div>';
+    xp(2);
+  });
+  $('#ml-detail').innerHTML = '<p class="dim">Click a cause. They are ordered by how often each one is the real culprit.</p>';
+  $('#ml-debug').innerHTML = ML.debug.map(d => '<li>' + d + '</li>').join('');
+  paint();
+}
+
 /* ---------- boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   [initBackground, initGuess, initTokenizer, initEmbeddings, initAttention, initSampler,
    initSpeed, initTraining, initLab, initContext, initRag, initDecider, initAgent, initHalluc,
-   initShip, initMem0, initDf, initHybrid, initRagFusion, initRagEval, initQuiz].forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
+   initShip, initMem0, initDf, initHybrid, initRagFusion, initRagEval,
+   initTfBlock, initDecoding, initChunking, initTuning, initJudge, initBeyondRag,
+   initQuiz].forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 });
 })();

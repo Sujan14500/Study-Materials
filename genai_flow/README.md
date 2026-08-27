@@ -1,7 +1,7 @@
 # GenAI Flow
 
 An interactive, animated course that takes someone from "what even is a token" to
-"I could ship a RAG-backed agent". Eighteen chapters, every concept attached to
+"I could ship a RAG-backed agent". Twenty-four chapters, every concept attached to
 something you can click, drag or break.
 
 ## Run it
@@ -36,7 +36,13 @@ open index.html           # macOS
 | 15 | Ship it | Cost/latency calculator and a production checklist that saves |
 | 16 | Mem0: agent memory | Step a conversation through extract → reconcile and watch ADD/UPDATE/DELETE/NOOP fire, then search the store |
 | 17 | Data Formulator | Fill in encoding shelves, ask for a field the data doesn't have, read the pandas/SQL it generates |
-| 18 | Final quiz | 19 questions with explanations, plus a glossary |
+| 18 | One transformer block | A real 4-dim, 1-head model computed live: step all ten operations, then switch the feed-forward off and watch the prediction flip from "cat" to "mat" |
+| 19 | Decoding controls | Temperature, top-k, top-p, repetition penalty, stop sequences and max tokens applied to one real distribution, in the order a server applies them |
+| 20 | Chunking | Six splitters run live on one document, plus a probe question whose answer sits on a boundary |
+| 21 | Fine-tuning menu | A four-question decision tool, a LoRA-vs-QLoRA table, a draggable-rank LoRA diagram and exact parameter arithmetic |
+| 22 | LLM as a judge | Eight judged answer pairs with the biases switched on; toggle mitigations and watch agreement with humans climb from 25% to 100% |
+| 23 | Beyond RAG | A long-context-vs-RAG calculator on your own numbers, classic vs agentic RAG animated, five architectures compared, and an Arabic retrieval debug |
+| 24 | Final quiz | 35 questions with explanations, plus an 80-term glossary |
 
 Progress, XP and the checklist persist in `localStorage`.
 
@@ -62,6 +68,17 @@ and are actually parallel on the map, that quiz answer indices are valid, that e
 question can retrieve something, that the Mem0 run only UPDATEs/DELETEs memories that
 exist at that point, that every Data Formulator number ties back to `sales.csv`, and that
 every `#id` the demos reach for is actually created somewhere.
+
+The deep-dive chapters get the same treatment. Chapter 18's transformer is re-implemented
+from scratch in `test.js` and asserted: every attention row sums to 1, nothing attends to the
+future, "sat" really does attend mostly to "cat", and — the claim the chapter is built on —
+the feed-forward ON predicts a *place* word while feed-forward OFF predicts an *animate* one.
+Chapter 19 asserts that temperature monotonically raises entropy and that top-p keeps the
+smallest set covering the mass. Chapter 21 checks the LoRA arithmetic really is under 1% of
+the base model and that the VRAM ordering QLoRA < LoRA < full holds. Chapter 22 asserts the
+naive judge looks unreliable, the mitigated one reaches 100%, and position swap is the single
+biggest lever. Chapter 23 asserts stuffing a corpus costs far more than retrieving from it and
+that the lost-in-the-middle curve dips in the middle and is symmetric.
 
 It also re-derives chapter 6’s inference maths independently and asserts the claims the
 chapter makes: streaming moves time-to-first-token and *nothing* else, prompt caching moves
@@ -89,5 +106,14 @@ teaching something false and the test says so.
 - The Data Formulator chapter ships pre-computed transforms so every number on screen can
   be checked against `sales.csv` in `test.js`. A live run generates the code fresh, and the
   code shown is the shape of what it produces, not a verbatim capture.
+- Chapter 18's model is a genuine transformer block, just a tiny one: 4 dimensions, 1 head,
+  8 tokens of vocabulary. The weights are hand-designed so the dimensions mean something
+  (animate / action / place / modifier) and so one feed-forward neuron is a readable "fact"
+  neuron. Real models learn these; the *mechanism* on screen is the real thing.
+- Chapter 22's judge bench is a deterministic simulation over eight real answer pairs, with
+  each documented bias modelled as an explicit term. Toggling a mitigation zeroes its term.
+  The agreement numbers are what that model produces, not measurements of a specific judge.
+- Chapter 23's "lost in the middle" curve is the *shape* reported in that literature, scaled
+  by context length. Your model's curve will differ; the argument does not.
 - Chapter 15 is about Microsoft Research's open-source Data Formulator, not a Power BI
   feature. Power BI's own AI is Copilot; the chapter says so and compares them.

@@ -1,7 +1,7 @@
 # AI System Design Flow
 
 An interactive, animated course on AI/ML system design — the discipline, not the model zoo.
-Nineteen chapters spanning classic ML systems (recommenders, search, fraud) and LLM-era ones
+Twenty-three chapters spanning classic ML systems (recommenders, search, fraud) and LLM-era ones
 (RAG at scale, model cascades), because real products contain both.
 
 **Written for someone with no prior experience.** Chapter 1 is nothing but vocabulary —
@@ -11,8 +11,9 @@ food-delivery app, carries the whole course, so you are never learning a new dom
 new concept at the same time.
 
 Every idea is attached to a calculator or a simulator you can push until it breaks: server
-sizing, A/B sample size, latency budgets, retrieval funnels, cost per 1k queries, and a
-feedback loop that collapses a catalogue in front of you. Each calculator has a worked
+sizing, A/B sample size, latency budgets, retrieval funnels, cost per 1k queries, GPU memory
+against a real card, a semantic-cache threshold with real wrong answers on the other side of
+it, BM25 scored term by term, and a feedback loop that collapses a catalogue in front of you. Each calculator has a worked
 example above it with small friendly numbers, so you do the arithmetic by hand once before
 the slider becomes a magic box.
 
@@ -55,7 +56,11 @@ open index.html           # macOS
 | 16 | Operate it | Rollout ladder, failure modes and fallbacks, and a checklist that saves |
 | 17 | Design patterns | Fifteen cards, each with an animated diagram of its shape, the problem, five lines of code and the trap — plus a drill that hands you a situation and asks for the name |
 | 18 | Redis | The four use cases as cards — cache, sorted set, lock, geo hash — each with its commands and its trap, plus a drill that gives you a situation and asks which one |
-| 19 | Final quiz | 14 questions with explanations, plus a 40-term glossary |
+| 19 | Caching layers | A five-rung cache ladder, then a semantic-cache threshold you drag while watching real paraphrases hit and wrong answers get served |
+| 20 | Sharding & parallelism | Weights + KV cache + activations computed live against a real GPU, six ways to split a model, and a PagedAttention toggle that shows the memory you were throwing away |
+| 21 | Elasticsearch & BM25 | An inverted index built in front of you, BM25 scored term by term with the real numbers, and the query that scores zero everywhere |
+| 22 | Big files, small RAM | The 5 GB file on a 2 GB machine, six approaches with computed peak memory, and the follow-up nobody prepares for: when the aggregate is what does not fit |
+| 23 | Final quiz | 29 questions with explanations, plus a 40-term glossary |
 
 Every chapter opens with a jargon-free "in plain English" box, and the calculators
 each have a hand-worked example above them.

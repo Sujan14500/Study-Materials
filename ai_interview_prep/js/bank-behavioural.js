@@ -1,0 +1,147 @@
+/* ============================================================
+   Behavioural — the questions that decide the offer, asked of
+   AI engineers specifically.
+   ============================================================ */
+window.QB = (window.QB || []).concat([
+
+{ id: 'bh01', topic: 'behavioural', level: 1,
+  q: 'Tell me about an AI project you shipped. What did it do and what did it cost?',
+  lay: 'They want a real thing with real numbers, not a demo. What problem, what you built, what it measurably did, and what it cost to run.',
+  tech: 'Structure: <b>Problem</b> (with a number — "support handled 4,000 tickets a month, 60% were the same twenty questions"). <b>Constraint</b> (latency budget, budget, data availability, team size). <b>What you built</b>, in two sentences, with the one interesting technical decision. <b>Result</b> — a measured outcome, not a vibe: deflection rate, time saved, error rate, cost per request. <b>What you would do differently.</b> If it did not ship, say so and say why — that is a legitimate and often more interesting story.',
+  trap: 'Have the cost number ready. "About $0.04 a request, roughly $3,000 a month at our volume" signals someone who has operated a system. Not knowing it signals someone who built a prototype and moved on.',
+  tags: ['storytelling'] },
+
+{ id: 'bh02', topic: 'behavioural', level: 2,
+  q: 'Tell me about a time an AI system failed in production. What happened?',
+  lay: 'Pick a real one, explain how you found out, what you did in the first ten minutes, and what you changed so it could not happen the same way again.',
+  tech: 'A good answer includes: <b>how you detected it</b> (an alarm, ideally, not a customer); <b>containment</b> (what you turned off and how fast); <b>root cause</b> (specific — "a timestamp at the top of the system prompt zeroed the cache hit rate", not "the model was unreliable"); <b>the fix</b>; and <b>the systemic change</b> — the alarm, the test, or the control that now exists. Blameless framing throughout: the interesting question is why the control was missing, not who typed the change.',
+  trap: 'Avoid "the model hallucinated" as a root cause. It is the symptom. The cause is almost always upstream — empty retrieval passed through, a missing verification step, a context that silently truncated.',
+  tags: ['incident', 'storytelling'] },
+
+{ id: 'bh03', topic: 'behavioural', level: 2,
+  q: 'Tell me about a time you disagreed with a technical decision on an AI project.',
+  lay: 'Show that you can argue with evidence, lose gracefully, and commit either way.',
+  tech: 'A strong shape: what the decision was, why you disagreed (with a specific concern, ideally quantified), how you made the case (a prototype, an eval run, a cost model — evidence rather than opinion), what happened, and what you did afterwards. Both outcomes are fine: "I was right and we changed course" and "I was wrong and here is what I had not considered" are equally good, and the second is often more convincing.',
+  trap: 'The common trap is a story where you were obviously right and everyone else was foolish. Interviewers are listening for whether you can work with people who disagree with you, not whether you were correct.',
+  tags: ['collaboration'] },
+
+{ id: 'bh04', topic: 'behavioural', level: 2,
+  q: 'How do you keep up with a field that changes this fast?',
+  lay: 'Have an actual system, name it, and be honest that you filter aggressively — because nobody reads everything.',
+  tech: 'A credible answer names sources and a filter: primary sources for things you will act on (papers, provider documentation, release notes), a few high-signal secondary sources, and a habit of building rather than only reading — implementing one technique per month teaches more than fifty summaries. Also name what you deliberately ignore: most announcements are not relevant to what you are building, and the ability to say so is a sign of judgement rather than disengagement.',
+  trap: 'Have one concrete recent example: something you read or tried in the last month and what you concluded. Generic answers ("I follow the space closely") are worth nothing; "I tried contextual retrieval on our corpus last month and it moved recall@10 by four points" is worth a lot.',
+  tags: ['learning'] },
+
+{ id: 'bh05', topic: 'behavioural', level: 2,
+  q: 'A stakeholder wants an AI feature you think will not work. What do you do?',
+  lay: 'Find out what they actually need, propose the smallest test that would settle it, and be specific about what would make you change your mind.',
+  tech: 'Approach: (1) separate the goal from the proposed solution — often the goal is achievable another way; (2) name the specific concern with evidence ("the corpus does not contain the answers to 40% of these questions, so retrieval cannot help") rather than a general objection; (3) propose a cheap experiment with a decision criterion agreed in advance — a two-week spike with an eval set is usually enough; (4) commit to the result either way. Framing it as "here is how we find out cheaply" beats "this will not work".',
+  trap: 'Being right about feasibility and wrong about influence is a common failure. The valued skill is turning a disagreement into an experiment that both sides accept in advance.',
+  tags: ['stakeholders'] },
+
+{ id: 'bh06', topic: 'behavioural', level: 2,
+  q: 'How do you explain to a non-technical stakeholder why the model got something wrong?',
+  lay: 'Explain the mechanism briefly — it predicts rather than looks up — then say what specifically went wrong in this case and what you are changing.',
+  tech: 'Structure: one sentence of mechanism ("it produces the most plausible continuation; it is not looking anything up"); the specific cause in this instance ("the relevant policy page was not in the index because ingestion had been failing for two days"); the fix; and the systemic change ("we now alarm on index freshness"). Avoid two failure modes: excessive jargon, and excessive apology that implies the technology is fundamentally unreliable — because the next question is "should we be using this at all?" and you want that conversation to be about specific controls.',
+  trap: 'Never say "AI is like that". It sounds humble and it destroys confidence in the whole programme. Specific cause, specific fix.',
+  tags: ['communication'] },
+
+{ id: 'bh07', topic: 'behavioural', level: 2,
+  q: 'Tell me about a time you had to say no to shipping something.',
+  lay: 'Be specific about the risk, propose a narrower version that could ship, and accept that the call may not be yours.',
+  tech: 'A good answer: the specific failure mode you were worried about (with a number where you had one — "our eval showed a 4% unsupported-claim rate and this was a medical context"), the mitigation options you offered with their costs, the narrower version you proposed, the escalation path you used, and the outcome — including if you were overruled and what you did to reduce the risk anyway.',
+  trap: 'The valued behaviour is proposing a path to yes. "I blocked it" is a weaker story than "I proposed shipping it to internal users only with a human review step, which let us gather the evidence to widen it two months later".',
+  tags: ['judgement'] },
+
+{ id: 'bh08', topic: 'behavioural', level: 2,
+  q: 'How do you prioritise when everything is uncertain?',
+  lay: 'Reduce the biggest uncertainty first, cheaply. Whatever you are least sure about is what will kill the project, so find out about that before building anything polished.',
+  tech: 'A concrete method: list the assumptions the project depends on, rank them by (how uncertain × how fatal if wrong), and design the cheapest test for the top one. For AI projects the top assumption is usually "the data contains the answers" — which a two-day retrieval spike with fifty labelled questions settles definitively. Build the evaluation before the feature, because it converts every subsequent decision from opinion into measurement.',
+  trap: 'Interviewers listen for whether you build the eval first. Teams that build the feature and then try to work out whether it is good spend months in an argument they cannot resolve.',
+  tags: ['prioritisation'] },
+
+{ id: 'bh09', topic: 'behavioural', level: 2,
+  q: 'Describe a time you improved an AI system\'s quality significantly. What did you actually do?',
+  lay: 'They want the specific change and the number it moved. "We improved the prompt" is not a story; "recall@10 went from 0.61 to 0.84 when we switched to document-aware chunking" is.',
+  tech: 'Structure: the symptom (what users complained about), the diagnosis (how you localised it — and for RAG that usually means measuring retrieval separately), the change, the measured effect, and what you learned about where to look next time. The best answers involve a diagnosis that overturned an assumption — "everyone thought it was the model; retrieval metrics showed the answering chunk was not in the top 50 for 40% of queries".',
+  trap: 'Have the diagnostic step in the story, not just the fix. Anyone can list techniques; the signal is knowing how you decided which one to apply.',
+  tags: ['storytelling', 'debugging'] },
+
+{ id: 'bh10', topic: 'behavioural', level: 2,
+  q: 'What would you do in your first 30 days on this team?',
+  lay: 'Learn the system, find out how they measure quality, and fix one small real thing. Do not propose a rewrite in week two.',
+  tech: 'A credible plan: <b>Week 1</b> — read the code and the traces, run the system, talk to whoever handles escalations, find out what the eval situation is. <b>Week 2</b> — read fifty real production transcripts; that is worth more than any dashboard. <b>Week 3</b> — ship one small improvement end to end to learn the deployment path. <b>Week 4</b> — propose the highest-leverage change with evidence from what you have seen. If there is no eval set, building one is almost always the highest-leverage first contribution.',
+  trap: 'Reading real transcripts is the specific thing that impresses. Most engineers look at dashboards; the ones who read fifty conversations find the problem nobody had noticed.',
+  tags: ['onboarding'] },
+
+{ id: 'bh11', topic: 'behavioural', level: 2,
+  q: 'How do you work with a product manager who wants "AI" without a clear problem?',
+  lay: 'Turn the enthusiasm into a specific user problem with a number attached, then work out whether AI is the right tool for it. Often it is not, and saying so early saves a quarter.',
+  tech: 'Approach: ask what user pain this addresses and how they would measure success; look for problems with the shape AI is good at (messy language in, judgement out, high volume, tolerance for occasional error); check whether a simpler solution exists (search, a rule, a form); and if it does proceed, agree the success metric and the kill criterion before building. Propose a two-week spike with an eval set rather than a quarter of building.',
+  trap: 'Name a case where the right answer was "not AI". A candidate who has recommended a rules engine or a better search box over an LLM has judgement; one who has never said no has not been in the room long enough.',
+  tags: ['product', 'stakeholders'] },
+
+{ id: 'bh12', topic: 'behavioural', level: 2,
+  q: 'Tell me about a technical trade-off you made that you later regretted.',
+  lay: 'Pick a real one, explain the reasoning at the time (which should be defensible), what went wrong, and what you would look for now.',
+  tech: 'Good candidates in this field: skipping the eval set to ship faster and then being unable to tell whether changes helped; choosing a framework that obscured the prompt; over-engineering a multi-agent system where a router would have done; caching without a version in the key; or not pinning a model version. Explain what you would look for now — the transferable lesson matters more than the incident.',
+  trap: 'Avoid the humblebrag ("I cared too much about quality"). A real regret with a real cost is far more convincing, and interviewers can tell the difference immediately.',
+  tags: ['reflection'] },
+
+{ id: 'bh13', topic: 'behavioural', level: 2,
+  q: 'How do you handle the pressure to ship AI features quickly?',
+  lay: 'Ship narrow and instrumented rather than broad and blind. A small feature with an eval set and a kill switch can go out fast; a big one without them cannot go out safely at any speed.',
+  tech: 'Practical negotiation: reduce scope rather than reduce controls; ship to internal users or a small cohort first; keep the non-negotiables short and explain each one in terms of consequence (a kill switch because containment time is otherwise deploy time; an eval set because otherwise we cannot tell whether the next change helps); and be explicit about the debt you are taking on and when it comes due. Speed and safety trade in scope, not in controls.',
+  trap: 'The framing that works with product stakeholders is time-to-recovery rather than perfection: "we can ship Thursday if we can turn it off in thirty seconds; without that we need until the following week."',
+  tags: ['pressure', 'judgement'] },
+
+{ id: 'bh14', topic: 'behavioural', level: 2,
+  q: 'What is the most interesting thing you have learned about LLMs from working with them?',
+  lay: 'An open question testing depth and genuine engagement. Pick something specific and slightly counterintuitive that you actually observed.',
+  tech: 'Answers that land: that most "hallucination" tickets are retrieval bugs; that tool descriptions matter more than the system prompt; that returning six fields instead of a raw payload can beat a model upgrade; that a small model with good retrieval beats a large one with bad retrieval; that evaluation is harder than building and determines everything; or that the biggest cost lever is usually caching rather than model choice. Ground it in a specific incident.',
+  trap: 'Avoid the philosophical answer about intelligence. The question is testing whether you have hands-on experience, and a specific surprising observation from real work is the evidence.',
+  tags: ['depth'] },
+
+{ id: 'bh15', topic: 'behavioural', level: 3,
+  q: 'How would you build an AI engineering team from scratch?',
+  lay: 'Fewer specialists than people expect. You need people who can ship software, one person who understands evaluation deeply, and access to someone who knows the domain.',
+  tech: 'A realistic first team: strong generalist software engineers (most of the work is data pipelines, APIs and reliability — not model training); one person who owns evaluation and measurement; access to domain experts for labelling and review; and infrastructure or platform support for the serving layer. What you usually do NOT need early: a research scientist, or a dedicated MLOps team. Priorities in order: measurement, then data pipelines, then the feature. Culture: read production transcripts, treat evals as tests, be willing to say "not AI".',
+  trap: 'The counterintuitive point worth making: most of AI engineering is ordinary software engineering done carefully, plus a measurement discipline most teams lack. Hiring for research skills when you need pipelines and evaluation is the common mistake.',
+  tags: ['leadership'] },
+
+{ id: 'bh16', topic: 'behavioural', level: 2,
+  q: 'How do you decide when an AI feature is good enough to ship?',
+  lay: 'Compare it against what happens today, not against perfection. If the current process is a person guessing and the model is better on average with a safety net, that can be enough.',
+  tech: 'The framework: define the baseline (what happens now, and how good is it — often worse than people assume); define the cost of an error (recoverable or not, who bears it); set a bar relative to the baseline plus the safety net you are adding; and decide the rollout shape (internal → cohort → general) with a kill criterion. A feature that is 85% accurate with a one-click escalation can be a large improvement on a queue with a two-day response time.',
+  trap: 'Interviewers listen for whether you compare against the status quo rather than against perfect. "Better than what we do today, with a way to catch the failures" is a shippable standard; "99% accurate" usually is not achievable and often is not necessary.',
+  tags: ['judgement', 'product'] },
+
+{ id: 'bh17', topic: 'behavioural', level: 2,
+  q: 'Tell me about a time you had to learn something quickly for a project.',
+  lay: 'Show a method, not just enthusiasm. How you got from nothing to useful, and how you knew you understood it well enough.',
+  tech: 'A good structure: what you needed to learn and why the deadline mattered; how you approached it (primary sources for the core concept, a small implementation to test understanding, someone experienced to check your reasoning); how you validated that you had actually understood it (usually by building something that worked, or by predicting something correctly); and what you would do differently. Concrete beats general.',
+  trap: 'Include the part where you were wrong about something and found out. Learning stories with no error in them read as rehearsed.',
+  tags: ['learning'] },
+
+{ id: 'bh18', topic: 'behavioural', level: 2,
+  q: 'What questions do you have for us?',
+  lay: 'Ask things that reveal how they actually work: how they measure quality, what happens when the model is wrong, and what the last incident was.',
+  tech: 'High-signal questions for an AI role: "How do you evaluate quality today, and who owns it?" "What happens when the model gets something wrong — what is the escalation path?" "What was your last AI-related incident and what changed afterwards?" "How do you decide between building and buying?" "What is the cost per request and does anyone watch it?" "How much of the team\'s time goes on data pipelines versus model work?" Each answer tells you whether the team is running a system or a prototype.',
+  trap: 'The evaluation question is the most informative one you can ask. A team that cannot describe how they measure quality is a team where you will spend your first quarter building that, and it is better to know before you accept.',
+  tags: ['interviewing'] },
+
+{ id: 'bh19', topic: 'behavioural', level: 2,
+  q: 'How do you handle being asked to do something you think is technically impossible?',
+  lay: 'Distinguish "impossible" from "expensive" from "I do not know how yet". Most requests are the second or third, and saying so precisely is more useful than refusing.',
+  tech: 'Separate the categories: genuinely impossible with current technology (rare, and worth being specific about — "a model cannot reliably guarantee it will never produce X"); possible but uneconomic at this scale; possible but needing data you do not have; or possible and nobody has tried. For each, propose the alternative — a narrower version, a human in the loop, or a spike to reduce the uncertainty. Give a concrete reason rather than a general one, because "it is not possible" without evidence sounds like reluctance.',
+  trap: 'Guarantees are the honest impossibility in this field. "The model will never say anything harmful" is not achievable; "harmful output is caught by an output classifier with a measured false-negative rate" is. Reframing a guarantee as a control with a measured rate is a genuinely useful contribution.',
+  tags: ['judgement', 'communication'] },
+
+{ id: 'bh20', topic: 'behavioural', level: 3,
+  q: 'Where do you think this field is going, and how does that affect what you build?',
+  lay: 'They want to see whether you have opinions grounded in engineering rather than headlines — and whether those opinions change how you design things today.',
+  tech: 'A grounded answer connects a trend to a design decision. Examples: models are getting cheaper and better fast, so avoid architectures that are expensive to migrate away from and keep a provider abstraction; context windows are growing, which makes retrieval easier rather than unnecessary and lets you be more generous with k; reasoning models shift cost from prompt engineering to inference, which changes routing decisions; the moat is not the model but the data, the evaluation and the domain understanding, so invest there; and tooling standardisation (MCP, OpenTelemetry conventions) means less bespoke plumbing over time.',
+  trap: 'Avoid both extremes — breathless prediction and dismissiveness. The credible position is that the models will keep improving and that the engineering around them (evaluation, retrieval, harness, controls) is where the durable work is, because that is where it has been for two years.',
+  tags: ['vision'] }
+
+]);

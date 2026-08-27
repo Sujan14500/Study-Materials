@@ -1,8 +1,9 @@
 # Python Basics
 
 An interactive, animated course that takes someone from "what is a variable" to reading a
-traceback, picking the right container, and writing a comprehension without thinking about it.
-Twelve chapters, every concept attached to something you can click, step or break.
+traceback, picking the right container, writing a comprehension without thinking about it, and
+then fitting a model with scikit-learn. Thirteen chapters, every concept attached to something
+you can click, step or break.
 
 The angle: syntax is the easy half. This course teaches the **model underneath** — names are
 labels, objects live on a heap, defaults are evaluated once — because that is where every
@@ -32,8 +33,10 @@ open index.html           # macOS
 | 7 | Errors | Seven real tracebacks that type in bottom-up, with the fix beside them |
 | 8 | Comprehensions | Watch items flow through map / filter / dict / set / generator forms |
 | 9 | Files & projects | An animated terminal that sets up a venv, plus one annotated class |
-| 10 | Gotchas | Nine guess-the-output cards |
-| 11 | Final quiz | 15 questions with explanations, plus a 28-term glossary |
+| 10 | The data stack | **Animated**: a Python loop and a NumPy array race on the same sum; then eleven pandas operations with their real output |
+| 11 | scikit-learn & ML | **Animated**: step an eight-stage churn pipeline; pick the estimator for six jobs; six ways to fool yourself |
+| 12 | Gotchas | Nine guess-the-output cards |
+| 13 | Final quiz | 21 questions with explanations, plus a 45-term glossary |
 
 Progress, XP and answers persist in `localStorage`.
 
@@ -67,9 +70,14 @@ answers the course claims. Specifically it checks that
 - every traceback's last line is the exception it claims to be,
 - each `order(...)` call binds exactly the parameters in the signature, and the keyword-only
   argument is never reachable positionally,
+- every pandas result in Chapter 10 matches a reimplementation of pandas' own printing rules
+  applied to the one source table — the frames, the Series, the column widths,
+- the scikit-learn walkthrough never mentions `X_test` between the split and the evaluate stage,
+  which is the leak the chapter spends its whole length warning about,
+- every option in the estimator chooser is the right answer somewhere, so none is dead,
 - every `#id` the demos reach for is actually created somewhere.
 
-That last one has already caught one real wiring bug.
+That last one has already caught two real wiring bugs.
 
 ## Notes on accuracy
 
@@ -84,3 +92,11 @@ That last one has already caught one real wiring bug.
   steps are checked against their declared end state by `test.js`, but they are a recording,
   not a live interpreter.
 - Chapter 9's project layout is one common convention (`src/` layout), not the only correct one.
+- Chapter 10's list-vs-array bars count **Python-level operations** — a million versus one. That
+  number is exact. The wall-clock speedup is stated as a typical range and is not measured in
+  your browser, which the widget says on screen.
+- The pandas outputs are recomputed from the source table by `test.js`, and formatted the way
+  pandas 2.x prints them. Older pandas differs in small ways (`value_counts` gained its
+  `Name: count` line in 2.0).
+- Chapter 11 teaches conventional practice — split first, pipeline everything, touch the test set
+  once. That is the consensus, not a law; time series, tiny datasets and nested CV all bend it.

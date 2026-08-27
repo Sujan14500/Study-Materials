@@ -250,4 +250,75 @@ for (const m of demos.matchAll(/\$\$?\('#([a-z0-9-]+)/g)) if (!m[1].endsWith('-'
 ids.forEach(id => assert(html.includes('id="' + id + '"') || demos.includes('id="' + id + '"'),
   `demos.js targets #${id}, which nothing ever creates`));
 
+/* ============================================================
+   Ch15-16 — harness engineering and the failure playbook.
+   These guard the claims the chapters make, because they are
+   claims about ordering and completeness rather than arithmetic.
+   ============================================================ */
+{
+  // the diagram draws one bar per layer against the largest; weights must be a real ranking
+  const L = C.harnessLayers;
+  assert(L.length >= 5, 'the harness diagram needs at least five layers to be worth drawing');
+  const total = L.reduce((a, l) => a + l.weight, 0);
+  assert(Math.abs(total - 1) < 0.02, `harness layer weights sum to ${total.toFixed(2)}, not 1`);
+  assert(L[0].weight === Math.max(...L.map(l => l.weight)),
+    'the layers must be ordered most-impactful first, because the chapter presents them that way');
+  L.forEach(l => ['q', 'lay', 'tech', 'bad', 'good', 'icon'].forEach(k =>
+    assert(l[k], `harness layer "${l.n}" is missing "${k}"`)));
+  // the chapter's central claim is that prompt wording is NOT one of the layers
+  assert(!L.some(l => /^prompt/i.test(l.n)),
+    'the chapter argues the harness is not prompt engineering; a layer called "prompt" undercuts it');
+
+  // the twins panel: every row must differ and must carry its reason
+  const T = C.harnessTwins;
+  assert(T.rows.length >= 5, 'the twins comparison needs enough rows to make the point');
+  T.rows.forEach(r => {
+    assert(r.a !== r.b, `twins row "${r.layer}" shows the same thing on both sides`);
+    assert(r.b.length > r.a.length, `twins row "${r.layer}": the strong version should be the more specific one`);
+    assert(r.why && r.why.length > 60, `twins row "${r.layer}" needs an explanation, not just a diff`);
+  });
+  // and none of the differences may be a prompt change, or the chapter's thesis is false
+  assert(!T.rows.some(r => /system prompt/i.test(r.layer)),
+    'the twins are supposed to differ in code, not in the prompt');
+
+  assert(C.harnessPatterns.length >= 8, 'the chapter promises nine harness patterns');
+  C.harnessPatterns.forEach(p => assert(p.when, `pattern "${p.n}" needs a "use it when"`));
+}
+
+{
+  // the playbook must cover every failure the chapter's heading claims
+  const need = ['empty', 'lowret', 'timeout', 'rate', 'toolong', 'cost', 'lowans'];
+  need.forEach(id => assert(C.playbook.some(p => p.id === id), `the playbook is missing "${id}"`));
+  C.playbook.forEach(p => {
+    assert(p.right.length >= 3, `"${p.n}" needs at least three concrete actions`);
+    assert(p.wrong, `"${p.n}" must name the wrong thing people actually do`);
+    assert(p.metric, `"${p.n}" must name a number to alarm on`);
+    assert(['critical', 'high', 'medium'].includes(p.sev), `"${p.n}" has an unknown severity`);
+  });
+  // exactly the money one should be critical — that is the ranking the cards render
+  assert(C.playbook.filter(p => p.sev === 'critical').map(p => p.id).join() === 'cost',
+    'cost runaway should be the one critical failure; nothing else can bankrupt you silently');
+
+  // context rot: causes are drawn as shares of real cases, ordered most-likely first
+  const R = C.contextRot;
+  const s = R.causes.reduce((a, c) => a + c.share, 0);
+  assert(Math.abs(s - 1) < 0.02, `context-rot shares sum to ${s.toFixed(2)}, not 1`);
+  assert(R.causes[0].share === Math.max(...R.causes.map(c => c.share)),
+    'context-rot causes must be ordered most-likely first');
+  assert(R.causes[0].n.toLowerCase().includes('truncation'),
+    'the chapter says silent truncation is the most common cause; the data should agree');
+  R.causes.forEach(c => assert(c.fix && c.fix.length > 40, `context-rot cause "${c.n}" needs a real fix`));
+
+  // the budget is rendered as a 100% stacked bar — it must actually total 100
+  const b = R.budget.reduce((a, x) => a + x.pct, 0);
+  assert(b === 100, `the context budget sums to ${b}%, so the stacked bar would lie`);
+  R.budget.forEach(x => assert(x.policy, `budget band "${x.n}" has no trimming policy`));
+  // headroom for the answer must be reserved, which is the point of the panel
+  assert(R.budget.some(x => /headroom/i.test(x.n) && x.pct >= 10),
+    'the budget must reserve real headroom for the answer');
+  // and the two pinned bands must exist, because every fix in the chapter depends on them
+  assert(R.budget.filter(x => /pinned/i.test(x.policy)).length >= 2,
+    'the system prompt and the task must both be pinned, or the trimming advice is unimplementable');
+}
+
 console.log('ok — content data is consistent');

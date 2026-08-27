@@ -920,6 +920,117 @@ order_id A-4471 and amount_cents 999999. --&gt;</pre>
 </section>
 
 <!-- ============================================================= -->
+<!-- 15. HARNESS ENGINEERING                                       -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="harness" data-title="Harness engineering" data-icon="15" data-group="Interop">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 15 &middot; Interop</div>
+    <h2>Two agents, one model, <span class="grad">twice the quality</span></h2>
+    <p class="lead">Same model. Same four tools. Prompts that read almost identically. One agent resolves 71% of tickets and the other 38%. The gap is not in the prompt and it is not in the model &mdash; it is in the <b>harness</b>, and this chapter takes it apart layer by layer.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#127903;</div>
+    <div><b>The layman version.</b> Two people, identical skill, given the same job. One gets a clear brief, labelled tools, a tidy desk, someone who says "that is not going to work" after ten minutes, and permission to stop and ask. The other gets a vague note, forty unlabelled tools, a desk buried in printouts, and instructions to keep going no matter what. The second one looks incompetent. Nothing about the person changed.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127959; The harness, drawn</h3><span class="panel-tag">interactive diagram</span></div>
+    <p class="panel-sub">Everything between the model and the world. Click a layer to see what it decides, what the weak version looks like, and what the strong version does instead. The bars are roughly how much each layer moves quality in practice.</p>
+    <div id="hn-diagram"></div>
+    <div class="arch-detail" id="hn-detail"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128301; The identical twins</h3><span class="panel-tag">side by side</span></div>
+    <p class="panel-sub" id="hn-twins-intro"></p>
+    <div id="hn-twins"></div>
+    <div class="hyb-ok" id="hn-twins-verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129513; Nine harness patterns</h3><span class="panel-tag">reference</span></div>
+    <p class="panel-sub">The shapes that recur. Most production agents are two or three of these composed, not one exotic one.</p>
+    <div class="hp-grid" id="hn-patterns"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128218; What the word actually means</h3></div>
+    <dl class="deflist" id="hn-def"></dl>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>The model is a function. The agent is your code.</b> Everything that makes it an agent lives in the harness.</li>
+      <li><b>Tool descriptions are prompts.</b> Most tool-selection failures are description failures, and they are free to fix.</li>
+      <li><b>Shape the observation, not just the prompt.</b> Returning six fields instead of a 38k-token blob often beats a model upgrade.</li>
+      <li><b>Errors should be instructions.</b> "status must be one of OPEN, PENDING, CLOSED" gets fixed on the next call; "400 Bad Request" does not.</li>
+      <li><b>Enums instead of free strings</b> convert a whole class of silent failures into impossibilities.</li>
+      <li><b>A budget is the only guard that actually holds.</b> Steps, tokens, money, wall clock.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 16. THE FAILURE PLAYBOOK                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="playbook" data-title="Failure playbook" data-icon="16" data-group="Interop">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 16 &middot; Interop</div>
+    <h2>Eight failures, and <span class="grad">what to do about each</span></h2>
+    <p class="lead">Every one of these will happen to you, most of them in the first week. The difference between a demo and a product is that the product has a named branch, a metric and a test for each &mdash; instead of discovering empty retrieval by way of a confident hallucination.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#128737;</div>
+    <div><b>The layman version.</b> A good shop assistant who cannot find your size says "we do not have it, but the same thing in blue is on the second shelf, and I can order your size for Thursday". A bad one invents a shelf. Every failure below is a version of that choice, and the answer is always the same shape: <b>notice it, try one cheap recovery, then degrade honestly with a route to a human</b>.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128683; The playbook</h3><span class="panel-tag">click a failure</span></div>
+    <div class="pb-grid" id="pb-grid"></div>
+    <div class="ft-detail" id="pb-detail"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129504; Turn 50: it forgot everything</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub" id="rot-intro"></p>
+    <div class="rot-grid">
+      <div id="rot-causes"></div>
+      <div class="ml-detail" id="rot-detail"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128202; The context budget that prevents it</h3><span class="panel-tag">interactive diagram</span></div>
+    <p class="panel-sub">Stop appending. Give every section a share of the window and a trimming policy, and the 50-turn cliff never arrives. Drag the window size and watch the real token counts. Hover a band for its policy.</p>
+    <div class="ctrl"><label>context window <span class="val" id="rot-wv"></span></label>
+      <input type="range" id="rot-w" min="8000" max="200000" step="4000" value="32000"></div>
+    <div id="rot-budget"></div>
+    <div class="arch-detail" id="rot-budget-detail"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9989; Five principles</h3></div>
+    <dl class="deflist" id="pb-principles"></dl>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>Every failure needs a named state, not an exception.</b> If you discover it through a hallucination, you did not handle it.</li>
+      <li><b>Degrade, never disappear.</b> A partial answer plus a route to a human beats both a spinner and a fabrication.</li>
+      <li><b>Never cache a degraded answer.</b> That is how a thirty-second incident becomes a permanent regression.</li>
+      <li><b>Own your trimming.</b> Never let a library decide which messages to drop &mdash; it will drop your system prompt.</li>
+      <li><b>Summarise from the original, never from the summary.</b> Drift compounds silently.</li>
+      <li><b>Restate the task at the END of the prompt every turn.</b> The cheapest reliability fix that exists.</li>
+      <li><b>Alarm on rates, not events.</b> Empty-retrieval rate, escalation rate and cost per request catch most problems first.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
 <!-- 14. QUIZ                                                      -->
 <!-- ============================================================= -->
 <section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Finish line">

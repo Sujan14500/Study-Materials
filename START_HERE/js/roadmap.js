@@ -1,0 +1,93 @@
+/* ============================================================
+   roadmap.js — every course in this repo, in the order to do them.
+   `href` is relative to START_HERE/index.html and is checked by test.js.
+   ============================================================ */
+window.COURSES = {
+  python:     { n: 'Python Basics',            i: '🐍', href: '../python_basics/index.html',            ch: 13, hrs: '6-8 h',
+    d: 'Values, names, strings, collections, control flow, functions, errors, comprehensions, files and the gotchas that bite everyone.',
+    why: 'Most AI engineering is ordinary Python done carefully. Generators in particular are the answer to half the data questions in an interview.' },
+  dsa:        { n: 'DSA Basics',               i: '🧮', href: '../dsa_basics/index.html',                ch: 15, hrs: '10-14 h',
+    d: 'Big-O, arrays, strings, linked lists, stacks and queues, hash tables, trees, heaps, graphs, sorting, recursion, dynamic programming.',
+    why: 'Still asked in the coding round at most companies, and the hash-table and heap intuitions come back directly in retrieval and ranking.' },
+  ml:         { n: 'ML Fundamentals',          i: '📈', href: '../ml_fundamentals/index.html',           ch: 13, hrs: '8-10 h',
+    d: 'Splits, linear regression, gradient descent, classification, evaluation, overfitting, cross-validation, trees, clustering, features.',
+    why: 'You cannot talk credibly about evaluation without this, and gradient-boosted trees are still the right answer for tabular problems.' },
+  dl:         { n: 'DL Fundamentals',          i: '🕸️', href: '../dl_fundamentals/index.html',           ch: 12, hrs: '8-10 h',
+    d: 'The neuron, activations, XOR, forward pass, backpropagation, training, regularisation, vanishing gradients, convolution, sequences.',
+    why: 'Makes the transformer chapter something you understand rather than something you memorised.' },
+  genai:      { n: 'GenAI Flow',               i: '🧠', href: '../genai_flow/index.html',                ch: 24, hrs: '14-18 h',
+    d: 'Tokens, embeddings, attention, generation, speed, training, prompting, context, RAG, advanced RAG, agents, evaluation, shipping — plus deep dives on one transformer block, decoding controls, chunking, the fine-tuning menu, LLM-as-judge and beyond-RAG.',
+    why: 'The core course. If you only do one thing on this page, do this one — most interview questions live inside it.' },
+  langchain:  { n: 'LangChain',                i: '🔗', href: '../langchain/index.html',                 ch: 13, hrs: '6-8 h',
+    d: 'Models and messages, prompt templates, LCEL, structured output, loaders and splitters, vectors, the RAG chain, memory, tools and agents.',
+    why: 'Answers "why does this framework exist" with something better than an opinion, and the splitter and retriever pieces are genuinely useful.' },
+  langgraph:  { n: 'LangGraph',                i: '🕹️', href: '../langgraph/index.html',                 ch: 15, hrs: '7-9 h',
+    d: 'State and reducers, nodes and edges, conditional routing, cycles, ReAct agents, checkpointers, interrupts, time travel, streaming, subgraphs.',
+    why: 'Checkpointing and durable interrupts are what make human-in-the-loop possible, and that is an interview answer people fumble.' },
+  agentic:    { n: 'Agentic AI Flow',          i: '🤖', href: '../agentic_ai_flow/index.html',           ch: 17, hrs: '10-12 h',
+    d: 'The agent loop, tools and function calling, ReAct, planning, memory, reflection, multi-agent, guardrails, reliability maths, evaluation, MCP — plus harness engineering and the eight-failure playbook.',
+    why: 'Agents are where most 2025-onward interviews go, and the harness chapter answers the "same model, different quality" question directly.' },
+  sysdesign:  { n: 'AI System Design',         i: '🏗️', href: '../ai_system_design_concepts/index.html', ch: 23, hrs: '14-18 h',
+    d: 'Metrics, labels, features, the model ladder, retrieval funnels, latency budgets, capacity, feedback loops, RAG at scale, vector indexes, LLM serving, Redis — plus caching layers, sharding and parallelism, Elasticsearch and BM25, and big files on small machines.',
+    why: 'The whiteboard round. Also where the cost and latency arithmetic lives, which is what separates senior answers from confident ones.' },
+  projects:   { n: 'Projects Walkthrough',     i: '🔬', href: '../projects_walkthrough/index.html',      ch: 18, hrs: '6-8 h',
+    d: 'Two real systems taken apart: a refund agent with a policy boundary, idempotency, sagas and approvals; and a support platform with tenant isolation, generated SQL, a confidence gate, memory and an eval gate.',
+    why: 'Interviewers ask "tell me about something you shipped". This is what a good answer sounds like, and what to build so you have one.' },
+  interview:  { n: 'AI Interview Prep',        i: '🎯', href: '../ai_interview_prep/index.html',         ch: 486, hrs: 'ongoing', unit: 'questions',
+    d: '486 questions with a plain-English and a technical answer each, 203 multiple-choice questions, flashcards with spaced repetition, a timed mock interview and seven study paths.',
+    why: 'Where you find out whether you can say it out loud in ninety seconds, which is the thing that actually gets tested.' },
+  datanyx:    { n: 'Datanyx Field Guide',      i: '📓', href: '../datanyx2.0/DATANYX_FIELD_GUIDE.html',  ch: 1,  hrs: '2-3 h', unit: 'guide',
+    d: 'A field guide and interview Q&A for the Datanyx project, including its architecture and the decisions behind it.',
+    why: 'Project-specific. Read it if you will be asked about this system.' }
+};
+
+/* Ordered stages. Every id must exist in COURSES. */
+window.ROADMAP = [
+  { n: 'Stage 0 — Foundations',
+    tag: 'skip if you already write software for a living',
+    d: 'The ground everything else stands on. If you can already write Python comfortably and know what overfitting means, skip to Stage 1 and come back if something later does not land.',
+    items: ['python', 'dsa', 'ml', 'dl'] },
+  { n: 'Stage 1 — How LLMs actually work',
+    tag: 'do this one properly',
+    d: 'The single most important course here. Everything after it — RAG, agents, serving, evaluation — is an application of what is in these chapters. Do the interactive bits rather than reading past them; the transformer block and the decoding controls are the two that change how you think.',
+    items: ['genai'] },
+  { n: 'Stage 2 — Building with them',
+    tag: 'frameworks, and why they exist',
+    d: 'Now that you know what the model is doing, learn the plumbing around it. Do LangChain first for the pieces (loaders, splitters, retrievers, LCEL), then LangGraph for state, checkpointing and human-in-the-loop.',
+    items: ['langchain', 'langgraph'] },
+  { n: 'Stage 3 — Agents',
+    tag: 'where the interviews are going',
+    d: 'The loop, the tools, the harness, and the eight ways it fails in production. The harness-engineering chapter answers the question interviewers love — two teams, same model, same tools, very different quality.',
+    items: ['agentic'] },
+  { n: 'Stage 4 — Systems and scale',
+    tag: 'the whiteboard round',
+    d: 'Latency budgets, capacity arithmetic, retrieval funnels, vector indexes, caching layers, parallelism, and what a request actually costs. This is where senior candidates are separated from enthusiastic ones.',
+    items: ['sysdesign'] },
+  { n: 'Stage 5 — Two real systems',
+    tag: 'so you have something to talk about',
+    d: 'Read two production systems end to end, then build your own version of one. "Tell me about something you shipped" is the question you cannot revise for the night before.',
+    items: ['projects', 'datanyx'] },
+  { n: 'Stage 6 — Interview drilling',
+    tag: 'out loud, on the clock',
+    d: 'Study mode to fill the gaps, flashcards to make it recall rather than recognition, the quiz to catch misconceptions, and the mock interview to find out whether you can actually say it in ninety seconds. Start this in parallel with Stage 1 — do not save it for the end.',
+    items: ['interview'] }
+];
+
+/* Alternative orders for people who do not have twelve weeks. */
+window.TRACKS = [
+  { id: 'full',      n: 'Everything, in order',      i: '🗺️', time: '10-14 weeks',
+    d: 'The complete path from "I can write a for loop" to "I can design and defend a production RAG agent". Stages 0 through 6.',
+    stages: [0, 1, 2, 3, 4, 5, 6] },
+  { id: 'engineer',  n: 'I already write software',   i: '⌨️', time: '6-8 weeks',
+    d: 'Skip the Python and DSA groundwork, keep a light pass over ML and DL for the evaluation vocabulary, then go straight at the LLM material.',
+    stages: [1, 2, 3, 4, 5, 6], note: 'Come back to ML Fundamentals if evaluation questions feel shaky.' },
+  { id: 'genai',     n: 'GenAI engineer role',        i: '🧠', time: '4-6 weeks',
+    d: 'Model-facing roles: prompting, RAG, fine-tuning, evaluation. Lighter on serving and infrastructure.',
+    stages: [1, 2, 3, 6], note: 'Add Stage 4 if the job description mentions scale, cost or latency.' },
+  { id: 'aieng',     n: 'AI / platform engineer role', i: '🚀', time: '5-7 weeks',
+    d: 'System-facing roles: serving, cost, reliability, pipelines. Heavier on system design, lighter on the framework tour.',
+    stages: [1, 3, 4, 5, 6], note: 'LangChain and LangGraph are optional here; know what they do and why.' },
+  { id: 'sprint',    n: 'Interview in two weeks',     i: '⏱️', time: '10 evenings',
+    d: 'Triage. Interview prep first for coverage, GenAI Flow for the mechanisms you cannot fake, and one system-design pass. Everything else waits until after the offer.',
+    stages: [6, 1, 4], note: 'Use the "Two weeks to an interview" path inside AI Interview Prep for the day-by-day version.' }
+];

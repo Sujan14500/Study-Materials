@@ -525,4 +525,174 @@ C.annFamilies.forEach(f => {
   }
 }
 
+/* ============================================================
+   Chapters 19-22. Each block re-derives the widget maths and
+   asserts the claim the chapter makes on screen.
+   ============================================================ */
+
+/* ---- ch19: the semantic cache threshold really is a trade-off ---- */
+{
+  const cached = C.cacheCached.intent;
+  const run = t => {
+    let served = 0, wrong = 0, missed = 0;
+    C.cacheQueries.forEach(q => {
+      const hit = q.sim >= t, same = q.intent === cached;
+      if (hit) { served++; if (!same) wrong++; }
+      else if (same) missed++;
+    });
+    return { served, wrong, missed };
+  };
+  // raising the threshold can only ever serve fewer things and be wrong less often
+  let prev = run(0.60);
+  for (let t = 0.62; t <= 1.001; t += 0.02) {
+    const r = run(t);
+    assert(r.served <= prev.served, `hit rate rose when the threshold rose to ${t.toFixed(2)}`);
+    assert(r.wrong <= prev.wrong, `wrong answers rose when the threshold rose to ${t.toFixed(2)}`);
+    assert(r.missed >= prev.missed, `missed hits fell when the threshold rose to ${t.toFixed(2)}`);
+    prev = r;
+  }
+  // the panel is only worth showing if a loose threshold actually serves wrong answers
+  assert(run(0.80).wrong > 0, 'no wrong answer at a loose threshold — the chapter has nothing to teach');
+  assert(run(0.99).wrong === 0, 'a very tight threshold must be safe, or the trade-off is not a trade-off');
+  // and the negation trap must exist: high similarity, different intent
+  const trap = C.cacheQueries.filter(q => q.sim >= 0.9 && q.intent !== cached);
+  assert(trap.length > 0, 'the chapter claims negation embeds close to its opposite; no such query exists');
+  assert(trap.some(q => /\bnot\b/i.test(q.q)), 'the negation example is missing from the query set');
+  // the ladder must be ordered cheapest-first with rising hit rate for the first rungs
+  const L = C.cacheLadder;
+  for (let i = 1; i < 4; i++) assert(L[i].hit > L[i - 1].hit, `ladder rung "${L[i].n}" does not improve on the one before it`);
+  // exactly one layer may serve a wrong answer, and it must be the semantic one
+  const risky = L.filter(l => l.risk > 0.02);
+  assert(risky.length === 1 && risky[0].id === 'semantic', 'only the semantic cache should be able to be wrong');
+  // every pathology needs fixes, or the panel is a list of complaints
+  C.cachePathologies.forEach(p => assert(p.fixes.length >= 3, `"${p.n}" needs at least three fixes`));
+  assert(C.cachePathologies.some(p => p.id === 'penetration'), 'cache penetration is asked by name in interviews');
+  // the key recipe must include the three things that make invalidation free
+  ['prompt_version', 'model_id', 'retrieved_version', 'tenant_id'].forEach(k =>
+    assert(C.cacheKeyRecipe.includes(k), `the cache key recipe is missing ${k}`));
+}
+
+/* ---- ch20: parallelism arithmetic ---- */
+{
+  const mem = (m, bits, seq, batch, strat, deg) => {
+    const headDim = m.d / m.heads;
+    const kvPerToken = 2 * m.layers * m.kvHeads * headDim * 2;
+    const weights = m.params * bits / 8;
+    const kv = kvPerToken * seq * batch;
+    let w = weights, k = kv;
+    if (strat === 'tensor' || strat === 'pipeline') { w = weights / deg; k = kv / deg; }
+    return { weights, kv, kvPerToken, perGpu: w + k };
+  };
+  const m70 = C.parModels.filter(m => m.n === 'Llama-3 70B')[0];
+  // a 70B model in fp16 is about 141 GB of weights — it cannot fit one 80GB card, which is the chapter's premise
+  const w16 = mem(m70, 16, 4096, 1, 'none', 1).weights / 1073741824;
+  assert(w16 > 80, `70B in fp16 is ${w16.toFixed(0)} GB; the chapter claims it does not fit one GPU`);
+  assert(mem(m70, 4, 4096, 1, 'none', 1).weights * 4 === mem(m70, 16, 4096, 1, 'none', 1).weights,
+    '4-bit must be exactly a quarter of 16-bit');
+  // splitting must actually split, and data parallel must not
+  assert(mem(m70, 16, 4096, 16, 'tensor', 8).perGpu < mem(m70, 16, 4096, 16, 'none', 1).perGpu / 7,
+    'tensor parallel over 8 GPUs must cut per-GPU memory by close to 8x');
+  assert(mem(m70, 16, 4096, 16, 'data', 8).perGpu === mem(m70, 16, 4096, 16, 'none', 1).perGpu,
+    'data parallel must not reduce per-GPU memory — that is the chapter’s whole warning');
+  // the KV cache must grow linearly in both sequence length and batch
+  const a = mem(m70, 16, 4096, 1, 'none', 1).kv, b = mem(m70, 16, 8192, 1, 'none', 1).kv;
+  const c = mem(m70, 16, 4096, 2, 'none', 1).kv;
+  assert(Math.abs(b / a - 2) < 1e-9 && Math.abs(c / a - 2) < 1e-9, 'KV cache must be linear in sequence and batch');
+  // grouped-query attention must genuinely shrink the KV cache, which is why every modern model uses it
+  C.parModels.forEach(m => assert(m.kvHeads <= m.heads, `${m.n} has more KV heads than query heads`));
+  const gqa = C.parModels.filter(m => m.kvHeads < m.heads);
+  assert(gqa.length >= 3, 'most of these models should use grouped-query attention');
+  // MoE: total parameters must exceed what is active per token
+  const mix = C.parModels.filter(m => m.experts)[0];
+  assert(mix && mix.active < mix.experts, 'an MoE model must activate fewer experts than it holds');
+  // PagedAttention must actually beat max_tokens reservation on this workload
+  const P = C.pagedSim;
+  const naive = P.reqs.length * P.maxTokens;
+  const pagedA = P.reqs.reduce((s, l) => s + Math.ceil(l / P.blockSize) * P.blockSize, 0);
+  const used = P.reqs.reduce((s, l) => s + l, 0);
+  assert(pagedA < naive / 3, `paged allocation (${pagedA}) must be far below reserving max_tokens (${naive})`);
+  assert(1 - used / pagedA < 0.05, 'paged waste must be under 5% — the chapter claims waste is bounded by the block size');
+  assert(1 - used / naive > 0.7, 'the naive scheme must waste most of its memory, or the demo proves nothing');
+  P.reqs.forEach(l => assert(l <= P.maxTokens, 'a request cannot generate more than max_tokens'));
+  // every strategy card needs the fields the detail panel renders
+  C.parStrategies.forEach(s => ['what', 'lay', 'split', 'comm', 'good', 'bad'].forEach(k =>
+    assert(s[k], `parallel strategy "${s.n}" is missing "${k}"`)));
+}
+
+/* ---- ch21: BM25, re-derived ---- */
+{
+  const tok = s => (s.toLowerCase().match(/[a-z0-9][a-z0-9-]*/g) || []);
+  const post = {}, len = {};
+  C.lexCorpus.forEach(d => {
+    const ts = tok(d.t); len[d.id] = ts.length;
+    ts.forEach(t => { post[t] = post[t] || {}; post[t][d.id] = (post[t][d.id] || 0) + 1; });
+  });
+  const N = C.lexCorpus.length;
+  const avgdl = C.lexCorpus.reduce((a, d) => a + len[d.id], 0) / N;
+  const { k1, b } = C.bm25;
+  const idf = t => { const df = post[t] ? Object.keys(post[t]).length : 0; return Math.log(1 + (N - df + 0.5) / (df + 0.5)); };
+  const score = (q, id) => tok(q).reduce((s, t) => {
+    if (!post[t] || !post[t][id]) return s;
+    const tf = post[t][id];
+    return s + idf(t) * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * len[id] / avgdl));
+  }, 0);
+  // a rare term must be worth more than a common one — the whole point of IDF
+  assert(idf('e-4055') > idf('refunds'), 'a rare error code must have higher IDF than a common word');
+  assert(idf('business') > 0, 'IDF must stay positive with this formulation, even for common terms');
+  // saturation: ten mentions must be worth far less than ten times one mention
+  const sat = tf => (tf * (k1 + 1)) / (tf + k1);
+  assert(sat(10) < 3 * sat(1), 'term frequency must saturate, or BM25 is just TF-IDF');
+  assert(sat(2) > sat(1) && sat(100) > sat(10), 'more mentions must still be worth more, just less each time');
+  // length normalisation: the shorter document wins on an equal-frequency term
+  const rank = q => C.lexCorpus.map(d => ({ id: d.id, s: score(q, d.id) })).sort((x, y) => y.s - x.s);
+  assert(rank('E-4055')[0].id === 'd3', 'the exact error code must retrieve its own document first');
+  assert(rank('E-4021')[0].id === 'd4', 'the other error code must retrieve the other document');
+  assert(rank('downloaded digital goods')[0].id === 'd5', 'exact vocabulary must retrieve the exact document');
+  // and the query that proves you need a dense lane must genuinely score zero everywhere
+  const dead = 'how soon will i receive my money';
+  assert(rank(dead).every(r => r.s === 0),
+    'the chapter claims BM25 scores this query zero everywhere; it does not, so the argument for hybrid is broken');
+  assert(C.lexQueries.some(q => q.q === dead), 'the zero-score query must be offered as a chip');
+  // shorter document wins on "business days": d2 is shorter than d1
+  const bd = rank('business days');
+  assert(len['d2'] < len['d1'], 'the length-normalisation example needs d2 shorter than d1');
+  assert(bd[0].id === 'd2', 'length normalisation must put the shorter document first');
+}
+
+/* ---- ch22: memory arithmetic ---- */
+{
+  const peak = (s, fileGB) => fileGB * s.peakMult + 0.35;
+  const naive = C.bigStrategies.filter(s => s.id === 'naive')[0];
+  const stream = C.bigStrategies.filter(s => s.id === 'stdlib')[0];
+  // the interview scenario: 5 GB file, 2 GB RAM
+  assert(peak(naive, 5) > 2, 'loading a 5 GB CSV must not fit in 2 GB — that is the question');
+  assert(peak(stream, 5) < 2, 'streaming a 5 GB CSV must fit in 2 GB — that is the answer');
+  // and streaming must survive an absurd file, because peak memory does not depend on file size
+  assert(peak(stream, 200) < 2, 'streaming must be effectively independent of file size');
+  assert(peak(naive, 200) > peak(naive, 5), 'the naive approach must scale with the file');
+  // the ordering the bars draw must be stable and meaningful
+  const ordered = C.bigStrategies.slice().sort((a, b) => peak(a, 5) - peak(b, 5));
+  assert(ordered[0].id === 'stdlib', 'the row-at-a-time approach must be the smallest');
+  assert(ordered[ordered.length - 1].id === 'naive', 'loading the whole file must be the largest');
+  C.bigStrategies.forEach(s => {
+    assert(s.code && s.lay && s.tech, `big-data strategy "${s.n}" is missing a field`);
+    assert(s.oom === (peak(s, 5) > 2), `"${s.n}" declares oom=${s.oom} but computes ${peak(s, 5).toFixed(2)} GB against 2 GB`);
+  });
+  // the follow-up question: the aggregate is what actually kills you
+  const stateGB = keys => keys * 130 / 1073741824;
+  assert(stateGB(1e3) < 0.001, 'a thousand keys must be trivially small');
+  assert(stateGB(1e7) > 1, 'ten million keys must be over a gigabyte, or the follow-up has no teeth');
+  // four meanings of "streaming" — the chapter's opening claim
+  assert(C.streamMeanings.length === 4, 'the chapter promises four meanings of streaming');
+  assert(C.streamMeanings.some(m => /token/i.test(m.n)) && C.streamMeanings.some(m => /data/i.test(m.n)),
+    'token streaming and data streaming must both be named, since that is the confusion being fixed');
+}
+
+/* ---- comparison tables must be rectangular ---- */
+[C.cacheCompare, C.parCompare, C.lexCompare].forEach(t => {
+  t.rows.forEach(r => assert(r.length === t.cols.length + 1,
+    `comparison row "${r[0]}" has ${r.length - 1} cells for ${t.cols.length} columns`));
+  assert(t.verdict && t.verdict.length > 40, 'every comparison table needs a verdict that says which to pick');
+});
+
 console.log('ok — content data and widget arithmetic are consistent');

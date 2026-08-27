@@ -2,7 +2,7 @@
 
 An interactive, animated course on agentic AI — from "what actually makes something
 an agent" to "I can review someone's agent design and name what will break".
-Fifteen chapters, every concept attached to something you can step, drag or break.
+Seventeen chapters, every concept attached to something you can step, drag or break.
 
 Companion to [`genai_flow`](../genai_flow) (tokens → RAG),
 [`langgraph`](../langgraph) (stateful graphs) and
@@ -39,7 +39,9 @@ open index.html           # macOS
 | 12 | Evaluating agents | Four runs graded on outcome *and* trajectory — two pass an outcome-only eval and shouldn't |
 | 13 | Ship it | Cost calculator showing quadratic growth, architecture, and a checklist that saves |
 | 14 | MCP | Step a whole JSON-RPC session frame by frame, and watch the N×M wiring grid collapse |
-| 15 | Final quiz | 15 questions with explanations, plus a glossary |
+| 15 | Harness engineering | The six layers between the model and the world, then two agents with the same model and tools whose only differences are code - revealed one row at a time |
+| 16 | Failure playbook | Eight production failures with a detection, one cheap recovery, an honest degradation and a metric each; plus why an agent forgets everything at turn 50, and the context budget that prevents it |
+| 17 | Final quiz | 27 questions with explanations, plus a 54-term glossary |
 
 Progress, XP and the checklist persist in `localStorage`.
 

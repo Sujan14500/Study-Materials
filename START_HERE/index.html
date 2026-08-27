@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Start Here — the study roadmap</title>
+<meta name="description" content="Every course in this repository, in the order to do them, with a track for how much time you have.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<canvas id="bg-particles" class="bg-particles" aria-hidden="true"></canvas>
+
+<main class="wrap">
+
+  <header class="hero">
+    <div class="hero-tag">study roadmap · everything is local · nothing to install</div>
+    <h1>Start <span class="grad">here</span></h1>
+    <p class="hero-sub">
+      Twelve interactive courses and a 486-question interview bank, in the order that
+      makes each one easier than the last. Pick how much time you have, then click a
+      card to open it.
+    </p>
+
+    <div class="hero-anim" aria-hidden="true">
+      <svg viewBox="0 0 720 130" class="road-svg">
+        <defs>
+          <linearGradient id="rg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#7c5cff"/><stop offset="45%" stop-color="#22d3ee"/>
+            <stop offset="100%" stop-color="#34d399"/>
+          </linearGradient>
+        </defs>
+        <path id="road" d="M30,95 C140,95 150,30 250,30 S380,100 470,72 S620,25 690,45"
+              fill="none" stroke="url(#rg)" stroke-width="2.5" stroke-dasharray="7 7" opacity=".5"/>
+        <g id="road-stops"></g>
+        <circle r="6" fill="#fff"><animateMotion dur="7s" repeatCount="indefinite"><mpath href="#road"/></animateMotion></circle>
+        <circle r="4" fill="#22d3ee"><animateMotion dur="7s" begin="2.3s" repeatCount="indefinite"><mpath href="#road"/></animateMotion></circle>
+      </svg>
+    </div>
+
+    <div class="prog-wrap">
+      <div class="ring" id="ring">
+        <svg viewBox="0 0 120 120">
+          <defs><linearGradient id="ringg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7c5cff"/><stop offset="55%" stop-color="#22d3ee"/>
+            <stop offset="100%" stop-color="#34d399"/></linearGradient></defs>
+          <circle cx="60" cy="60" r="52" class="ring-bg"/>
+          <circle cx="60" cy="60" r="52" class="ring-fg" id="ring-fg"/>
+        </svg>
+        <div class="ring-mid"><b id="ring-pct">0%</b><span>done</span></div>
+      </div>
+      <div class="prog-text">
+        <div class="prog-line" id="prog-line">Nothing marked complete yet.</div>
+        <div class="prog-next" id="prog-next"></div>
+        <div class="btn-row">
+          <button class="btn" id="open-next">Open the next course &rarr;</button>
+          <button class="btn btn-ghost" id="reset">Reset progress</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="panel">
+    <div class="panel-head"><h2>How much time do you have?</h2><span class="panel-tag">pick a track</span></div>
+    <p class="panel-sub">The stages below reorder to match. Everything stays available &mdash; a track only changes what is highlighted and what order it is suggested in.</p>
+    <div class="tracks" id="tracks"></div>
+    <div class="track-note" id="track-note"></div>
+  </section>
+
+  <section id="stages"></section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Everything, in one table</h2></div>
+    <p class="panel-sub">If you would rather just pick something. Click any row to open it.</p>
+    <div class="tbl-wrap">
+      <table class="tbl" id="all-table">
+        <thead><tr><th></th><th>Course</th><th>Chapters</th><th>Time</th><th>What it covers</th><th></th></tr></thead>
+        <tbody id="all-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>How to actually use these</h2></div>
+    <ul class="tips">
+      <li><b>Do the interactive bits.</b> Every course is built around widgets you can push until they break. Reading past them is the fastest way to feel productive and learn nothing.</li>
+      <li><b>Start the interview bank on day one.</b> Not at the end. Use Study mode to check whether a chapter landed, and let the flashcards space it out for you.</li>
+      <li><b>Say answers out loud.</b> The gap between recognising an answer and producing one under a clock is enormous, and it is the gap interviews measure.</li>
+      <li><b>Build one thing.</b> A RAG system over documents you actually care about teaches more than three courses, and it gives you something to talk about.</li>
+      <li><b>Come back to Stage 0.</b> If evaluation or vector maths feels slippery later, the fundamentals courses are where that gets fixed &mdash; not by re-reading the advanced chapter.</li>
+    </ul>
+    <div class="note">Progress is stored in your browser only. Opening a course in a new tab does not lose your place here.</div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+<script src="js/roadmap.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

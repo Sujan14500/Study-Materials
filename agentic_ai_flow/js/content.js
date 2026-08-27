@@ -1055,3 +1055,268 @@ C.nlLessons = [
   ['State beats transcript', 'A typed field the agent reads is reliable. A fact buried in message 14 that it has to re-derive is not.'],
   ['Failing loudly is a feature', 'An agent that escalates at step 12 with a list of what it tried is worth more than one that is still going at step 40.']
 ];
+
+/* ============================================================
+   Ch15 - harness engineering
+   ============================================================ */
+C.harnessDef = [
+  ['The model is not the agent', 'The model is a function: tokens in, tokens out, no memory, no hands, no judgement about when to stop. Everything that makes it an agent - the loop, the tools, what goes into the context, what comes back out, when to retry, when to give up, when to ask a human - is code you wrote. That code is the harness.'],
+  ['Why the phrase exists', 'Two teams ship an agent on the same model with the same tools and one is twice as good. There is no prompt difference worth mentioning. The difference is in the harness: what the tool descriptions say, what the observation looks like when it comes back, how errors are worded, what gets trimmed from a long conversation, and how many steps it is allowed before something intervenes.'],
+  ['The honest definition', 'Harness engineering is everything between the model and the world. Prompt engineering is one small part of it. Context engineering - deciding what occupies the window at each step - is a large part of it. And the largest part is unglamorous: error strings, retries, budgets, schemas and stop conditions.']
+];
+C.harnessLayers = [
+  { id: 'ctx', n: 'Context assembly', icon: '&#129513;', weight: 0.24,
+    q: 'What is in the window on this exact step?',
+    lay: 'What you put on the desk before asking someone to work.',
+    tech: 'System prompt, tool schemas, retrieved documents, conversation history, scratchpad, the last observation. Order matters (stable content first, for prefix caching), and so does what you leave out.',
+    bad: 'Everything appended forever until the window overflows and the model forgets the task.',
+    good: 'A budget per section, oldest turns summarised, tool results truncated at the source, and the current task restated near the END of the prompt where attention is strongest.' },
+  { id: 'tools', n: 'Tool surface', icon: '&#128295;', weight: 0.22,
+    q: 'What can it do, and how well is that explained?',
+    lay: 'The labels on the buttons.',
+    tech: 'Names, descriptions, parameter schemas, enums instead of free strings, defaults, and how many tools are visible at once. The description IS the prompt for that tool - most tool-selection failures are description failures.',
+    bad: '40 tools named get_data_v2 with a one-line description and a free-text "query" parameter.',
+    good: '5-8 tools with a sentence on when NOT to use each, enums for anything closed, and a worked example inside the description.' },
+  { id: 'obs', n: 'Observation shaping', icon: '&#128065;', weight: 0.18,
+    q: 'What does the model see after the tool runs?',
+    lay: 'How the answer is handed back.',
+    tech: 'The single most underrated layer. A 40,000-token JSON blob is worse than a 200-token summary with the ids the model needs to drill in further. Errors should be actionable sentences, not stack traces.',
+    bad: 'Return the raw API response. The model reads three fields and pays for 40k tokens of the other ones.',
+    good: 'Project to the fields that matter, truncate lists with "... and 214 more, call again with offset", and turn errors into instructions: "no results for status=OPEN; valid values are OPEN, PENDING, CLOSED".' },
+  { id: 'ctrl', n: 'Control flow', icon: '&#128260;', weight: 0.16,
+    q: 'When does it loop, stop, retry or escalate?',
+    lay: 'The rules of the game.',
+    tech: 'Max steps, a per-request token and money budget, loop detection, forced stop conditions, and the decision to plan-then-act versus react step by step.',
+    bad: 'while True with a max of 50 steps and no other guard. It will spend $14 rediscovering that a tool is broken.',
+    good: 'Hard step cap, cost ceiling, "same tool with the same arguments twice in a row" detector, and an explicit give-up path that produces a useful partial answer.' },
+  { id: 'state', n: 'State and memory', icon: '&#128190;', weight: 0.10,
+    q: 'What survives between steps, turns and sessions?',
+    lay: 'The notebook.',
+    tech: 'The scratchpad within a run, the summary across turns, durable facts across sessions, and the checkpoint that lets a crashed run resume rather than restart.',
+    bad: 'Everything in the prompt, nothing on disk. A crash loses the run and a long conversation loses the beginning.',
+    good: 'A checkpoint per step, a separate long-term store with explicit write rules, and a summary that is regenerated rather than appended to.' },
+  { id: 'io', n: 'Output contract', icon: '&#128220;', weight: 0.10,
+    q: 'What shape must the answer be, and who checks?',
+    lay: 'The form it has to fill in.',
+    tech: 'Structured output or a grammar constraint, schema validation, citation-id verification, refusal detection, and a repair loop that shows the model its own validation error.',
+    bad: 'Parse JSON out of prose with a regex and hope.',
+    good: 'Constrained decoding where available, validate, and on failure re-prompt with the exact validator message - which succeeds most of the time on the first retry.' }
+];
+C.harnessTwins = {
+  intro: 'Two teams. Same model, same four tools, same task, prompts that read almost identically. One agent resolves 71% of tickets, the other 38%. Here is the entire difference, layer by layer.',
+  rows: [
+    { layer: 'Tool description', a: '"search_orders: search orders"',
+      b: '"search_orders: find orders for ONE customer by email or order id. Do not use it to browse - it returns at most 20. If you need a count, use count_orders instead."',
+      why: 'The weak version gives the model no way to know when the tool is wrong for the job, so it calls it repeatedly, gets truncated results, and concludes the order does not exist.' },
+    { layer: 'Parameter schema', a: 'status: string',
+      b: 'status: enum[OPEN, PENDING, REFUNDED, CLOSED]',
+      why: 'A free string invites "open", "Open", "opened", "in progress". Every one of those is a silent empty result. An enum makes the failure impossible instead of recoverable.' },
+    { layer: 'Error message', a: '{"error": "400 Bad Request"}',
+      b: '{"error": "status must be one of OPEN, PENDING, REFUNDED, CLOSED - you sent \'open\'"}',
+      why: 'The model cannot fix what it cannot see. A good error is a prompt: it names the mistake and the legal values, and the next call is usually correct.' },
+    { layer: 'Observation size', a: 'the raw 38k-token API response',
+      b: 'six projected fields plus "3 more orders, call with offset=3"',
+      why: 'The blob costs money, buries the answer in the middle of the context, and pushes the original task out of the window. This one change alone often moves the number more than a model upgrade.' },
+    { layer: 'History policy', a: 'append every turn forever',
+      b: 'keep the system prompt, a rolling summary, and the last 6 turns verbatim',
+      why: 'Appending works beautifully until turn 40 and then falls off a cliff. See the next chapter.' },
+    { layer: 'Stop condition', a: 'max 50 steps',
+      b: 'max 12 steps, $0.40 ceiling, repeat-call detector, explicit give-up that hands over a partial answer plus what it tried',
+      why: 'The weak agent burns budget looping. The strong one fails fast and hands a human something useful, which users score far higher than a confident wrong answer.' }
+  ],
+  verdict: 'Nothing in that list is a prompt. Every row is code around the model. That is what "harness" means, and it is why "we use the same model" tells you almost nothing about how good an agent will be.'
+};
+C.harnessPatterns = [
+  { n: 'ReAct loop', d: 'Think, act, observe, repeat until done. The default harness. Cheap and debuggable; needs a step cap and loop detection or it wanders.', when: 'Most tool-using agents. Start here.' },
+  { n: 'Plan-then-execute', d: 'Produce a full plan first, then execute steps with a cheaper model, re-planning only on failure. Fewer expensive calls and a plan a human can approve before anything runs.', when: 'Multi-step tasks with side effects, or anywhere a human needs to sign off.' },
+  { n: 'Reflection / critic', d: 'A second pass that criticises the first and triggers a revision. Buys real quality on writing and code; doubles cost, and needs a hard cap or it revises forever.', when: 'Quality matters more than latency, and errors are visible on re-reading.' },
+  { n: 'Router / dispatcher', d: 'A cheap classifier picks the specialist or the model tier before any expensive work happens. Usually the highest-leverage single change to cost.', when: 'Mixed traffic where most requests are easy.' },
+  { n: 'Tool scoping by phase', d: 'Only expose the tools legal in the current phase. Halves the tool list, roughly halves selection errors, and makes whole classes of mistake impossible.', when: 'More than about eight tools, or any tool with side effects.' },
+  { n: 'Supervisor / worker', d: 'One agent owns the goal and delegates to specialists with their own contexts. Isolates context, but the handoff message is now the hardest part of the system.', when: 'Genuinely separable subtasks. Not a default - it multiplies failure modes.' },
+  { n: 'Blackboard / shared state', d: 'Agents read and write one shared structured state instead of passing messages. Easier to inspect and checkpoint than a message chain.', when: 'Several workers contributing to one artefact.' },
+  { n: 'Human in the loop gate', d: 'Interrupt before any irreversible action, checkpoint, wait, resume. This is a durability feature before it is a safety feature.', when: 'Money moves, data is deleted, or an email leaves the building.' },
+  { n: 'Escalation ladder', d: 'Cheap model, then strong model, then human. Every rung has an explicit trigger, and the answer records which rung produced it.', when: 'Any production system with a quality bar and a budget.' }
+];
+
+/* ============================================================
+   Ch16 - the failure playbook
+   ============================================================ */
+C.contextRot = {
+  intro: 'An agent runs happily for 50 turns and then forgets your name, the task, and the constraint you gave it at the start. Nothing crashed. Here is exactly what happened.',
+  causes: [
+    { n: 'Silent truncation', share: 0.42,
+      d: 'Your framework, or the provider, dropped the oldest messages to make the request fit. The system prompt was message zero, so it went first. No error, no warning - the agent simply stops knowing its own instructions.',
+      fix: 'Never let a library decide what to drop. Own the trimming: pin the system prompt, pin the task statement, and drop from the middle. Log the token count of every request and alarm when it approaches the limit.' },
+    { n: 'Summary drift', share: 0.21,
+      d: 'You summarise old turns, then summarise the summary, then summarise that. Each pass loses specifics and keeps generalities, so after ten rounds "refund order 4471 for $89.20" has become "the customer had a billing issue".',
+      fix: 'Always summarise from the ORIGINAL transcript, never from the previous summary. Keep an unsummarised pinned facts block - ids, numbers, names, constraints - that is copied verbatim and never rewritten.' },
+    { n: 'Lost in the middle', share: 0.15,
+      d: 'Nothing was dropped. The instruction is sitting at token 60,000 of 120,000, exactly where attention is weakest, so the model behaves as if it were not there.',
+      fix: 'Put the current task and the hard constraints at the END of the prompt, immediately before the model generates. Restate them every turn - it costs a few hundred tokens and it is the cheapest reliability fix there is.' },
+    { n: 'Tool output flooding', share: 0.12,
+      d: 'One tool returned 40,000 tokens of JSON on turn 12. It is still in the history on turn 50, and it has pushed out everything else.',
+      fix: 'Truncate at the tool boundary, not in the prompt builder. Store the full result out of band with an id, and let the model ask for more of it if it needs to.' },
+    { n: 'No pinned identity', share: 0.06,
+      d: 'The user\'s name, tenant, locale and permissions were mentioned once, in turn one, in prose.',
+      fix: 'Structured state, re-injected every turn. Facts the agent must never lose do not belong in the conversation - they belong in the template.' },
+    { n: 'Cache-driven prompt shuffling', share: 0.04,
+      d: 'Something near the top of the prompt changes every turn - a timestamp, a shuffled tool list - so the prefix cache never hits, cost rises, someone "fixes" it by trimming history harder, and the agent gets more forgetful.',
+      fix: 'Freeze the prefix. Everything volatile goes at the bottom.' }
+  ],
+  budget: [
+    { n: 'System prompt + tools', pct: 12, policy: 'pinned, never trimmed, always first (prefix cache)' },
+    { n: 'Pinned facts / task', pct: 6, policy: 'pinned, restated at the END of the prompt every turn' },
+    { n: 'Rolling summary', pct: 14, policy: 'regenerated from the original transcript, never from itself' },
+    { n: 'Last N turns verbatim', pct: 28, policy: 'a sliding window, oldest turns fall into the summary' },
+    { n: 'Retrieved context', pct: 24, policy: 're-retrieved per turn; last turn\'s documents are usually wrong for this one' },
+    { n: 'Headroom for the answer', pct: 16, policy: 'reserved. Running out here is a truncated answer, which looks like a model failure' }
+  ]
+};
+C.playbook = [
+  { id: 'empty', n: 'Empty retrieval', icon: '&#128269;', sev: 'high',
+    sym: 'The retriever returned nothing, or nothing above the score floor.',
+    wrong: 'Pass the empty context to the model anyway. It will answer from parametric memory, sound completely confident, and cite nothing.',
+    right: [
+      'Detect it explicitly - zero hits, or best score below a floor you calibrated on real queries.',
+      'Try one cheap recovery: relax filters, drop the rarest term, run the lexical lane alone, or rewrite the query once.',
+      'If still empty, refuse with a specific message naming what you searched, and offer the nearest topics you DID find.',
+      'Log it. An empty-retrieval rate above a couple of percent is a corpus or a chunking problem, not a query problem.'
+    ],
+    metric: 'empty-retrieval rate, and the answer-quality score conditioned on it' },
+  { id: 'lowret', n: 'Low-confidence retrieval', icon: '&#128202;', sev: 'high',
+    sym: 'Documents came back, but the top score is barely above the floor and the results disagree with each other.',
+    wrong: 'Treat rank 1 as the truth. Score is not calibrated; a top hit at 0.31 is not "the answer", it is "the least bad of a bad set".',
+    right: [
+      'Use the score GAP between rank 1 and rank 5, not the absolute score. A flat distribution means the retriever is guessing.',
+      'Escalate: rerank with a cross-encoder, fan the query into several rewrites, or widen k before you give up.',
+      'Hedge the answer explicitly - "the closest thing I found says X, which may not be what you asked" - and offer escalation.',
+      'Never let a low-confidence answer be written to the cache.'
+    ],
+    metric: 'score gap distribution, and human thumbs conditioned on it' },
+  { id: 'timeout', n: 'LLM timeout', icon: '&#9203;', sev: 'high',
+    sym: 'The provider did not answer inside your deadline.',
+    wrong: 'Retry immediately, three times, with the same giant prompt. You have now tripled the load on a service that is already struggling and quadrupled the user\'s wait.',
+    right: [
+      'Set a client timeout SHORTER than the user\'s patience, not longer. If your budget is 4s, do not wait 60.',
+      'Retry once with exponential backoff plus jitter, and only on genuinely transient errors.',
+      'Hedge: after the p95 latency has elapsed, fire a second request to a different model or region and take the first to answer.',
+      'Fail over to a smaller, faster model with a trimmed prompt, and mark the answer as degraded so it is not cached.',
+      'Circuit-break after a threshold: stop calling for 30 seconds rather than queueing forever.'
+    ],
+    metric: 'timeout rate, retry rate, and the share of answers served from the degraded path' },
+  { id: 'rate', n: 'Rate limit hit (429)', icon: '&#128683;', sev: 'medium',
+    sym: 'The provider is refusing calls.',
+    wrong: 'Retry in a tight loop. This is how a rate limit becomes an outage.',
+    right: [
+      'Respect the Retry-After header. It is not advisory.',
+      'Exponential backoff with FULL jitter, or every client retries in lockstep and you rebuild the spike you just caused.',
+      'Throttle at the source with a token-bucket limiter sized to your actual quota, so you rarely see a 429 at all.',
+      'Priority queue: interactive requests jump ahead of batch work, and batch work absorbs the delay.',
+      'Route overflow to a second provider or a smaller model, and shed the lowest-value traffic first.'
+    ],
+    metric: '429 rate per key, queue depth, and the age of the oldest queued request' },
+  { id: 'toolong', n: 'Context too long', icon: '&#128220;', sev: 'medium',
+    sym: 'The request exceeds the window, or is close enough that the answer gets truncated.',
+    wrong: 'Let the SDK silently drop the oldest messages - which are your system prompt and your task.',
+    right: [
+      'Count tokens BEFORE you send, and treat overflow as a normal branch rather than an exception.',
+      'Trim by policy, in a fixed order: oldest verbatim turns first, then old tool outputs, then retrieved documents by rank. Never the system prompt, never the pinned facts.',
+      'Summarise the dropped span from the original text and pin any ids and numbers it contained.',
+      'Reserve headroom for the answer. Truncated output is the failure users actually notice.'
+    ],
+    metric: 'p95 prompt tokens against the limit, and the truncation rate' },
+  { id: 'cost', n: 'Cost runaway', icon: '&#128176;', sev: 'critical',
+    sym: 'A loop, a retry storm or one enormous document turns a $0.02 request into $14.',
+    wrong: 'Find out at the end of the month.',
+    right: [
+      'A per-request budget in tokens AND money, checked before every model call. Exceeded means stop and return what you have.',
+      'A per-user and per-tenant daily ceiling, enforced at the gateway.',
+      'Loop detection: the same tool with the same arguments twice in a row is almost always a bug.',
+      'Cap the size of anything that enters the prompt - documents, tool results, pasted text - at the boundary.',
+      'Alert on cost per request, not just total spend. Total spend hides a small number of catastrophic requests.'
+    ],
+    metric: 'cost per request p50 and p99, steps per run p99, and the share of runs that hit the cap' },
+  { id: 'lowans', n: 'Low-confidence answer', icon: '&#129300;', sev: 'high',
+    sym: 'Retrieval was fine, but the generated answer is hedged, unsupported, or contradicts its own sources.',
+    wrong: 'Ship it. A confident wrong answer costs more trust than a refusal, and it is the one users remember.',
+    right: [
+      'Verify mechanically first: does every citation id exist, is every number in the answer present in the context, does the output parse. No LLM needed for any of that.',
+      'Then a cheap judge on faithfulness only - "is every claim supported by the context, yes or no" - which is a much easier question than "is this good".',
+      'Below the bar: retry once at a lower temperature, then escalate to a stronger model, then hand to a human with everything you gathered.',
+      'Show the sources so the user can check, and make the escalation path one click.',
+      'Never cache anything below the bar.'
+    ],
+    metric: 'unsupported-claim rate, escalation rate, and thumbs-down rate by path' },
+  { id: 'toolfail', n: 'Tool failure', icon: '&#128736;', sev: 'medium',
+    sym: 'The tool threw, returned garbage, or returned success with an empty body.',
+    wrong: 'Feed the stack trace to the model and hope it improvises.',
+    right: [
+      'Translate the error into an instruction the model can act on: what was wrong, and what the legal values are.',
+      'Distinguish retryable from terminal. A 500 is worth one retry; a 422 means the arguments were wrong and retrying identically is pointless.',
+      'Cap retries per tool per run, and remove a repeatedly failing tool from the surface for the rest of the run.',
+      'Have a documented answer for "this tool is down" so the agent degrades instead of stalling.'
+    ],
+    metric: 'per-tool error rate, and the recovery rate after a tool error' }
+];
+C.playbookPrinciples = [
+  ['Every failure needs a named state, not an exception', 'The difference between a demo and a product is that the product has a branch for each of these, with a test. If your code discovers empty retrieval by way of a confident hallucination, you did not handle it.'],
+  ['Degrade, never disappear', 'A partial answer plus what was tried plus a route to a human beats both a spinner and a fabrication. Users forgive limits; they do not forgive being misled.'],
+  ['Mark the degraded path, and never cache it', 'An answer produced by the fallback model on a trimmed prompt after a timeout must be tagged as such. Caching it turns a thirty-second incident into a permanent quality regression nobody can find.'],
+  ['Budgets are the only real guard', 'Steps, tokens, money, wall clock. Everything else is advice; a budget is enforcement, and it is the difference between a bad day and a bad invoice.'],
+  ['Alarm on rates, not on events', 'One timeout is weather. A timeout rate that doubled is an incident. Empty-retrieval rate, escalation rate and cost per request are the three numbers that catch most problems before users report them.']
+];
+
+/* ---------- quiz and glossary additions for chapters 15-16 ---------- */
+C.quiz = C.quiz.concat([
+  { q: 'Two teams ship an agent on the same model with the same tools. One is twice as good and the prompts look identical. What is most likely different?',
+    o: ['Random seed', 'The harness - tool descriptions, observation shaping, error wording, trimming policy and stop conditions', 'The temperature', 'The vector database'], a: 1,
+    e: 'The model is a function; everything that makes it an agent is code around it. Tool descriptions ARE prompts, an error string is a prompt, and returning six projected fields instead of a 38k-token blob often beats a model upgrade.' },
+  { q: 'Your tool takes status as a free-text string and the agent keeps sending "open" instead of "OPEN". Best fix?',
+    o: ['Add an example to the system prompt', 'Change the parameter to an enum so the invalid value is impossible', 'Lower the temperature', 'Retry three times'], a: 1,
+    e: 'An enum converts a recoverable silent failure into an impossible one. Where you cannot use an enum, make the error message name the legal values - the next call is then usually correct.' },
+  { q: 'A tool returns 38,000 tokens of JSON and the agent gets worse over the run. Why?',
+    o: ['The model is too small', 'The blob costs money, buries the answer mid-context and pushes the original task out of the window', 'JSON is hard to parse', 'The tool is slow'], a: 1,
+    e: 'Shape the observation at the tool boundary: project the fields that matter, truncate lists with a pointer to fetch more, and keep the full payload out of band under an id.' },
+  { q: 'An agent runs for 50 turns and then forgets its own instructions. The most common cause is...',
+    o: ['The model degrading over time', 'Silent truncation - a library dropped the oldest messages, and the system prompt was message zero', 'Temperature drift', 'The vector index going stale'], a: 1,
+    e: 'No error is raised. Own the trimming yourself: pin the system prompt and the task, drop from the middle, and log the token count of every request.' },
+  { q: 'Why must a rolling summary be regenerated from the original transcript rather than from the previous summary?',
+    o: ['It is faster', 'Summarising a summary loses specifics each pass, so ids, numbers and constraints quietly evaporate', 'It uses fewer tokens', 'The model refuses otherwise'], a: 1,
+    e: 'After ten rounds "refund order 4471 for $89.20" has become "the customer had a billing issue". Keep a pinned facts block copied verbatim and never rewritten.' },
+  { q: 'Where should the current task and hard constraints sit in a long agent prompt?',
+    o: ['At the very top, in the system prompt only', 'Restated at the END, immediately before generation', 'In the middle, for balance', 'In the tool descriptions'], a: 1,
+    e: 'Attention is strongest at the edges of a long context and weakest in the middle. Restating the task every turn costs a few hundred tokens and is the cheapest reliability fix available.' },
+  { q: 'Retrieval returned nothing. What is the WRONG thing to do?',
+    o: ['Refuse with a specific message', 'Pass the empty context to the model anyway', 'Relax the filters and retry once', 'Log it and alarm on the rate'], a: 1,
+    e: 'With no context the model answers from parametric memory, sounds completely confident and cites nothing. That is the single most common source of production hallucination.' },
+  { q: 'Your LLM call times out. What is the correct first response?',
+    o: ['Retry immediately three times with the same prompt', 'Retry once with exponential backoff and jitter, then fail over to a smaller model on a trimmed prompt and mark the answer degraded', 'Increase the timeout to 120 seconds', 'Return an error page'], a: 1,
+    e: 'Tight retries multiply load on a service already struggling. And the degraded answer must be tagged so it is never written to the cache - otherwise a thirty-second incident becomes a permanent regression.' },
+  { q: 'On a 429 rate limit, which detail do engineers most often get wrong?',
+    o: ['Retrying at all', 'Using backoff without FULL jitter, so every client retries in lockstep and rebuilds the spike', 'Reading the response body', 'Logging it'], a: 1,
+    e: 'Also: respect Retry-After, throttle at the source with a token bucket sized to your real quota, and put interactive traffic ahead of batch work in the queue.' },
+  { q: 'Which guard actually prevents a cost runaway?',
+    o: ['A code review', 'A per-request budget in tokens AND money, checked before every model call, plus a repeat-call detector', 'A bigger context window', 'Lower temperature'], a: 1,
+    e: 'Everything else is advice; a budget is enforcement. Alarm on cost per request rather than total spend - total spend hides a handful of catastrophic requests.' },
+  { q: 'The answer is generated but you are not confident in it. What comes FIRST?',
+    o: ['An LLM judge', 'Mechanical verification - do the citation ids exist, are the numbers present in the context, does the output parse', 'Ask the user', 'Regenerate at a higher temperature'], a: 1,
+    e: 'Those checks are free, deterministic and never hallucinate. Only then use a cheap judge on faithfulness alone, which is a far easier question than "is this good".' },
+  { q: 'Which harness pattern is usually the highest-leverage single change to cost?',
+    o: ['Reflection', 'A cheap router that picks the model tier or specialist before any expensive work', 'Supervisor and workers', 'A blackboard'], a: 1,
+    e: 'Most traffic is easy. Classifying first and sending the easy majority to a small model routinely cuts spend by more than half without touching quality on the hard cases.' }
+]);
+
+C.glossary = C.glossary.concat([
+  ['Harness', 'Everything between the model and the world: the loop, the tools, context assembly, observation shaping, budgets and stop conditions. Prompt engineering is one small part of it.'],
+  ['Context engineering', 'Deciding what occupies the context window at each step, and with what priority. The layer where most agent quality is actually won or lost.'],
+  ['Observation shaping', 'Transforming a tool result before the model sees it - project fields, truncate lists, turn errors into instructions. The most underrated harness layer.'],
+  ['Context rot', 'The gradual loss of earlier instructions and facts over a long run, through truncation, summary drift or attention sagging in the middle of a long prompt.'],
+  ['Summary drift', 'Summarising a summary repeatedly until specifics are gone. Fixed by always summarising from the original transcript.'],
+  ['Pinned facts', 'Ids, names, numbers and constraints kept in structured state and re-injected verbatim every turn, never left to survive inside prose history.'],
+  ['Silent truncation', 'A library or provider dropping the oldest messages to fit the window, with no error. Usually takes your system prompt with it.'],
+  ['Single-flight', 'Letting exactly one caller regenerate a missing cached value while everyone else waits for that result. The fix for a stampede.'],
+  ['Full jitter', 'Randomising the whole backoff interval rather than adding a small random amount, so retrying clients spread out instead of retrying in lockstep.'],
+  ['Degraded path', 'An answer produced by a fallback model, a trimmed prompt or a retry. Must be tagged, must be surfaced, and must never be cached.'],
+  ['Escalation ladder', 'Cheap model, then strong model, then human - with an explicit trigger at each rung and the rung recorded on the answer.'],
+  ['Repeat-call detector', 'A guard that trips when the agent calls the same tool with the same arguments twice in a row. Almost always a bug, and almost always expensive.']
+]);

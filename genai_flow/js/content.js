@@ -1254,3 +1254,603 @@ log_event("rag_answer", {
 # Sample 2% of traffic into a weekly human review queue. That queue is
 # where your next 50 eval questions come from.` }
 ];
+
+/* ============================================================
+   Ch18 - inside one transformer block (a real 4-dim toy model)
+   Every number the demo shows is computed live from these weights.
+   Dimensions are deliberately meaningful:
+     d0 = animate   d1 = action   d2 = place   d3 = modifier
+   ============================================================ */
+C.tf = {
+  dims: ['animate', 'action', 'place', 'modifier'],
+  vocab: {
+    the:  [0.05, 0.05, 0.05, 0.05],
+    cat:  [0.90, 0.10, 0.05, 0.00],
+    dog:  [0.85, 0.12, 0.05, 0.00],
+    sat:  [0.10, 0.90, 0.15, 0.00],
+    ran:  [0.10, 0.85, 0.15, 0.05],
+    on:   [0.00, 0.15, 0.70, 0.00],
+    mat:  [0.10, 0.00, 0.90, 0.05],
+    fast: [0.00, 0.25, 0.00, 0.85]
+  },
+  /* small sinusoid-style position codes: enough to break ties, too small to
+     drown out meaning. Real models use the same idea at a much larger scale. */
+  pos: [
+    [ 0.00, 0.10, 0.00, 0.10], [ 0.08, 0.06, 0.04, 0.09], [ 0.09,-0.04, 0.07, 0.07],
+    [ 0.01,-0.10, 0.09, 0.04], [-0.08,-0.06, 0.10, 0.00], [-0.09, 0.04, 0.09,-0.04]
+  ],
+  /* Wq reads "how action-like am I", Wk reads "how animate are you".
+     That is the whole trick: a verb goes looking for its subject. */
+  Wq: [[0.1,0,0,0],[1.0,0,0,0],[0,1.0,0,0],[0,0,1.0,0]],
+  Wk: [[1.0,0,0,0],[0,0,0,0],[0,1.0,0,0],[0,0,1.0,0]],
+  Wv: [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]],
+  Wo: [[0.75,0,0,0],[0,0.75,0,0],[0,0,0.75,0],[0,0,0,0.75]],
+  /* eight FFN neurons. Each column of W1 is a pattern detector;
+     the matching row of W2 is what that neuron writes back into the stream. */
+  neurons: [
+    { n: 'animate?',       d: 'fires on cats, dogs, people' },
+    { n: 'action?',        d: 'fires on verbs' },
+    { n: 'place?',         d: 'fires on locations and prepositions' },
+    { n: 'modifier?',      d: 'fires on adverbs' },
+    { n: 'animate+action', d: 'THE FACT NEURON: something alive is doing something, so a place is coming' },
+    { n: 'action+place',   d: 'a verb that already has its location' },
+    { n: 'place+mod',      d: 'a described location' },
+    { n: 'generic',        d: 'always slightly on - the bias term of the layer' }
+  ],
+  W1: [
+    [1,0,0,0,0.7,0,0,0.3],
+    [0,1,0,0,0.7,0.7,0,0.3],
+    [0,0,1,0,0,0.7,0.7,0.3],
+    [0,0,0,1,0,0,0.7,0.3]
+  ],
+  b1: [-0.2,-0.2,-0.2,-0.2,-0.5,-0.5,-0.5,-0.3],
+  W2: [
+    [ 0.20, 0.00, 0.00, 0.00],
+    [ 0.00, 0.20, 0.00, 0.00],
+    [ 0.00, 0.00, 0.20, 0.00],
+    [ 0.00, 0.00, 0.00, 0.20],
+    [-1.20,-0.35, 2.60, 0.00],
+    [ 0.00, 0.00, 0.50, 0.00],
+    [ 0.00, 0.00, 0.20, 0.10],
+    [ 0.05, 0.05, 0.05, 0.05]
+  ],
+  logitGain: 9,
+  prompts: [
+    { t: ['the','cat','sat'],            note: 'The flagship run. Attention finds the subject; the feed-forward supplies the world knowledge.' },
+    { t: ['the','dog','ran'],            note: 'Same shape, different words. Nothing is memorised per sentence.' },
+    { t: ['the','cat','sat','on'],       note: '"on" is already a place word, so the place neuron fires from the token itself.' },
+    { t: ['the','cat','sat','on','the'], note: 'A determiner at the end. Attention has to reach back four tokens to know what kind of noun is due.' }
+  ],
+  steps: [
+    { k: 'embed',   n: '1 - Embed + position', d: 'Each token id becomes a vector. Position codes are added so "cat sat" and "sat cat" are not the same input.' },
+    { k: 'ln1',     n: '2 - LayerNorm',        d: 'Re-centre and re-scale each vector. Purely stabilising - no information about other tokens moves here.' },
+    { k: 'qkv',     n: '3 - Q, K, V',          d: 'Three cheap linear maps. Query = what I am looking for. Key = what I advertise. Value = what I hand over if picked.' },
+    { k: 'scores',  n: '4 - Scores + mask',    d: 'Every query dots every key, divided by sqrt(d). Future positions are set to -infinity so the model cannot read ahead.' },
+    { k: 'softmax', n: '5 - Softmax',          d: 'Scores become a probability distribution over the tokens you are allowed to see. Each row sums to exactly 1.' },
+    { k: 'mix',     n: '6 - Weighted sum',     d: 'Values are averaged using those weights. This is the ONLY step where information moves between positions.' },
+    { k: 'res1',    n: '7 - Residual add',     d: 'Add the attention result back onto the original vector. The block edits the stream; it does not replace it.' },
+    { k: 'ffn',     n: '8 - Feed-forward',     d: 'Widen 4 to 8, GELU, narrow 8 back to 4. Each hidden unit is a pattern detector that writes a fact back into the stream.' },
+    { k: 'res2',    n: '9 - Residual add',     d: 'Add the feed-forward result back. The block is done - a real model now does this 32 to 96 more times.' },
+    { k: 'logits',  n: '10 - Unembed',         d: 'Only the LAST position matters. Dot it with every vocabulary vector, softmax, and you have the next-token distribution.' }
+  ]
+};
+
+C.tfCompare = {
+  cols: ['Self-attention', 'Feed-forward (MLP)'],
+  rows: [
+    ['One-line job',       'Move information between tokens',       'Add stored knowledge to one token'],
+    ['Sees other tokens',  'Yes - the only part that does',         'No. Runs on each position independently'],
+    ['Parameters',         'about one third of the block',          'about two thirds of the block (the 4x widening)'],
+    ['Cost grows with',    'sequence length, quadratically',        'sequence length, linearly'],
+    ['Remove it and',      'words stop referring to each other',    'the model becomes routing with no facts'],
+    ['Analogy',            'a meeting where everyone shares notes', 'each person then consulting their own memory']
+  ]
+};
+
+C.tfMyths = [
+  ['"Attention is where the knowledge is."', 'No. Attention is routing. The feed-forward holds roughly two thirds of the parameters and is where factual associations live - the demo above proves it by switching it off.'],
+  ['"More heads is the same as more layers."', 'Different axes. Heads split one attention step into parallel sub-questions; layers stack whole blocks so later ones read the output of earlier ones.'],
+  ['"The residual is just an optimisation trick."', 'It is that too, but conceptually it is the point: every block is a small edit to a running document (the residual stream), not a rewrite.'],
+  ['"Position is baked into the token."', 'It is added, and in modern models using RoPE it is rotated into Q and K at every layer, not added once at the bottom.'],
+  ['"Bigger context is free."', 'Attention is O(n squared) in sequence length. Doubling the context quadruples the attention work and doubles the KV cache memory.']
+];
+
+C.tokVocabWhy = [
+  { n: 'One token per word', pro: 'Human-readable, short sequences.', con: 'English alone has millions of word forms. "running", "runs", "ran" are unrelated ids. Every typo and every new product name is <UNK>, and the embedding matrix becomes larger than the rest of the model.', verdict: 'dead' },
+  { n: 'One token per character', pro: 'Tiny vocabulary (about 100 entries), nothing is ever unknown.', con: 'Sequences get 4-5x longer. Attention is quadratic, so that is 16-25x the attention cost, and the model must relearn spelling before it can learn meaning.', verdict: 'niche' },
+  { n: 'Subword (BPE / WordPiece / Unigram)', pro: 'Fixed vocabulary of 30k-200k. Common words stay whole, rare words split into reusable pieces, nothing is ever unknown, and morphology is partly shared.', con: 'Splits are statistical not linguistic, numbers tokenise badly, and non-English scripts cost more tokens per word.', verdict: 'winner' }
+];
+
+/* ============================================================
+   Ch19 - decoding controls
+   ============================================================ */
+C.decodeDist = {
+  ctx: 'The support ticket says the payment failed, so the first thing to check is the',
+  cands: [
+    { w: 'gateway',   l: 3.10 }, { w: 'logs',     l: 2.95 }, { w: 'error',   l: 2.70 },
+    { w: 'card',      l: 2.20 }, { w: 'account',  l: 1.85 }, { w: 'status',  l: 1.60 },
+    { w: 'timestamp', l: 1.20 }, { w: 'customer', l: 0.95 }, { w: 'the',     l: 0.40 },
+    { w: 'weather',   l: -1.40 }, { w: 'poem',    l: -2.10 }, { w: 'banana', l: -3.00 }
+  ]
+};
+C.decodeKnobs = [
+  { k: 'temperature', n: 'Temperature',
+    d: 'Divides every logit before softmax. Below 1 sharpens the distribution; above 1 flattens it.',
+    lay: 'The volume knob on the model\'s imagination. 0.0 means it always says its single favourite word. 2.0 means it will happily say "banana".',
+    when: 'Facts, extraction, code, SQL: 0 to 0.3. Chat: 0.7. Brainstorming and naming: 0.9 to 1.2. Above 1.3 is rarely useful.' },
+  { k: 'top_k', n: 'Top-k',
+    d: 'Keep only the k highest-probability tokens, renormalise, then sample. A hard cut by rank.',
+    lay: 'Only let the top 40 candidates into the room, then pick from those.',
+    when: 'Blunt but predictable. Bad when the distribution is genuinely peaked (k=40 lets in 39 bad options) or genuinely flat (k=40 cuts off good ones).' },
+  { k: 'top_p', n: 'Top-p (nucleus)',
+    d: 'Keep the smallest set of tokens whose probabilities add up to p, then renormalise. A cut by mass, not by count.',
+    lay: 'Keep adding candidates until you have covered 90% of the probability, then stop. The room is small when the model is sure and large when it is not.',
+    when: 'Usually better than top-k because it adapts to how confident the model is. 0.9 to 0.95 for chat; 1.0 plus temperature 0 for deterministic work.' },
+  { k: 'rep', n: 'Repetition / frequency penalty',
+    d: 'Subtracts from the logit of any token already generated. Frequency penalty scales with count; presence penalty is a flat one-off.',
+    lay: 'A nudge that says "you already said that". Stops the model looping "thank you thank you thank you".',
+    when: '0.1 to 0.5 for long free text. Dangerous on code and structured output - it will penalise the fiftieth legitimate return statement, or a JSON key you need repeated.' },
+  { k: 'maxtok', n: 'Max tokens',
+    d: 'A hard ceiling on generated tokens. It does NOT make the model concise - it truncates it mid-sentence.',
+    lay: 'A guillotine, not an editor. If you want short answers, ask for short answers in the prompt AND set this as a safety net.',
+    when: 'Always set it. It is your only defence against a runaway loop billing you for 100k tokens.' },
+  { k: 'stop', n: 'Stop sequences',
+    d: 'Strings that end generation the moment they appear. The stop string itself is not returned.',
+    lay: 'A tripwire. "Stop the second you type newline-newline-User:" so the model cannot start role-playing the user.',
+    when: 'Essential for few-shot formats and agent scratchpads - stop at "Observation:" so the model cannot hallucinate its own tool results.' },
+  { k: 'seed', n: 'Seed',
+    d: 'Fixes the pseudo-random draw. Same seed, prompt, params and model build gives the same output.',
+    lay: 'The "do that again" button.',
+    when: 'Evals and bug reports. Best-effort on most hosted APIs - batching and hardware can still change results.' }
+];
+C.decodeRecipes = [
+  { n: 'Extraction / classification / SQL', t: 0.0, k: 0, p: 1.00, rep: 0.0, why: 'You want the single most likely answer every time. Randomness here is a bug you cannot reproduce.' },
+  { n: 'Support answer from retrieved docs', t: 0.2, k: 0, p: 0.90, rep: 0.0, why: 'Nearly deterministic, with a little slack so it can phrase things naturally around whatever the retriever returned.' },
+  { n: 'General chat', t: 0.7, k: 0, p: 0.95, rep: 0.2, why: 'The default for a reason. Varied enough to feel alive, tight enough to stay sensible.' },
+  { n: 'Brainstorming / naming', t: 1.1, k: 0, p: 0.98, rep: 0.6, why: 'You are paying for variety. The repetition penalty stops it circling one idea.' },
+  { n: 'Self-consistency voting', t: 0.8, k: 0, p: 0.95, rep: 0.0, why: 'Deliberately non-deterministic: sample 5 answers and take the majority. Needs temperature above 0 or all 5 are identical.' }
+];
+C.decodeTraps = [
+  ['Temperature 0 is not "deterministic"', 'It is greedy, which is different. Batching, GPU non-determinism and MoE routing can still change the token. Pin a seed as well, and never assert on exact strings in tests when you can assert on a parsed field.'],
+  ['Do not stack top-k and top-p aggressively', 'k=10 with p=0.7 means the effective filter is whichever is tighter, and you no longer know which one is doing the work. Pick one, usually top-p.'],
+  ['Repetition penalty breaks JSON', 'JSON repeats braces, quotes and key names by design. A penalty of 1.2 will happily produce unparseable output. Use structured output or grammar constraints instead.'],
+  ['Max tokens is a cost control, not a style control', 'Truncation mid-sentence looks like a model failure to users and to your eval judge. Ask for brevity in the prompt; keep max tokens as the circuit breaker.']
+];
+
+/* ============================================================
+   Ch20 - chunking
+   ============================================================ */
+C.chunkDoc = [
+  { tag: 'h1', text: 'Refund Policy' },
+  { tag: 'p',  text: 'Customers may request a refund within 30 days of purchase. Refunds are issued to the original payment method.' },
+  { tag: 'h2', text: 'Processing time' },
+  { tag: 'p',  text: 'Card refunds settle in 5 to 10 business days. The delay is on the issuing bank, not on us. Bank transfers settle in 2 business days.' },
+  { tag: 'h2', text: 'Exceptions' },
+  { tag: 'p',  text: 'Digital goods already downloaded are not refundable. Subscription refunds are prorated from the cancellation date.' },
+  { tag: 'h2', text: 'Escalation' },
+  { tag: 'p',  text: 'If a refund has not arrived after 10 business days, open a ticket with the transaction id. Support will trace it with the gateway.' }
+];
+C.chunkStrategies = [
+  { id: 'fixed', n: 'Fixed-size', icon: '&#128207;', size: 300, overlap: 0,
+    lay: 'Cut every 300 characters, like slicing bread without looking.',
+    tech: 'Split on a token or character count with no overlap. Cheapest, fastest, index-friendly.',
+    good: 'Uniform machine logs, transcripts, anything with no structure.',
+    bad: 'Cuts sentences and tables in half. The half-sentence at a boundary retrieves badly and reads worse.',
+    param: 'size 256-512 tokens, overlap 0' },
+  { id: 'overlap', n: 'Fixed + overlap', icon: '&#128279;', size: 300, overlap: 60,
+    lay: 'Same slices, but each slice repeats the tail of the one before it.',
+    tech: 'Sliding window with a 10-20% stride overlap, so a fact split by a boundary still appears whole inside one chunk.',
+    good: 'The safe default. Almost always better than plain fixed for a small storage cost.',
+    bad: 'Duplicates content, inflating the index, and can return two near-identical chunks inside one top-k.',
+    param: 'size 400, overlap 50-80 tokens' },
+  { id: 'recursive', n: 'Recursive', icon: '&#129386;', size: 300, overlap: 0,
+    lay: 'Try to break at paragraphs. Too big? Break at sentences. Still too big? Then break at words.',
+    tech: 'An ordered separator list - paragraph, newline, sentence, space - applied until every piece fits the budget.',
+    good: 'Prose, docs, wikis. The workhorse for most RAG systems.',
+    bad: 'Still blind to meaning. It respects punctuation, not topic.',
+    param: 'size 500, overlap 60' },
+  { id: 'document', n: 'Document-aware', icon: '&#127959;', size: 0, overlap: 0,
+    lay: 'Follow the headings. Each section becomes a chunk and keeps its heading attached.',
+    tech: 'Parse the format first - Markdown headers, HTML DOM, PDF outline, code AST - and chunk on real structural nodes. Prepend the heading path to every chunk.',
+    good: 'Manuals, API docs, legal contracts, source code. Anything with a real outline.',
+    bad: 'Needs a parser per format, and one enormous section still has to be sub-split.',
+    param: 'split on h1/h2/h3, then recursive' },
+  { id: 'semantic', n: 'Semantic', icon: '&#129522;', size: 0, overlap: 0,
+    lay: 'Read sentence by sentence and start a new chunk the moment the subject changes.',
+    tech: 'Embed each sentence, walk the sequence, and cut where the cosine distance between consecutive sentences spikes above a percentile threshold.',
+    good: 'Mixed-topic documents with no headings - meeting notes, long emails, papers.',
+    bad: 'Costs an embedding call per sentence at index time, and the threshold needs tuning per corpus.',
+    param: 'breakpoint at 95th percentile distance' },
+  { id: 'parent', n: 'Parent-child', icon: '&#128104;&#8205;&#128102;', size: 150, overlap: 0,
+    lay: 'Search with tiny precise snippets, but hand the model the whole surrounding section.',
+    tech: 'Index small child chunks for retrieval precision; store a pointer to a large parent chunk and return the parent to the LLM. Also called small-to-big.',
+    good: 'Usually the quality winner. Resolves the tension between "small chunks retrieve better" and "big chunks answer better".',
+    bad: 'Two stores to keep in sync, and parents can blow the context budget when k is large.',
+    param: 'child 150 / parent 1200, k = 4' }
+];
+C.chunkExtras = [
+  ['Contextual retrieval', 'Before embedding, ask a cheap model to prepend one or two sentences situating the chunk inside the whole document - "this is from the Exceptions section of the refund policy and covers digital goods". Anthropic reported roughly a 35% drop in retrieval failures from this alone, and around 49% combined with BM25. One cheap call per chunk, once, at index time.'],
+  ['Late chunking', 'Embed the WHOLE document with a long-context embedding model first, then pool the token embeddings into chunk vectors. Every chunk vector has already seen the full document, so pronouns and back-references still resolve. Requires an embedding model with a long window.'],
+  ['Metadata is not optional', 'Every chunk should carry source, section path, document version, timestamp and permissions. Filtering on those before the vector search is usually a bigger quality win than any clever splitter, and it is how you stop one tenant retrieving another tenant\'s document.'],
+  ['Chunk size is an eval question, not an opinion', 'There is no universally correct size. Build a 50-question eval set, sweep size over 128/256/512/1024 and overlap over 0/10%/20%, and read recall@10. An afternoon of work settles the argument permanently.']
+];
+
+/* ============================================================
+   Ch21 - the fine-tuning menu
+   ============================================================ */
+C.ftMethods = [
+  { id: 'prompt', n: 'Prompt / few-shot', fam: 'no training',
+    what: 'Write better instructions and paste 3-10 examples.',
+    data: '0-20 examples', gpu: 'none', time: 'minutes', cost: 1, quality: 2, risk: 1,
+    lay: 'Telling a new hire what you want, and showing them two finished examples.',
+    use: 'Always try this first. Most "we need to fine-tune" tickets die here.',
+    stop: 'Examples no longer fit in context, or you need the behaviour to be reliable at temperature 0 across thousands of calls.' },
+  { id: 'rag', n: 'RAG', fam: 'no training',
+    what: 'Retrieve the right documents at question time and put them in the prompt.',
+    data: 'your documents', gpu: 'none', time: 'days', cost: 2, quality: 3, risk: 2,
+    lay: 'Giving the new hire the company handbook and letting them look things up.',
+    use: 'The answer depends on facts that change. Fine-tuning teaches STYLE and FORM; RAG supplies FACTS.',
+    stop: 'The model knows the facts but still formats, reasons or refuses wrongly. That is a tuning problem, not a retrieval one.' },
+  { id: 'sft', n: 'Full SFT', fam: 'training',
+    what: 'Supervised fine-tuning: update every weight on (prompt, ideal answer) pairs.',
+    data: '5k-100k+ pairs', gpu: '8x A100/H100 for a 7B model', time: 'days', cost: 5, quality: 5, risk: 5,
+    lay: 'Sending the hire back to university for a term to rewire how they think.',
+    use: 'You own a large, clean, domain-specific dataset and need a big behaviour shift - a new language, a new modality, a house style nothing else reproduces.',
+    stop: 'You have under a few thousand examples. Full SFT on small data forgets more than it learns.' },
+  { id: 'lora', n: 'LoRA', fam: 'training',
+    what: 'Freeze the base model. Inject small trainable rank-r matrices A and B beside chosen weight matrices; only A and B learn. At inference you can merge them back so there is zero added latency.',
+    data: '500-50k pairs', gpu: '1x A100 40-80GB for a 7B model', time: 'hours', cost: 3, quality: 4, risk: 2,
+    lay: 'Not rewiring the brain - clipping on a small pair of specialist glasses that adjust what it sees.',
+    use: 'The default fine-tune. Adapters are 10-200MB, so one base model can hot-swap a different adapter per customer.',
+    stop: 'You need to teach genuinely new knowledge at scale, or the base model has never seen the language you need.' },
+  { id: 'qlora', n: 'QLoRA', fam: 'training',
+    what: 'LoRA, but the frozen base is loaded in 4-bit NF4 with double quantisation and paged optimisers. Gradients flow through the quantised weights into full-precision adapters.',
+    data: '500-50k pairs', gpu: '1x 24GB consumer card for 7B; 1x 80GB for 70B', time: 'hours', cost: 2, quality: 4, risk: 3,
+    lay: 'The same clip-on glasses, but you compressed the textbook so it fits in your backpack.',
+    use: 'You do not have datacentre GPUs. QLoRA is what makes fine-tuning a 70B model on a single card possible at all.',
+    stop: 'You need maximum quality and have the VRAM. 4-bit costs a small but real amount of accuracy, and each step is roughly 30% slower than plain LoRA.' },
+  { id: 'dpo', n: 'DPO', fam: 'preference',
+    what: 'Direct Preference Optimisation. Train directly on (prompt, chosen, rejected) triples with a closed-form loss. No reward model, no RL loop.',
+    data: '1k-50k preference pairs', gpu: 'same as LoRA - it composes with it', time: 'hours', cost: 3, quality: 4, risk: 3,
+    lay: 'Instead of writing the perfect answer, show two answers and point at the better one. Far easier to collect.',
+    use: 'Tone, safety, helpfulness, refusal behaviour - anything where "better" is easier to judge than to write.',
+    stop: 'You have no preference data. DPO also drifts if beta is too low; keep a reference model and watch the KL divergence.' },
+  { id: 'rlhf', n: 'RLHF (PPO)', fam: 'preference',
+    what: 'Train a reward model on human comparisons, then optimise the policy against it with PPO plus a KL penalty back to the reference model.',
+    data: '50k+ comparisons', gpu: 'large - three models resident at once', time: 'weeks', cost: 5, quality: 5, risk: 5,
+    lay: 'Hire a panel of judges, teach a robot to imitate the judges, then let the robot coach the model full time.',
+    use: 'Frontier labs aligning a base model. Rare inside application teams.',
+    stop: 'Almost always. DPO gets most of the benefit for a fraction of the machinery, and reward hacking is a real, expensive failure mode.' },
+  { id: 'grpo', n: 'GRPO', fam: 'preference',
+    what: 'Group Relative Policy Optimisation. Sample a GROUP of answers per prompt, score them all, and use the group mean as the baseline - so no separate value or critic network is needed.',
+    data: 'prompts plus an automatic scorer', gpu: 'heavy inference, lighter memory than PPO', time: 'days', cost: 4, quality: 5, risk: 4,
+    lay: 'Give the model the same maths problem eight times, mark all eight, and push it toward whichever attempts beat the class average.',
+    use: 'Reasoning tasks with a verifiable answer - maths, code that must pass tests, output that must parse. This is the family behind recent reasoning models.',
+    stop: 'Your task has no automatic scorer. GRPO lives or dies on the reward function.' },
+  { id: 'distil', n: 'Distillation', fam: 'compress',
+    what: 'Generate outputs from a large teacher model, then SFT or LoRA a small student on them.',
+    data: '10k-1M teacher outputs', gpu: 'student-sized', time: 'days', cost: 3, quality: 4, risk: 3,
+    lay: 'The professor writes ten thousand worked solutions and the student learns the professor\'s style.',
+    use: 'You have a working expensive pipeline and need it much cheaper or faster at nearly the same quality on YOUR narrow task.',
+    stop: 'Check the teacher\'s terms of service. A student never exceeds its teacher, and it inherits every one of the teacher\'s mistakes.' }
+];
+C.loraVsQlora = {
+  cols: ['LoRA', 'QLoRA'],
+  rows: [
+    ['Base model weights', 'frozen, kept at 16-bit',                    'frozen, quantised to 4-bit NF4'],
+    ['Adapter weights',    'trainable, 16-bit',                          'trainable, 16-bit (unchanged)'],
+    ['VRAM for a 7B model','about 16-20 GB',                             'about 6-10 GB'],
+    ['VRAM for a 70B model','about 160 GB - needs a multi-GPU node',     'about 46 GB - fits one 80GB card'],
+    ['Training speed',     'baseline',                                   'roughly 25-40% slower per step (de-quantise on the fly)'],
+    ['Quality',            'the reference point',                        'very close - usually within about a point on benchmarks'],
+    ['Extra tricks',       'none needed',                                'double quantisation and paged optimisers to survive memory spikes'],
+    ['Inference',          'merge adapter into base, zero added latency','merge back into a 16-bit base, or serve 4-bit and accept a small quality cost'],
+    ['Pick it when',       'you have the VRAM and want maximum quality', 'the model does not fit otherwise - which is most of the time']
+  ],
+  verdict: 'QLoRA is not a different algorithm. It is LoRA plus a memory trick on the frozen part. If the model fits in your VRAM with LoRA, use LoRA. If it does not, QLoRA is the reason you can train at all.'
+};
+C.loraMath = {
+  note: 'These parameter counts are exact arithmetic, not estimates. For each adapted matrix of shape d_in by d_out, LoRA adds r * (d_in + d_out) parameters.',
+  presets: [
+    { n: 'Llama-3 8B',  d: 4096, layers: 32, base: 8.03e9 },
+    { n: 'Llama-3 70B', d: 8192, layers: 80, base: 70.6e9 },
+    { n: 'Mistral 7B',  d: 4096, layers: 32, base: 7.24e9 }
+  ],
+  targets: [
+    { id: 'qv',   n: 'q_proj, v_proj',                   mats: 2, label: 'the original LoRA paper setting' },
+    { id: 'qkvo', n: 'q, k, v, o',                       mats: 4, label: 'all attention projections' },
+    { id: 'all',  n: 'attention + MLP (gate, up, down)', mats: 7, label: 'the QLoRA paper recommendation - best quality' }
+  ]
+};
+C.ftDecision = [
+  { q: 'What is actually wrong with the current output?',
+    a: [ { t: 'It states wrong facts', v: 'facts' },
+         { t: 'It has the facts but the wrong format, tone or structure', v: 'form' },
+         { t: 'It reasons badly on multi-step problems', v: 'reason' },
+         { t: 'It is correct but too slow or too expensive', v: 'cost' } ] },
+  { q: 'How many labelled examples can you realistically get?',
+    a: [ { t: 'Under 50', v: 'tiny' }, { t: '50 to 1,000', v: 'small' },
+         { t: '1,000 to 50,000', v: 'mid' }, { t: 'Over 50,000', v: 'big' } ] },
+  { q: 'What hardware can you get for training?',
+    a: [ { t: 'None - API only', v: 'none' }, { t: 'One consumer GPU, 16-24GB', v: 'consumer' },
+         { t: 'One A100 or H100, 40-80GB', v: 'single' }, { t: 'A multi-GPU node or more', v: 'cluster' } ] },
+  { q: 'Can a program automatically score an answer right or wrong?',
+    a: [ { t: 'Yes - tests pass, JSON parses, the number matches', v: 'verifiable' },
+         { t: 'No - a human has to judge it', v: 'subjective' } ] }
+];
+
+/* ============================================================
+   Ch22 - LLM as a judge
+   ============================================================ */
+C.judgeBench = [
+  { id: 'a1', q: 'Why did my refund fail?', human: 4, lenA: 0.30, lenB: 0.55, better: 'A',
+    ansA: 'Card ending 4471 was reported lost on 12 March, so the issuer declined the reversal (E-4055). Ask the customer for a new card and we will reissue.',
+    ansB: 'Refunds can fail for many reasons. Please check your payment method and try again, and contact support if the problem continues.' },
+  { id: 'a2', q: 'How long do refunds take?', human: 3, lenA: 0.05, lenB: 0.95, better: 'A',
+    ansA: '5 to 10 business days.',
+    ansB: 'Great question! Refund timing depends on several factors. In general, for card payments, the funds are returned to your issuing bank, which then posts them to your account. This typically takes between five and ten business days, though some banks are faster.' },
+  { id: 'a3', q: 'Is a downloaded ebook refundable?', human: 5, lenA: 0.15, lenB: 0.35, better: 'B',
+    ansA: 'Yes, all purchases are refundable within 30 days.',
+    ansB: 'No - digital goods already downloaded are excluded under the Exceptions section of the refund policy.' },
+  { id: 'a4', q: 'Refund has not arrived after 12 days', human: 4, lenA: 0.45, lenB: 0.15, better: 'A',
+    ansA: 'Past 10 business days this is no longer normal bank delay. Open a ticket with the transaction id so support can trace it with the gateway.',
+    ansB: 'Please wait a little longer, refunds sometimes take time.' },
+  { id: 'a5', q: 'Can I get a partial refund?', human: 2, lenA: 0.20, lenB: 0.45, better: 'B',
+    ansA: 'Subscription refunds are prorated from the cancellation date.',
+    ansB: 'Subscription refunds are prorated from the cancellation date, and one-off purchases are refunded in full within 30 days.' },
+  { id: 'a6', q: 'Which payment method is it returned to?', human: 5, lenA: 0.30, lenB: 0.10, better: 'B',
+    ansA: 'You can choose any payment method you like at refund time.',
+    ansB: 'The original payment method, always.' },
+  { id: 'a7', q: 'Do you refund shipping?', human: 1, lenA: 0.10, lenB: 0.50, better: 'B',
+    ansA: 'Yes, shipping is always refunded.',
+    ansB: 'The policy does not cover shipping. I cannot answer this from the sources I have - escalating to a human.' },
+  { id: 'a8', q: 'How long is the refund window?', human: 5, lenA: 0.10, lenB: 0.12, better: 'tie',
+    ansA: '30 days from purchase.',
+    ansB: '30 days from the purchase date.' }
+];
+C.judgeBiases = [
+  { id: 'position',    n: 'Position bias',     d: 'The answer shown first wins more often, regardless of quality. The largest and best-documented judge bias.' },
+  { id: 'verbosity',   n: 'Verbosity bias',    d: 'Longer answers score higher even when the extra words add nothing.' },
+  { id: 'self',        n: 'Self-preference',   d: 'A model prefers text written by itself or by its own family.' },
+  { id: 'vague',       n: 'Scale drift',       d: 'Without a rubric, "7 out of 10" means something different on every call.' },
+  { id: 'noise',       n: 'Sampling noise',    d: 'The same input judged twice returns two different scores.' },
+  { id: 'calibration', n: 'Poor calibration',  d: 'Absolute scores bunch at 7-9 and cannot separate good from great.' }
+];
+C.judgeConfigs = [
+  { id: 'rubric',    n: 'Explicit rubric',        fixes: ['vague','calibration'],
+    d: 'Replace "rate this 1-10" with named criteria and a written definition of each score. Removes the judge\'s freedom to invent its own scale.' },
+  { id: 'swap',      n: 'Position swap',          fixes: ['position'],
+    d: 'Run every pair twice with A and B swapped and keep only verdicts that agree. Doubles the cost and buys the single biggest reliability gain.' },
+  { id: 'reference', n: 'Reference answer',       fixes: ['calibration'],
+    d: 'Give the judge a gold answer to compare against instead of judging from its own knowledge. Turns an open judgement into a comparison.' },
+  { id: 'cot',       n: 'Reason before scoring',  fixes: ['vague'],
+    d: 'Force the judge to write its reasoning first and emit the score last. A score produced before the reasoning is a vibe.' },
+  { id: 'pairwise',  n: 'Pairwise, not absolute', fixes: ['calibration'],
+    d: 'Ask "which is better" instead of "score this 1-5". Models rank far more reliably than they score.' },
+  { id: 'lenpen',    n: 'Length control',         fixes: ['verbosity'],
+    d: 'Tell the judge explicitly that length is not quality, and track the correlation between verdict and answer length as a diagnostic.' },
+  { id: 'consist',   n: 'Self-consistency, n=3',  fixes: ['noise'],
+    d: 'Sample the judge three times at low temperature and take the majority verdict. Removes single-sample jitter.' },
+  { id: 'diffjudge', n: 'Different model family', fixes: ['self'],
+    d: 'Never let a model grade its own output. Self-preference is measurable and it will flatter itself.' }
+];
+C.judgeGolden = [
+  'Measure the judge before you trust it. Label 100 cases by hand, then report agreement (Cohen\'s kappa) between judge and human. Below about 0.6 the judge is noise wearing a lab coat.',
+  'A judge is a regression detector, not a grade. Its job is to notice that today is worse than yesterday - the absolute number barely matters.',
+  'Freeze the judge model and the judge prompt. If both the system and the ruler move, you have measured nothing.',
+  'Always keep a cheap deterministic layer underneath: schema validation, citation-id existence, refusal-string detection. Those catch most regressions for free and never hallucinate.',
+  'Route disagreements to humans. Where the judge and the assertions disagree is exactly where your next eval cases come from.'
+];
+C.evalMethods = [
+  { n: 'Exact match', cost: 1, cover: 1, trust: 5,
+    lay: 'Did the string equal the answer key?',
+    tech: 'Character-for-character or normalised equality. Also regex, JSON-schema validation, does-it-compile, do-the-tests-pass.',
+    use: 'Classification labels, extracted fields, SQL results, structured output. Free and unarguable.',
+    fail: 'Marks "5-10 business days" wrong when the key says "five to ten business days".' },
+  { n: 'Semantic similarity', cost: 2, cover: 3, trust: 2,
+    lay: 'Are the two answers pointing at the same meaning?',
+    tech: 'Cosine between embeddings of output and reference, or BERTScore.',
+    use: 'A cheap regression tripwire across hundreds of cases.',
+    fail: 'Cannot tell "refunds take 5 days" from "refunds take 50 days" - they embed almost identically. Never use it alone for factual correctness.' },
+  { n: 'LLM as a judge', cost: 3, cover: 5, trust: 3,
+    lay: 'Ask a second model to mark the homework.',
+    tech: 'A judge model scores output against a rubric, optionally with a reference answer and a written chain of thought.',
+    use: 'Open-ended quality: helpfulness, tone, faithfulness to sources, instruction-following.',
+    fail: 'Every bias in the panel above. Trustworthy only once you have measured its agreement with humans.' },
+  { n: 'Pairwise / arena', cost: 3, cover: 4, trust: 4,
+    lay: 'Which of these two is better?',
+    tech: 'Head-to-head comparisons aggregated into an Elo or Bradley-Terry score.',
+    use: 'Comparing two model or prompt versions. Much more reliable than absolute scoring.',
+    fail: 'Gives a ranking, not a level. Elo cannot tell you whether both options are terrible.' },
+  { n: 'RAGAS-style RAG metrics', cost: 3, cover: 4, trust: 4,
+    lay: 'Grade the librarian and the writer separately.',
+    tech: 'Faithfulness (is every claim supported by the retrieved context), answer relevance, context precision, context recall.',
+    use: 'The only way to know whether a bad RAG answer is a retrieval bug or a generation bug.',
+    fail: 'Context recall needs ground-truth relevant documents, which is the expensive part nobody wants to build.' },
+  { n: 'Human evaluation', cost: 5, cover: 5, trust: 5,
+    lay: 'A person reads it and decides.',
+    tech: 'Annotators working from a written guideline; measure inter-annotator agreement before you trust the labels.',
+    use: 'The ground truth that calibrates every cheaper method. A few hundred cases is enough.',
+    fail: 'Slow, expensive and inconsistent unless the guideline is genuinely written down.' },
+  { n: 'Online / A-B', cost: 4, cover: 5, trust: 5,
+    lay: 'Ship it to 5% of users and watch what they do.',
+    tech: 'Randomised assignment; track thumbs, escalation rate, task completion, retention. Guard with a sequential test so you do not peek yourself into a false positive.',
+    use: 'The final word. Offline metrics only ever approximate this.',
+    fail: 'Slow, needs traffic, and can only compare things you were willing to expose to real users.' }
+];
+C.evalPyramid = [
+  { n: 'Assertions and unit checks', pct: 'about 60% of your suite', d: 'Deterministic, free, run on every commit. Does the JSON parse, is the citation id real, is the refusal string absent, is PII redacted, is latency under budget.' },
+  { n: 'Retrieval metrics',          pct: 'about 20%', d: 'recall@k, MRR, nDCG against a labelled question-to-document set. No LLM needed - and this is where most RAG bugs actually live.' },
+  { n: 'LLM judge on a frozen set',  pct: 'about 15%', d: 'A fixed 100-300 case golden set, judged with rubric plus position swap. Runs nightly and on every prompt change.' },
+  { n: 'Human review',               pct: 'about 5%',  d: 'A weekly sample, plus every case where the judge and the assertions disagree. This is what keeps the judge honest.' }
+];
+
+/* ============================================================
+   Ch23 - beyond RAG
+   ============================================================ */
+C.longCtx = {
+  note: 'Every number below is computed from the inputs you set. The recall curve follows the shape reported by the "lost in the middle" line of work: accuracy is high at the very start and the very end of a long context and sags in the middle.',
+  defaults: { corpusTokens: 4000000, ctxLimit: 1000000, k: 8, chunk: 500, inPrice: 3.0, outPrice: 15.0, qpd: 20000, prefillRate: 9000 }
+};
+C.ragVsLong = {
+  cols: ['Stuff it all in a 1M window', 'RAG'],
+  rows: [
+    ['Cost per question',   'you pay for every token, every time',        'you pay for about 4k tokens of retrieved context'],
+    ['Time to first token', 'prefill of 1M tokens - many seconds',        'one search hop plus a small prefill'],
+    ['Corpus ceiling',      'hard stop at the window size',               'unbounded - billions of documents'],
+    ['Freshness',           'rebuild the whole prompt, and prompt caches invalidate','update one chunk, everything else stays warm'],
+    ['Accuracy on a needle','high at the edges, sags in the middle',      'the needle arrives at position 1 of a short prompt'],
+    ['Permissions',         'everything in the window is visible to the model','filter by ACL before retrieval - the only workable answer'],
+    ['Citations',           'the model has to find and quote them',       'you already know which chunk you sent'],
+    ['Debuggability',       'one giant opaque prompt',                    'you can inspect exactly what was retrieved and why']
+  ],
+  verdict: 'A large window does not delete RAG - it makes RAG cheaper to build, because chunking can be lazier and k can be larger. The two are complementary: retrieve well, then use the roomy window to be generous with what you send.'
+};
+C.ragVariants = [
+  { id: 'classic', n: 'Classic RAG', icon: '&#128218;', cost: 1, power: 2, lat: 'one search plus one LLM call',
+    flow: ['question', 'embed', 'top-k search', 'stuff the prompt', 'answer'],
+    ctrl: 'Fixed pipeline. Always exactly one retrieval, whether or not one is needed.',
+    good: 'FAQ over a stable document set. Predictable latency, predictable bill, easy to debug.',
+    bad: 'Cannot recover from a bad first search, cannot decompose a multi-hop question, and cannot decide it did not need to search at all.' },
+  { id: 'agentic', n: 'Agentic RAG', icon: '&#128373;', cost: 4, power: 5, lat: '2-10 LLM calls plus N searches',
+    flow: ['question', 'plan', 'search / re-search', 'critique', 'answer or loop'],
+    ctrl: 'The model decides whether to search, what to search for, which tool to use, and whether the results were good enough.',
+    good: 'Multi-hop questions, ambiguous questions needing clarification, and corpora that need different tools - SQL plus vector plus web.',
+    bad: 'Latency and cost variance explode. Needs a hard step budget, a per-request cost ceiling and full tracing, or it will loop silently.' },
+  { id: 'graph', n: 'GraphRAG', icon: '&#128376;', cost: 4, power: 4, lat: 'expensive to index, fast to query',
+    flow: ['extract entities', 'build graph', 'cluster and summarise', 'traverse', 'answer'],
+    ctrl: 'Retrieval walks explicit relationships instead of measuring vector distance.',
+    good: 'Global questions no single chunk answers: "what themes recur across these 900 incident reports", "who touched this clause and when".',
+    bad: 'Indexing means an LLM pass over the whole corpus, the schema is a design project, and it is overkill for lookup questions.' },
+  { id: 'cag', n: 'CAG (cache-augmented)', icon: '&#129482;', cost: 3, power: 2, lat: 'lowest possible - no search hop',
+    flow: ['preload the whole corpus', 'precompute the KV cache', 'question', 'answer'],
+    ctrl: 'No retrieval at all. The corpus lives in a precomputed KV cache in front of every request.',
+    good: 'A small, stable, hot corpus that fits in the window: one product manual, one policy set, one module of code.',
+    bad: 'The corpus must fit, every update invalidates the cache, and you pay attention cost over the whole corpus on every request.' },
+  { id: 'fabric', n: 'Knowledge fabric / OKF', icon: '&#127963;', cost: 5, power: 5, lat: 'depends on the consumer',
+    flow: ['govern', 'model the ontology', 'unify sources', 'serve RAG, BI and agents'],
+    ctrl: 'A governed semantic layer OVER your sources. RAG becomes one consumer of it rather than the whole architecture.',
+    good: 'Enterprises where the hard problem is not search but agreement: which system is authoritative for "customer", who may see it, whose definition of "active user" wins.',
+    bad: 'An organisational programme, not a library. Months of work, and on day one it does nothing a good RAG pipeline could not.' }
+];
+C.okfNote = [
+  ['Be careful with this acronym', 'OKF is not a standardised term the way RAG is. In interviews it is almost always used for an Organisational or Open Knowledge Fabric: a governed semantic layer that unifies enterprise knowledge - ontology, entity resolution, lineage, access policy - and exposes it to many consumers. A few people use it for the Open Knowledge Foundation, an unrelated non-profit. Asking which one they mean scores points.'],
+  ['The honest comparison', 'RAG is a retrieval technique: chunk, embed, search, stuff, answer. A knowledge fabric is a data architecture: one governed model of what your entities are, where they authoritatively live, and who may read them. They are not alternatives - a fabric is what stops your RAG pipeline confidently citing a deprecated wiki page that three teams disagree with.'],
+  ['Why anyone bothers', 'Every large RAG deployment hits the same three walls: the same fact exists in four systems with four values, nobody can say which is authoritative, and permissions were never modelled so retrieval leaks across tenants. Those are governance problems. No reranker fixes them.']
+];
+C.multiling = {
+  symptom: 'Retrieval works in English and collapses in Arabic, even though the Arabic documents are indexed and the vector count is right.',
+  causes: [
+    { n: 'English-centric embedding model', weight: 0.35,
+      d: 'Most embedding models are trained overwhelmingly on English. Arabic text lands in a small, crowded region of the space, so every Arabic document looks similar to every other one and the ranking is close to random.',
+      fix: 'Switch to a genuinely multilingual model - multilingual-e5, BGE-M3, Cohere embed-multilingual. Re-embed the entire corpus; you cannot mix two embedding models inside one index.' },
+    { n: 'Tokenizer explosion', weight: 0.20,
+      d: 'A BPE vocabulary built mostly on English shatters Arabic into far more tokens per word. A 500-token chunk therefore holds a fraction of the text an English chunk holds, so one answer gets spread across several chunks.',
+      fix: 'Size chunks in characters or words for non-Latin scripts, or measure with the actual tokenizer per language.' },
+    { n: 'No text normalisation', weight: 0.15,
+      d: 'Arabic has optional diacritics, several alef and ya forms, and tatweel padding. The indexed form and the query form are literally different strings, so BM25 scores zero and your hybrid lane silently dies.',
+      fix: 'Apply Unicode NFKC, strip diacritics and tatweel, unify alef and ya forms - on BOTH the index and the query. Use the language analyzer your search engine already ships.' },
+    { n: 'Cross-lingual query', weight: 0.15,
+      d: 'The user asks in Arabic and the documents are in English. With a monolingual embedder those two never meet in vector space.',
+      fix: 'Either a cross-lingual embedding model, or translate the query into the document language at query time and search both.' },
+    { n: 'RTL and mixed-direction breakage', weight: 0.08,
+      d: 'Right-to-left text with embedded Latin product codes gets mangled by naive splitters and by the prompt template, so the model receives garbage that looks fine in the browser.',
+      fix: 'Log and inspect the actual bytes reaching the model, not the rendered UI.' },
+    { n: 'English-only reranker', weight: 0.07,
+      d: 'You fixed the embedder, but the cross-encoder reranker is still an English model, so it re-sorts good candidates into a bad order.',
+      fix: 'Use a multilingual reranker such as bge-reranker-v2-m3 or Cohere rerank-multilingual.' }
+  ],
+  debug: [
+    'Is the Arabic document in the index at all? Fetch it by id. If that fails it is an ingestion bug, not a retrieval bug.',
+    'Embed the Arabic document and the Arabic question, print the cosine. If a document that literally answers the question scores near your corpus average, the embedding model is the problem - stop looking anywhere else.',
+    'Compare that score with the same pair translated into English. A large gap is your proof.',
+    'Turn the vector lane off and query BM25 only. If BM25 also fails it is normalisation; if BM25 works it is the embedder.',
+    'Check tokens-per-chunk by language. If Arabic chunks hold half the text, fix chunking before anything else.',
+    'Only now look at the reranker and the prompt template.'
+  ]
+};
+
+/* ---------- deep-dive additions to the final quiz ---------- */
+C.quiz = C.quiz.concat([
+  { q: 'Which part of a transformer block holds most of the parameters and most of the stored facts?',
+    o: ['Self-attention', 'The feed-forward (MLP) sublayer', 'LayerNorm', 'The positional encoding'], a: 1,
+    e: 'Attention routes information between tokens; the feed-forward is roughly two thirds of the block and is where factual associations live. Switch it off in chapter 18 and the model can only echo what it just attended to.' },
+  { q: 'In one transformer block, which step is the only one where information moves between positions?',
+    o: ['LayerNorm', 'The residual add', 'The attention-weighted sum of values', 'The GELU non-linearity'], a: 2,
+    e: 'Everything else - LayerNorm, the feed-forward, the residual - runs on each position independently.' },
+  { q: 'What does the causal mask actually do?',
+    o: ['Hides padding tokens', 'Sets attention scores to future positions to minus infinity', 'Stops the model repeating itself', 'Limits the context window'], a: 1,
+    e: 'Minus infinity becomes zero after softmax, so a position physically cannot read anything to its right. That single detail is what makes it a language model rather than an encoder.' },
+  { q: 'Top-p differs from top-k because…',
+    o: ['It is faster', 'It cuts by probability mass, so the survivor set shrinks when the model is confident', 'It works only with temperature 0', 'It penalises repeated tokens'], a: 1,
+    e: 'Top-k always keeps k candidates whether or not they deserve it. Top-p keeps however many are needed to cover p of the mass - that adaptivity is the whole argument for it.' },
+  { q: 'You need JSON output. Which sampling setting is most likely to break it?',
+    o: ['temperature 0', 'top_p 1.0', 'A repetition penalty of 1.2', 'A stop sequence'], a: 2,
+    e: 'JSON repeats braces, quotes and key names by design. A repetition penalty punishes exactly the tokens the format requires.' },
+  { q: 'Which chunking strategy indexes small pieces but hands the model a larger surrounding block?',
+    o: ['Fixed with overlap', 'Semantic chunking', 'Parent-child (small-to-big)', 'Recursive splitting'], a: 2,
+    e: 'Small children give retrieval precision; the returned parent gives the model enough context to actually answer.' },
+  { q: 'What is contextual retrieval?',
+    o: ['Retrieving more chunks', 'Prepending an LLM-written sentence situating each chunk in its document before embedding it', 'Searching the context window', 'Caching the retrieved chunks'], a: 1,
+    e: 'One cheap LLM call per chunk at index time. Anthropic reported roughly a 35% drop in retrieval failures, and around 49% combined with BM25.' },
+  { q: 'The single practical difference between LoRA and QLoRA is…',
+    o: ['QLoRA trains more parameters', 'QLoRA quantises the frozen base model to 4-bit so it fits in far less VRAM', 'QLoRA needs no adapters', 'LoRA is for text, QLoRA for images'], a: 1,
+    e: 'Same algorithm, same adapters. QLoRA is the memory trick on the frozen part that lets a 70B model train on one 80GB card.' },
+  { q: 'Your model has the right facts but the wrong tone and format. What should you reach for?',
+    o: ['Better retrieval', 'A preference method such as DPO, or a LoRA fine-tune', 'A bigger context window', 'A vector database'], a: 1,
+    e: 'Fine-tuning teaches form; RAG supplies facts. Wrong format is a form problem, so tuning is the right lever.' },
+  { q: 'GRPO is the right choice when…',
+    o: ['You have no data at all', 'An automatic scorer can mark an answer right or wrong', 'You want the smallest possible model', 'You only have preference pairs'], a: 1,
+    e: 'GRPO samples a group of answers, scores them all, and uses the group mean as the baseline. Without a verifiable reward there is nothing to score against.' },
+  { q: 'Why is an LLM judge trustworthy enough to use at all?',
+    o: ['Judges never hallucinate', 'Judging is a much easier task than generating, and you can measure agreement with humans', 'It uses a bigger model', 'It runs at temperature 0'], a: 1,
+    e: 'Recognising quality is easier than producing it. The catch is that an unmeasured judge is worthless - label 100 cases and report kappa.' },
+  { q: 'Which judge mitigation usually buys the largest single reliability gain?',
+    o: ['Raising the temperature', 'Running each pair twice with A and B swapped', 'Asking for a longer explanation', 'Using the same model that produced the answers'], a: 1,
+    e: 'Position bias is the biggest documented judge bias, and the swap costs exactly 2x to remove it.' },
+  { q: 'A 1M-token context window mostly means…',
+    o: ['RAG is obsolete', 'You can be more generous with retrieved context, but cost, latency, permissions and freshness still favour retrieval', 'Embeddings are no longer needed', 'Chunking no longer matters at all'], a: 1,
+    e: 'You still pay for every token on every request, prefill still takes seconds, and everything in the window is visible to the model regardless of who is asking.' },
+  { q: 'Agentic RAG earns its extra cost mainly on…',
+    o: ['Simple single-fact lookups', 'Multi-hop or ambiguous questions that need decomposition and re-searching', 'Reducing embedding cost', 'Shrinking the index'], a: 1,
+    e: 'One embedding of a two-part question sits in the average of two meanings and retrieves neither well. On a simple lookup, agentic RAG just spends more to reach the same answer.' },
+  { q: 'Retrieval works in English and collapses in Arabic. What do you check first?',
+    o: ['The reranker', 'Whether the embedding model is genuinely multilingual', 'The temperature', 'The context window size'], a: 1,
+    e: 'Embed one Arabic document and its Arabic question and print the cosine. If a document that literally answers the question scores near the corpus average, the embedder is the bug - stop looking anywhere else.' },
+  { q: 'Why do LLMs use subword tokens instead of one token per word?',
+    o: ['It looks nicer', 'A fixed vocabulary handles unseen words, typos and morphology without an <UNK> token or a giant embedding table', 'Words are too short', 'It makes attention linear'], a: 1,
+    e: 'Per-word needs millions of entries and still breaks on new names. Per-character makes sequences 4-5x longer, and attention is quadratic in length. Subword is the compromise that wins.' }
+]);
+
+C.glossary = C.glossary.concat([
+  ['Residual stream', 'The running vector each transformer block reads, edits and adds back to. Nothing is ever overwritten.'],
+  ['Feed-forward / MLP', 'The per-token widen-activate-narrow sublayer. About two thirds of a block\'s parameters and where facts are stored.'],
+  ['Causal mask', 'Setting attention to future positions to minus infinity so a token cannot read ahead.'],
+  ['LayerNorm', 'Re-centring and re-scaling each vector so deep stacks stay trainable. Per-token; moves no information between positions.'],
+  ['RoPE', 'Rotary position embedding - position rotated into Q and K at every layer instead of added once at the bottom.'],
+  ['Top-k', 'Keep the k highest-probability tokens before sampling. A hard cut by rank.'],
+  ['Top-p / nucleus', 'Keep the smallest set of tokens covering p of the probability mass. A cut by mass, so it adapts to confidence.'],
+  ['Repetition penalty', 'Subtracting from the logit of tokens already produced. Ruins JSON and code.'],
+  ['Stop sequence', 'A string that ends generation the moment it appears. Essential for agent scratchpads.'],
+  ['Greedy decoding', 'Always take the highest-probability token. What temperature 0 does - and it is not the same as deterministic.'],
+  ['Parent-child chunking', 'Index small chunks for retrieval precision, return the larger parent to the model for answer quality.'],
+  ['Semantic chunking', 'Cut where the embedding distance between consecutive sentences spikes - a topic change.'],
+  ['Contextual retrieval', 'Prepending an LLM-written situating sentence to each chunk before embedding it.'],
+  ['Late chunking', 'Embed the whole document first with a long-context model, then pool token embeddings into chunk vectors.'],
+  ['LoRA', 'Freeze the base model and train two thin rank-r matrices beside chosen weights. The default fine-tune.'],
+  ['QLoRA', 'LoRA with the frozen base loaded in 4-bit NF4, so a 70B model trains on one 80GB card.'],
+  ['SFT', 'Supervised fine-tuning on (prompt, ideal answer) pairs.'],
+  ['DPO', 'Direct Preference Optimisation - train on (chosen, rejected) pairs with a closed-form loss. No reward model.'],
+  ['RLHF', 'Reward model trained on human comparisons, then PPO against it with a KL penalty.'],
+  ['GRPO', 'Group Relative Policy Optimisation - score a group of sampled answers and use the group mean as the baseline. No critic network.'],
+  ['Distillation', 'Train a small student on a large teacher\'s outputs. A cost project, not a quality project.'],
+  ['LLM as a judge', 'Using a second model to grade outputs against a rubric. Worthless until you measure its agreement with humans.'],
+  ['Position bias', 'A judge favouring whichever answer it was shown first. Removed by running both orderings.'],
+  ['Cohen\'s kappa', 'Agreement corrected for chance. Below about 0.6 a judge is noise wearing a lab coat.'],
+  ['RAGAS', 'A RAG metric family: faithfulness, answer relevance, context precision, context recall.'],
+  ['Lost in the middle', 'Accuracy sags for facts buried in the middle of a long context and stays high at the edges.'],
+  ['Agentic RAG', 'The model decides whether, what and how many times to search, then critiques its own results.'],
+  ['GraphRAG', 'Build an entity graph over the corpus and traverse relationships instead of measuring vector distance.'],
+  ['CAG', 'Cache-augmented generation - preload a small stable corpus into a precomputed KV cache, no retrieval hop.'],
+  ['Knowledge fabric (OKF)', 'A governed semantic layer over enterprise sources - ontology, lineage, access policy. Governance, not retrieval.']
+]);

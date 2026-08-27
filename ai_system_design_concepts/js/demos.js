@@ -1978,11 +1978,459 @@ function initHnsw() {
   if (cap) cap.innerHTML = '<b>' + C.hnswSteps[0][0] + '.</b> ' + C.hnswSteps[0][1];
 }
 
+
+/* ============================================================
+   Shared helpers for chapters 19-22
+   ============================================================ */
+function cmpTable(host, spec) {
+  if (!host) return;
+  host.innerHTML =
+    '<div class="cmp-wrap"><table class="cmp">' +
+    '<thead><tr><th></th>' + spec.cols.map(c => '<th>' + c + '</th>').join('') + '</tr></thead>' +
+    '<tbody>' + spec.rows.map(r =>
+      '<tr><th scope="row">' + r[0] + '</th>' +
+      r.slice(1).map((c, i) => '<td class="c' + i + '">' + c + '</td>').join('') + '</tr>').join('') +
+    '</tbody></table></div>';
+}
+const miniBar = (frac, cls) =>
+  '<div class="mini-bar ' + (cls || '') + '"><i style="width:' + Math.max(0, Math.min(100, frac * 100)) + '%"></i></div>';
+const bytesToGB = b => b / 1073741824;
+const fmtB = b => b >= 1073741824 ? bytesToGB(b).toFixed(1) + ' GB' : (b / 1048576).toFixed(0) + ' MB';
+
+/* ============================================================
+   Ch19 — caching layers
+   ============================================================ */
+function initCaching() {
+  const host = $('#cl-ladder'); if (!host) return;
+
+  /* ---- the ladder ---- */
+  function drawLadder(sel) {
+    host.innerHTML = '<div class="cl-rungs">' + C.cacheLadder.map((r, i) =>
+      '<button class="cl-rung' + (sel === r.id ? ' sel' : '') + '" data-id="' + r.id + '">' +
+      '<span class="cl-n">' + (i === 0 ? '&mdash;' : i) + '</span>' +
+      '<span class="cl-body"><b>' + r.n + '</b><small>' + r.what + '</small></span>' +
+      '<span class="cl-metric">' + miniBar(r.hit) + '<i>' + (r.hit * 100).toFixed(0) + '% hit</i></span>' +
+      '<span class="cl-lat">' + (r.lat === 0 ? 'prefill only' : r.lat + ' ms') + '</span>' +
+      (r.risk > 0 ? '<span class="cl-risk">can be wrong</span>' : '<span class="cl-safe">always correct</span>') +
+      '</button>').join('') + '</div>';
+    $$('.cl-rung', host).forEach(b => b.onclick = () => {
+      const r = C.cacheLadder.filter(x => x.id === b.dataset.id)[0];
+      drawLadder(r.id);
+      $('#cl-detail').innerHTML = '<h4>' + r.n + '</h4>' +
+        '<div class="knob-lay"><span>plain English</span>' + r.lay + '</div>' +
+        '<div class="knob-tech"><span>the key</span>' + r.what + '</div>' +
+        '<div class="cc-good"><b>Use it when</b> ' + r.when + '</div>' +
+        '<div class="arch-kill"><b>The trap:</b> ' + r.trap + '</div>';
+      xp(2);
+    });
+  }
+  drawLadder(null);
+  $('#cl-detail').innerHTML = '<p class="dim">Click a rung.</p>';
+
+  /* ---- semantic cache threshold ---- */
+  function scPaint() {
+    const t = parseFloat($('#sc-t').value);
+    $('#sc-tv').textContent = t.toFixed(2);
+    const cachedIntent = C.cacheCached.intent;
+    let served = 0, wrong = 0, missedGood = 0, calls = 0;
+    const rows = C.cacheQueries.map(q => {
+      const hit = q.sim >= t;
+      const same = q.intent === cachedIntent;
+      let verdict;
+      if (hit && same) { served++; verdict = 'good-hit'; }
+      else if (hit && !same) { served++; wrong++; verdict = 'wrong'; }
+      else if (!hit && same) { calls++; missedGood++; verdict = 'missed'; }
+      else { calls++; verdict = 'correct-miss'; }
+      return { q: q, verdict: verdict, hit: hit };
+    });
+    const n = C.cacheQueries.length;
+    const hitRate = served / n;
+    const wrongRate = served ? wrong / served : 0;
+    $('#sc-stats').innerHTML =
+      '<div class="stat"><div class="stat-v">' + (hitRate * 100).toFixed(0) + '%</div><div class="stat-k">cache hit rate</div></div>' +
+      '<div class="stat"><div class="stat-v ' + (wrong ? 'bad' : 'good') + '">' + wrong + '</div><div class="stat-k">WRONG answers served</div></div>' +
+      '<div class="stat"><div class="stat-v">' + missedGood + '</div><div class="stat-k">missed good hits</div></div>' +
+      '<div class="stat"><div class="stat-v">' + (hitRate * 100).toFixed(0) + '%</div><div class="stat-k">inference cost saved</div></div>';
+    $('#sc-rows').innerHTML = rows.map(r =>
+      '<div class="sc-row ' + r.verdict + '">' +
+      '<span class="sc-q">' + r.q.q + '</span>' +
+      '<span class="sc-sim">' + r.q.sim.toFixed(2) + '</span>' +
+      '<span class="sc-int">' + r.q.intent + '</span>' +
+      '<span class="sc-v">' + (r.verdict === 'good-hit' ? 'cache &#10003;' :
+        r.verdict === 'wrong' ? 'cache &#10007; WRONG' :
+        r.verdict === 'missed' ? 'model (could have hit)' : 'model &#10003;') + '</span></div>').join('');
+    let note;
+    if (wrong > 1) note = '<b class="bad">' + wrong + ' customers just got the wrong answer.</b> Look at "how long do refunds take NOT" &mdash; negation barely moves an embedding, so it sits at 0.95 similarity to its own opposite. This is the failure mode that makes people afraid of semantic caching, and the reason the threshold is not a hit-rate dial.';
+    else if (wrong === 1) note = '<b class="warn">One wrong answer.</b> Usually a near-duplicate intent: "refund time for a lost card" is not the same answer as "refund time". Either raise the threshold, or put the distinguishing entity (card status, payment method) into the cache key so they cannot collide.';
+    else if (hitRate < 0.15) note = '<b>Safe, and barely worth running.</b> At this threshold you are paying for an embedding and a vector search to hit almost nothing. If you cannot get above about 25% here, exact plus normalised caching is the better spend.';
+    else note = '<b class="good">This is the zone you want.</b> Real paraphrases hit, different intents miss, and nobody is served a wrong answer. Find it by labelling a few hundred real queries by intent &mdash; not by guessing 0.9 because it sounds high.';
+    $('#sc-note').innerHTML = note;
+  }
+  $('#sc-t').oninput = scPaint;
+
+  cmpTable($('#cache-compare'), C.cacheCompare);
+  $('#cache-compare-verdict').innerHTML = '<b>Verdict.</b> ' + C.cacheCompare.verdict;
+
+  $('#cache-paths').innerHTML = C.cachePathologies.map(p =>
+    '<button class="path" data-id="' + p.id + '"><span class="path-ico">' + p.icon + '</span>' +
+    '<b>' + p.n + '</b><span>' + p.lay + '</span></button>').join('');
+  $$('#cache-paths .path').forEach(b => b.onclick = () => {
+    const p = C.cachePathologies.filter(x => x.id === b.dataset.id)[0];
+    $$('#cache-paths .path').forEach(x => x.classList.toggle('active', x === b));
+    $('#cache-path-detail').innerHTML =
+      '<h4>' + p.icon + ' ' + p.n + '</h4>' +
+      '<div class="knob-lay"><span>plain English</span>' + p.lay + '</div>' +
+      '<div class="knob-tech"><span>technically</span>' + p.tech + '</div>' +
+      '<div class="lab-pane-title" style="margin-top:12px">Fixes</div>' +
+      '<ul class="fact-list">' + p.fixes.map(f => '<li>' + f + '</li>').join('') + '</ul>' +
+      '<div class="cc-bad"><b>In an LLM system</b> ' + p.llm + '</div>';
+    xp(2);
+  });
+  $('#cache-path-detail').innerHTML = '<p class="dim">Click a failure mode.</p>';
+  $('#cache-key-code').textContent = C.cacheKeyRecipe;
+  scPaint();
+}
+
+/* ============================================================
+   Ch20 — sharding and parallelism
+   ============================================================ */
+function parMemory(m, gpu, bits, seq, batch, strat, deg) {
+  const bytesPerParam = bits / 8;
+  const headDim = m.d / m.heads;
+  const kvPerToken = 2 * m.layers * m.kvHeads * headDim * 2;   // K and V, fp16
+  let weights = m.params * bytesPerParam;
+  let kv = kvPerToken * seq * batch;
+  const act = batch * seq * m.d * 2 * 4 + 2 * 1073741824;      // working set + framework
+  let perGpuW = weights, perGpuKv = kv, note = '';
+  if (strat === 'tensor')       { perGpuW = weights / deg; perGpuKv = kv / deg; }
+  else if (strat === 'pipeline'){ perGpuW = weights / deg; perGpuKv = kv / deg; }
+  else if (strat === 'data')    { perGpuW = weights;       perGpuKv = kv;       }
+  else if (strat === 'expert' && m.experts) {
+    const expertShare = 0.92;                                   // MoE weights are mostly experts
+    perGpuW = weights * (1 - expertShare) + weights * expertShare / deg;
+    perGpuKv = kv;
+  } else if (strat === 'expert') { perGpuW = weights; note = 'this model has no experts to split'; }
+  const perGpu = perGpuW + perGpuKv + act;
+  const cap = gpu.vram * 1073741824 * 0.92;                     // leave headroom
+  return { weights: weights, kv: kv, act: act, kvPerToken: kvPerToken,
+           perGpuW: perGpuW, perGpuKv: perGpuKv, perGpu: perGpu, cap: cap,
+           fits: perGpu <= cap, need: Math.ceil((weights + kv + act) / cap), note: note };
+}
+function initParallel() {
+  const host = $('#par-calc'); if (!host) return;
+  const S = { model: 1, gpu: 2, bits: 16, seq: 4096, batch: 16, strat: 'tensor', deg: 4 };
+  host.innerHTML =
+    '<label>model<select id="pc-m">' + C.parModels.map((m, i) => '<option value="' + i + '"' + (i === 1 ? ' selected' : '') + '>' + m.n + '</option>').join('') + '</select></label>' +
+    '<label>GPU<select id="pc-g">' + C.parGpus.map((g, i) => '<option value="' + i + '"' + (i === 2 ? ' selected' : '') + '>' + g.n + '</option>').join('') + '</select></label>' +
+    '<label>weight precision<select id="pc-b"><option value="16">fp16 / bf16</option><option value="8">int8</option><option value="4">int4 / NF4</option></select></label>' +
+    '<label>sequence length <span class="val" id="pv-seq"></span><input type="range" id="pc-seq" min="512" max="32768" step="512" value="4096"></label>' +
+    '<label>concurrent requests <span class="val" id="pv-batch"></span><input type="range" id="pc-batch" min="1" max="128" step="1" value="16"></label>' +
+    '<label>strategy<select id="pc-s">' + C.parStrategies.map(s => '<option value="' + s.id + '"' + (s.id === 'tensor' ? ' selected' : '') + '>' + s.n + '</option>').join('') + '</select></label>' +
+    '<label>GPUs (degree) <span class="val" id="pv-deg"></span><input type="range" id="pc-deg" min="1" max="16" step="1" value="4"></label>';
+  ['m', 'g', 'b', 'seq', 'batch', 's', 'deg'].forEach(k => {
+    const e = $('#pc-' + k); e.oninput = read; e.onchange = read;
+  });
+  function read() {
+    S.model = +$('#pc-m').value; S.gpu = +$('#pc-g').value; S.bits = +$('#pc-b').value;
+    S.seq = +$('#pc-seq').value; S.batch = +$('#pc-batch').value;
+    S.strat = $('#pc-s').value; S.deg = +$('#pc-deg').value;
+    paint();
+  }
+  function paint() {
+    const m = C.parModels[S.model], g = C.parGpus[S.gpu];
+    const deg = S.strat === 'none' ? 1 : S.deg;
+    $('#pv-seq').textContent = S.seq.toLocaleString();
+    $('#pv-batch').textContent = S.batch;
+    $('#pv-deg').textContent = deg;
+    const r = parMemory(m, g, S.bits, S.seq, S.batch, S.strat, deg);
+    $('#par-stats').innerHTML =
+      '<div class="stat"><div class="stat-v">' + fmtB(r.weights) + '</div><div class="stat-k">weights total</div></div>' +
+      '<div class="stat"><div class="stat-v">' + (r.kvPerToken / 1024).toFixed(0) + ' KB</div><div class="stat-k">KV per token</div></div>' +
+      '<div class="stat"><div class="stat-v">' + fmtB(r.kv) + '</div><div class="stat-k">KV cache total</div></div>' +
+      '<div class="stat"><div class="stat-v ' + (r.fits ? 'good' : 'bad') + '">' + fmtB(r.perGpu) + '</div><div class="stat-k">per GPU</div></div>' +
+      '<div class="stat"><div class="stat-v">' + fmtB(r.cap) + '</div><div class="stat-k">usable per GPU</div></div>' +
+      '<div class="stat"><div class="stat-v ' + (r.fits ? 'good' : 'bad') + '">' + (r.fits ? 'FITS' : 'OOM') + '</div><div class="stat-k">verdict</div></div>';
+    /* topology */
+    const boxes = [];
+    for (let i = 0; i < Math.min(deg, 16); i++) {
+      const wPct = r.perGpuW / r.cap, kPct = r.perGpuKv / r.cap, aPct = r.act / r.cap;
+      boxes.push('<div class="gpu' + (r.fits ? '' : ' over') + '">' +
+        '<div class="gpu-h">GPU ' + i + '<small>' + g.n + '</small></div>' +
+        '<div class="gpu-stack">' +
+        '<i class="w" style="height:' + Math.min(100, wPct * 100) + '%" title="weights"></i>' +
+        '<i class="k" style="height:' + Math.min(100, kPct * 100) + '%" title="KV cache"></i>' +
+        '<i class="a" style="height:' + Math.min(100, aPct * 100) + '%" title="activations"></i>' +
+        '</div><div class="gpu-f">' +
+        (S.strat === 'tensor' ? 'slice of every layer' :
+         S.strat === 'pipeline' ? 'layers ' + Math.round(i * m.layers / deg) + '-' + Math.round((i + 1) * m.layers / deg - 1) :
+         S.strat === 'data' ? 'full copy' :
+         S.strat === 'expert' ? 'experts ' + i + (m.experts ? '/' + m.experts : '') :
+         S.strat === 'zero' ? 'param + optimiser shard' : 'everything') +
+        '</div></div>');
+    }
+    $('#par-topology').innerHTML =
+      '<div class="gpu-legend"><span><i class="w"></i>weights</span><span><i class="k"></i>KV cache</span>' +
+      '<span><i class="a"></i>activations + framework</span><span class="dim">bar height = share of one GPU</span></div>' +
+      '<div class="gpu-row">' + boxes.join('') + '</div>';
+    const st = C.parStrategies.filter(x => x.id === S.strat)[0];
+    let v;
+    if (r.fits && deg === 1) v = '<b class="ok">It fits on one GPU.</b> Stop here. Every parallelism strategy below costs communication, complexity and a new class of failure &mdash; and none of them beat "it already fits".';
+    else if (r.fits) v = '<b class="ok">Fits across ' + deg + ' GPUs with ' + st.n.toLowerCase() + '.</b> Communication cost: ' + st.comm + '. ' +
+      (S.strat === 'tensor' && deg > 8 ? '<b class="warn">Above 8-way tensor parallel you are almost certainly communication-bound &mdash; go pipeline across nodes instead.</b>' :
+       S.strat === 'pipeline' && S.batch < deg * 4 ? '<b class="warn">With only ' + S.batch + ' concurrent requests across ' + deg + ' stages, most GPUs are sitting in the pipeline bubble. Raise concurrency or reduce the degree.</b>' : '');
+    else v = '<b class="warn">Out of memory.</b> You need about ' + fmtB(r.perGpu) + ' per GPU and have ' + fmtB(r.cap) + '. ' +
+      'Options in order of how much they cost you: <b>quantise the weights</b> (' + (S.bits > 8 ? 'int8 halves the weight bytes for a small quality cost' : 'already quantised') + '), ' +
+      '<b>cut the sequence length or concurrency</b> (the KV cache is ' + (r.kv / (r.weights + r.kv) * 100).toFixed(0) + '% of the non-activation memory here), ' +
+      'or <b>raise the parallel degree</b> to at least ' + r.need + '.';
+    if (r.note) v += ' <span class="dim">(' + r.note + ')</span>';
+    $('#par-verdict').innerHTML = v;
+  }
+
+  $('#par-grid').innerHTML = C.parStrategies.map(s =>
+    '<button class="rvcard" data-id="' + s.id + '"><span class="rv-ico">' + s.icon + '</span><b>' + s.n + '</b>' +
+    '<span class="rv-flow">splits: ' + s.split + '</span>' +
+    '<span class="ftcard-scales">comm: ' + s.comm.split(';')[0] + '</span></button>').join('');
+  $$('#par-grid .rvcard').forEach(b => b.onclick = () => {
+    const s = C.parStrategies.filter(x => x.id === b.dataset.id)[0];
+    $$('#par-grid .rvcard').forEach(x => x.classList.toggle('active', x === b));
+    $('#par-detail').innerHTML = '<h4>' + s.icon + ' ' + s.n + '</h4>' +
+      '<div class="knob-lay"><span>plain English</span>' + s.lay + '</div>' +
+      '<div class="knob-tech"><span>technically</span>' + s.what + '</div>' +
+      '<div class="ftv-facts"><span><b>splits</b> ' + s.split + '</span><span><b>communication</b> ' + s.comm + '</span></div>' +
+      '<div class="cc-good"><b>Good for</b> ' + s.good + '</div>' +
+      '<div class="cc-bad"><b>Breaks when</b> ' + s.bad + '</div>';
+    xp(2);
+  });
+  $('#par-detail').innerHTML = '<p class="dim">Click a strategy.</p>';
+  cmpTable($('#par-compare'), C.parCompare);
+  $('#par-compare-verdict').innerHTML = '<b>Verdict.</b> ' + C.parCompare.verdict;
+
+  /* ---- PagedAttention ---- */
+  let paged = true;
+  const tog = $('#pa-toggle');
+  tog.onclick = () => { paged = !paged; tog.classList.toggle('off', !paged); paPaint(); xp(2); };
+  function paPaint() {
+    const P = C.pagedSim;
+    const alloc = P.reqs.map(l => paged ? Math.ceil(l / P.blockSize) * P.blockSize : P.maxTokens);
+    const used = P.reqs.slice();
+    const totalAlloc = alloc.reduce((a, b) => a + b, 0);
+    const totalUsed = used.reduce((a, b) => a + b, 0);
+    const waste = 1 - totalUsed / totalAlloc;
+    const budget = 20480;                                  // fixed KV budget in tokens
+    let fit = 0, run = 0;
+    for (let i = 0; i < alloc.length; i++) { if (run + alloc[i] <= budget) { run += alloc[i]; fit++; } }
+    const maxAlloc = Math.max.apply(null, alloc);
+    $('#pa-viz').innerHTML = '<div class="pa-rows">' + P.reqs.map((l, i) =>
+      '<div class="pa-row"><span class="pa-id">req ' + i + '</span>' +
+      '<div class="pa-track"><i class="pa-alloc" style="width:' + (alloc[i] / maxAlloc * 100) + '%"></i>' +
+      '<u class="pa-used" style="width:' + (used[i] / maxAlloc * 100) + '%"></u></div>' +
+      '<span class="pa-n">' + used[i] + ' used / ' + alloc[i] + ' held</span></div>').join('') + '</div>';
+    $('#pa-stats').innerHTML =
+      '<div class="stat"><div class="stat-v">' + totalAlloc.toLocaleString() + '</div><div class="stat-k">KV slots held</div></div>' +
+      '<div class="stat"><div class="stat-v">' + totalUsed.toLocaleString() + '</div><div class="stat-k">actually used</div></div>' +
+      '<div class="stat"><div class="stat-v ' + (waste > 0.5 ? 'bad' : 'good') + '">' + (waste * 100).toFixed(0) + '%</div><div class="stat-k">wasted</div></div>' +
+      '<div class="stat"><div class="stat-v ' + (fit >= 10 ? 'good' : 'bad') + '">' + fit + ' / 10</div><div class="stat-k">fit in a 20k budget</div></div>';
+    $('#pa-note').innerHTML = paged
+      ? '<b class="good">Bounded waste.</b> Every request holds at most 15 unused token slots &mdash; one block minus one. All ten requests fit in the same memory that previously held ' + fit + '. Bigger batches mean the GPU is doing arithmetic instead of waiting, which is the entire reason throughput improves.'
+      : '<b class="bad">Reserving max_tokens.</b> A request that generates 40 tokens is holding 2,048 slots because the server cannot know in advance how long the answer will be. ' + (waste * 100).toFixed(0) + '% of your KV cache is holding nothing, your batch size is small for no reason, and your GPU is idle waiting for memory it is not using.';
+  }
+  $('#paged-note').innerHTML = C.pagedNote.map(p => '<dt>' + p[0] + '</dt><dd>' + p[1] + '</dd>').join('');
+  paPaint();
+  read();
+}
+
+/* ============================================================
+   Ch21 — lexical search
+   ============================================================ */
+function lexTok(s) { return (s.toLowerCase().match(/[a-z0-9][a-z0-9-]*/g) || []); }
+function lexIndex(corpus) {
+  const post = {}, len = {};
+  corpus.forEach(d => {
+    const ts = lexTok(d.t);
+    len[d.id] = ts.length;
+    ts.forEach(t => {
+      post[t] = post[t] || {};
+      post[t][d.id] = (post[t][d.id] || 0) + 1;
+    });
+  });
+  const avgdl = corpus.reduce((a, d) => a + len[d.id], 0) / corpus.length;
+  return { post: post, len: len, avgdl: avgdl, N: corpus.length };
+}
+function bm25Score(idx, terms, docId) {
+  const { k1, b } = C.bm25;
+  let total = 0; const parts = [];
+  terms.forEach(t => {
+    const p = idx.post[t];
+    if (!p) { parts.push({ t: t, df: 0, tf: 0, idf: 0, s: 0 }); return; }
+    const df = Object.keys(p).length, tf = p[docId] || 0;
+    const idf = Math.log(1 + (idx.N - df + 0.5) / (df + 0.5));
+    const dl = idx.len[docId];
+    const s = tf ? idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * dl / idx.avgdl)) : 0;
+    parts.push({ t: t, df: df, tf: tf, idf: idf, s: s });
+    total += s;
+  });
+  return { total: total, parts: parts };
+}
+function initLexical() {
+  const chips = $('#lex-queries'); if (!chips) return;
+  const idx = lexIndex(C.lexCorpus);
+  let q = C.lexQueries[0].q, why = C.lexQueries[0].why;
+  C.lexQueries.forEach((x, i) => {
+    const b = el('button', 'chip' + (i === 0 ? ' active' : ''), x.q);
+    b.onclick = () => { q = x.q; why = x.why; $('#lex-custom').value = ''; paint(); xp(2); };
+    chips.appendChild(b);
+  });
+  $('#lex-custom').oninput = e => {
+    if (!e.target.value.trim()) return;
+    q = e.target.value; why = 'Your own query. Terms that appear in no document contribute exactly zero &mdash; which is the whole weakness of lexical search in one observation.';
+    $$('.chip', chips).forEach(c => c.classList.remove('active'));
+    paint();
+  };
+  function paint() {
+    $$('.chip', chips).forEach(c => c.classList.toggle('active', c.textContent === q));
+    const terms = lexTok(q);
+    $('#lex-postings').innerHTML = terms.map(t => {
+      const p = idx.post[t];
+      const df = p ? Object.keys(p).length : 0;
+      const idf = Math.log(1 + (idx.N - df + 0.5) / (df + 0.5));
+      return '<div class="post' + (df ? '' : ' empty') + '">' +
+        '<b>' + t + '</b>' +
+        '<span class="post-df">df ' + df + ' &middot; idf ' + idf.toFixed(2) + '</span>' +
+        '<div class="post-list">' + (df
+          ? Object.keys(p).map(id => '<i>' + id + '<sub>&times;' + p[id] + '</sub></i>').join('')
+          : '<i class="none">no postings &mdash; contributes 0</i>') + '</div></div>';
+    }).join('') || '<p class="dim">Type a query.</p>';
+    const scored = C.lexCorpus.map(d => {
+      const r = bm25Score(idx, terms, d.id);
+      return { d: d, total: r.total, parts: r.parts };
+    }).sort((a, b) => b.total - a.total);
+    const top = scored[0].total;
+    $('#lex-results').innerHTML = scored.map((s, i) =>
+      '<div class="lex-r' + (s.total > 0 ? '' : ' zero') + '">' +
+      '<div class="lex-r-h"><span class="lex-rank">' + (i + 1) + '</span><b>' + s.d.id + '</b>' +
+      miniBar(top ? s.total / top : 0) + '<span class="lex-s">' + s.total.toFixed(3) + '</span></div>' +
+      '<div class="lex-t">' + s.d.t + '</div>' +
+      (s.total > 0 ? '<div class="lex-math">' + s.parts.filter(p => p.s > 0).map(p =>
+        p.t + ': idf ' + p.idf.toFixed(2) + ' &times; tf-sat ' + (p.s / p.idf).toFixed(2) + ' = ' + p.s.toFixed(3)).join(' &nbsp;+&nbsp; ') +
+        ' &nbsp;&rarr;&nbsp; ' + s.total.toFixed(3) + '</div>' : '') +
+      '</div>').join('');
+    $('#lex-note').innerHTML = '<b>Why this query is here:</b> ' + why +
+      (top === 0 ? ' <b class="bad">Every score is zero.</b> No amount of BM25 tuning fixes a query that shares no vocabulary with the corpus. That is the dense lane\'s job.' : '');
+  }
+  /* the formula, decoded */
+  const PARTS = [
+    { id: 'idf', label: 'IDF(t)', d: 'Inverse document frequency. A term in 1 of 8 documents is worth far more than a term in 7 of 8. This is why an error code like E-4055 dominates a query and "the" contributes nothing.',
+      knob: 'Not tunable. It falls out of your corpus &mdash; which is why the same query ranks differently after you add documents.' },
+    { id: 'tf', label: 'tf &times; (k1+1)', d: 'Raw term frequency in this document. More mentions means more relevant.',
+      knob: 'k1 (default 1.2) controls saturation. Higher k1 means term frequency keeps mattering; k1 = 0 means one mention is the same as fifty.' },
+    { id: 'sat', label: 'tf + k1&middot;(...)', d: 'The saturation denominator. This is what stops a document that repeats "refund" ninety times from beating a document that answers the question.',
+      knob: 'This single term is the difference between BM25 and naive TF-IDF, and it is why BM25 won.' },
+    { id: 'len', label: '1 - b + b&middot;(dl/avgdl)', d: 'Length normalisation. A 20-word document mentioning "refund" twice is more about refunds than a 2000-word document mentioning it twice.',
+      knob: 'b (default 0.75). b = 0 disables length normalisation entirely; b = 1 normalises fully. Lower it for corpora where long documents are genuinely more informative.' }
+  ];
+  $('#bm25-formula').innerHTML = '<div class="bm-formula">' +
+    '<span class="bm-sum">&sum;<sub>t &isin; q</sub></span>' +
+    '<span class="bm-part" data-id="idf">IDF(t)</span><span class="bm-op">&times;</span>' +
+    '<span class="bm-frac"><span class="bm-part" data-id="tf">tf<sub>t,d</sub> &middot; (k<sub>1</sub>+1)</span>' +
+    '<span class="bm-bar"></span>' +
+    '<span class="bm-part" data-id="sat">tf<sub>t,d</sub> + k<sub>1</sub> &middot;</span>' +
+    '<span class="bm-part" data-id="len">(1 - b + b &middot; dl/avgdl)</span></span></div>' +
+    '<div class="bm-consts">k<sub>1</sub> = ' + C.bm25.k1 + ' &nbsp;&middot;&nbsp; b = ' + C.bm25.b +
+    ' &nbsp;&middot;&nbsp; avgdl = ' + idx.avgdl.toFixed(1) + ' terms &nbsp;&middot;&nbsp; N = ' + idx.N + ' documents</div>';
+  $$('#bm25-formula .bm-part').forEach(p => {
+    const show = () => {
+      const x = PARTS.filter(a => a.id === p.dataset.id)[0];
+      $$('#bm25-formula .bm-part').forEach(y => y.classList.toggle('sel', y.dataset.id === p.dataset.id));
+      $('#bm25-detail').innerHTML = '<h4>' + x.label + '</h4><p>' + x.d + '</p>' +
+        '<div class="cc-param"><b>the knob</b> ' + x.knob + '</div>';
+    };
+    p.onmouseenter = show; p.onclick = show;
+  });
+  $('#bm25-detail').innerHTML = '<p class="dim">Hover a piece of the formula.</p>';
+  $('#lex-es').innerHTML = C.lexEsConcepts.map(e => '<dt>' + e[0] + '</dt><dd>' + e[1] + '</dd>').join('');
+  cmpTable($('#lex-compare'), C.lexCompare);
+  $('#lex-compare-verdict').innerHTML = '<b>Verdict.</b> ' + C.lexCompare.verdict;
+  paint();
+}
+
+/* ============================================================
+   Ch22 — big files, small RAM
+   ============================================================ */
+function initBigData() {
+  const host = $('#big-calc'); if (!host) return;
+  $('#stream-meanings').innerHTML = C.streamMeanings.map(s =>
+    '<div class="pcard reveal"><div class="pcard-badge">' + s.where + '</div><h3>' + s.n + '</h3>' +
+    '<p class="pcard-desc">' + s.d + '</p></div>').join('');
+
+  let sel = 'chunks';
+  host.innerHTML =
+    '<label>file size on disk <span class="val" id="bv-file"></span><input type="range" id="bc-file" min="1" max="200" step="1" value="5"></label>' +
+    '<label>machine RAM <span class="val" id="bv-ram"></span><input type="range" id="bc-ram" min="1" max="64" step="1" value="2"></label>';
+  $('#bc-file').oninput = paint; $('#bc-ram').oninput = paint;
+  function paint() {
+    const file = +$('#bc-file').value, ram = +$('#bc-ram').value;
+    $('#bv-file').textContent = file + ' GB';
+    $('#bv-ram').textContent = ram + ' GB';
+    const rows = C.bigStrategies.map(s => {
+      const peak = file * s.peakMult + 0.35;                       // + interpreter baseline
+      return { s: s, peak: peak, oom: peak > ram };
+    });
+    const maxPeak = Math.max.apply(null, rows.map(r => r.peak));
+    $('#big-bars').innerHTML = '<div class="big-rows">' + rows.map(r =>
+      '<button class="big-row' + (r.s.id === sel ? ' sel' : '') + (r.oom ? ' oom' : '') + '" data-id="' + r.s.id + '">' +
+      '<span class="big-n">' + r.s.n + '</span>' +
+      '<span class="big-track"><i style="width:' + Math.min(100, r.peak / maxPeak * 100) + '%"></i>' +
+      '<u style="left:' + Math.min(100, ram / maxPeak * 100) + '%"></u></span>' +
+      '<span class="big-v">' + (r.peak < 0.5 ? (r.peak * 1024).toFixed(0) + ' MB' : r.peak.toFixed(1) + ' GB') + '</span>' +
+      '<span class="big-x">' + (r.oom ? 'OOM' : '&#10003;') + '</span></button>').join('') +
+      '<div class="big-legend">the dashed line is your ' + ram + ' GB of RAM</div></div>';
+    $$('#big-bars .big-row').forEach(b => b.onclick = () => { sel = b.dataset.id; paint(); xp(2); });
+    const r = rows.filter(x => x.s.id === sel)[0];
+    const base = rows.filter(x => x.s.id === 'naive')[0];
+    $('#big-stats').innerHTML =
+      '<div class="stat"><div class="stat-v ' + (r.oom ? 'bad' : 'good') + '">' + (r.peak < 0.5 ? (r.peak * 1024).toFixed(0) + ' MB' : r.peak.toFixed(1) + ' GB') + '</div><div class="stat-k">peak memory</div></div>' +
+      '<div class="stat"><div class="stat-v">' + (base.peak / r.peak).toFixed(0) + 'x</div><div class="stat-k">less than loading it</div></div>' +
+      '<div class="stat"><div class="stat-v">' + r.s.speed.toFixed(1) + 'x</div><div class="stat-k">relative speed</div></div>' +
+      '<div class="stat"><div class="stat-v ' + (r.oom ? 'bad' : 'good') + '">' + (r.oom ? 'CRASHES' : 'SURVIVES') + '</div><div class="stat-k">on ' + ram + ' GB</div></div>';
+    $('#big-note').innerHTML = '<div class="knob-lay"><span>plain English</span>' + r.s.lay + '</div>' +
+      '<div class="knob-tech"><span>technically</span>' + r.s.tech + '</div>';
+    $('#big-code').textContent = r.s.code;
+  }
+
+  /* ---- the aggregate that does not fit ---- */
+  function cardPaint() {
+    const n = +$('#card-r').value, keys = Math.pow(10, n);
+    const ram = +$('#bc-ram').value;
+    const bytesPerKey = 130;                                  // dict entry + str object + float, CPython
+    const state = keys * bytesPerKey;
+    const stateGB = state / 1073741824;
+    const ok = stateGB < ram * 0.5;
+    $('#card-v').textContent = keys.toLocaleString();
+    $('#card-stats').innerHTML =
+      '<div class="stat"><div class="stat-v">' + keys.toLocaleString() + '</div><div class="stat-k">distinct keys</div></div>' +
+      '<div class="stat"><div class="stat-v">~' + bytesPerKey + ' B</div><div class="stat-k">per key in CPython</div></div>' +
+      '<div class="stat"><div class="stat-v ' + (ok ? 'good' : 'bad') + '">' + (stateGB < 0.1 ? (state / 1048576).toFixed(0) + ' MB' : stateGB.toFixed(1) + ' GB') + '</div><div class="stat-k">aggregate size</div></div>' +
+      '<div class="stat"><div class="stat-v ' + (ok ? 'good' : 'bad') + '">' + (ok ? 'stream it' : 'partition it') + '</div><div class="stat-k">correct answer</div></div>';
+    $('#card-note').innerHTML = ok
+      ? '<b class="good">Streaming is enough.</b> The file is unbounded but the state is not, so one pass with a dictionary finishes the job. This is the answer the interviewer is looking for.'
+      : '<b class="warn">This is the follow-up question.</b> You streamed the file perfectly and the <span class="mono">defaultdict</span> is now ' + stateGB.toFixed(1) + ' GB. Streaming bounded the FILE, not the STATE. Hash each key into one of N spill files, then aggregate each file independently &mdash; external group-by, and it is fifteen lines.';
+    $('#card-code').textContent = ok
+      ? `# state fits: one pass, one dict\nfrom collections import defaultdict\ntotals = defaultdict(float)\nfor row in stream("events.csv"):\n    totals[row["key"]] += row["amount"]`
+      : `# state does not fit: partition, then aggregate each part\nimport os, csv, hashlib\nfrom collections import defaultdict\n\nN = 64\nparts = [open(f"part-{i}.csv", "w", newline="") for i in range(N)]\nwriters = [csv.writer(p) for p in parts]\n\nfor row in stream("events.csv"):                 # pass 1: shuffle by key hash\n    h = int(hashlib.blake2b(row["key"].encode(), digest_size=4).hexdigest(), 16)\n    writers[h % N].writerow([row["key"], row["amount"]])\nfor p in parts: p.close()\n\nresult = {}\nfor i in range(N):                                # pass 2: each part fits in RAM\n    totals = defaultdict(float)                   # because equal keys share a part\n    with open(f"part-{i}.csv", newline="") as f:\n        for k, v in csv.reader(f):\n            totals[k] += float(v)\n    result.update(totals)\n    os.remove(f"part-{i}.csv")`;
+  }
+  $('#card-r').oninput = cardPaint;
+  $('#bc-ram').addEventListener('input', cardPaint);
+  $('#big-principles').innerHTML = C.bigPrinciples.map(p => '<dt>' + p[0] + '</dt><dd>' + p[1] + '</dd>').join('');
+  paint(); cardPaint();
+}
+
 /* ---------- boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   [initPlain, initJargon, initBackground, initClarify, initMetrics, initLabels, initSkew, initLadder, initFunnel,
    initBudget, initCapacity, initEval, initLoop, initRagScale, initCascade, initKv, initDecode, initDesigns,
-   initShip, initPatterns, initRedis, initAnn, initQuiz]
+   initShip, initPatterns, initRedis, initAnn,
+   initCaching, initParallel, initLexical, initBigData,
+   initQuiz]
     .forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 });
 })();

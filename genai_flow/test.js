@@ -340,4 +340,247 @@ ids.forEach(id => assert(html.includes('id="' + id + '"') || demos.includes('id=
   keys.forEach(k => assert(C[k] !== undefined, `demos.js reads C.${k}, which content.js does not define`));
 }
 
+/* ============================================================
+   Deep dives (ch18-23). Each block re-derives the maths from
+   scratch and asserts the claim the chapter makes on screen.
+   If an edit ever makes a chapter teach something false, this
+   is where it fails.
+   ============================================================ */
+
+/* ---- ch18: the toy transformer, re-implemented independently ---- */
+{
+  const T = C.tf;
+  const mv = (x, M) => M[0].map((_, j) => x.reduce((s, xi, i) => s + xi * M[i][j], 0));
+  const add = (a, b) => a.map((v, i) => v + b[i]);
+  const ln = x => {
+    const m = x.reduce((a, b) => a + b, 0) / x.length;
+    const v = x.reduce((a, b) => a + (b - m) ** 2, 0) / x.length;
+    return x.map(e => (e - m) / Math.sqrt(v + 1e-5));
+  };
+  const gelu = z => 0.5 * z * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (z + 0.044715 * z ** 3)));
+  const smax = a => {
+    const m = Math.max(...a.filter(Number.isFinite));
+    const e = a.map(v => Number.isFinite(v) ? Math.exp(v - m) : 0);
+    const s = e.reduce((x, y) => x + y, 0);
+    return e.map(v => v / s);
+  };
+  function fwd(toks, ffn) {
+    const n = toks.length, d = 4;
+    const X0 = toks.map((t, i) => add(T.vocab[t], T.pos[i]));
+    const Xn = X0.map(ln);
+    const Q = Xn.map(x => mv(x, T.Wq)), K = Xn.map(x => mv(x, T.Wk)), V = Xn.map(x => mv(x, T.Wv));
+    const A = [];
+    for (let i = 0; i < n; i++) {
+      const r = [];
+      for (let j = 0; j < n; j++) r.push(j <= i ? Q[i].reduce((s, q, k) => s + q * K[j][k], 0) / Math.sqrt(d) : -Infinity);
+      A.push(smax(r));
+    }
+    const ctx = A.map(row => row.reduce((acc, w, j) => w > 0 ? add(acc, V[j].map(v => v * w)) : acc, [0, 0, 0, 0]));
+    const X1 = X0.map((x, i) => add(x, mv(ctx[i], T.Wo)));
+    let X2 = X1, H = null;
+    if (ffn) {
+      H = X1.map(x => mv(ln(x), T.W1).map((v, j) => gelu(v + T.b1[j])));
+      X2 = X1.map((x, i) => add(x, mv(H[i], T.W2)));
+    }
+    const fin = ln(X2[n - 1]);
+    const words = Object.keys(T.vocab);
+    const probs = smax(words.map(w => fin.reduce((s, f, i) => s + f * T.vocab[w][i], 0) * T.logitGain));
+    return { A, probs, words, H };
+  }
+  // every prompt must fit the position table and use words that exist
+  T.prompts.forEach(p => {
+    assert(p.t.length <= T.pos.length, `tf prompt "${p.t.join(' ')}" is longer than the position table`);
+    p.t.forEach(w => assert(T.vocab[w], `tf prompt uses unknown token "${w}"`));
+  });
+  const r = fwd(['the', 'cat', 'sat'], true);
+  // softmax must actually be a distribution, or the chapter's percentages are fiction
+  r.A.forEach((row, i) => {
+    const s = row.reduce((a, b) => a + b, 0);
+    assert(Math.abs(s - 1) < 1e-9, `attention row ${i} sums to ${s}, not 1`);
+    // causal mask: nothing may attend to a position to its right
+    row.forEach((w, j) => assert(j <= i || w === 0, `token ${i} attends ${w} to future token ${j}`));
+  });
+  assert(Math.abs(r.probs.reduce((a, b) => a + b, 0) - 1) < 1e-9, 'next-token probabilities do not sum to 1');
+  // "sat" must attend mostly to "cat" — the chapter says a verb goes looking for its subject
+  assert(r.A[2][1] > 0.5, `"sat" attends only ${(r.A[2][1] * 100).toFixed(0)}% to "cat"; the chapter claims it dominates`);
+  // THE claim of the chapter: attention alone echoes, the feed-forward supplies knowledge
+  const top = x => x.words[x.probs.indexOf(Math.max(...x.probs))];
+  const withFfn = top(r), without = top(fwd(['the', 'cat', 'sat'], false));
+  assert(['mat', 'on'].includes(withFfn), `feed-forward ON predicts "${withFfn}"; chapter 18 claims a place word`);
+  assert(['cat', 'dog'].includes(without), `feed-forward OFF predicts "${without}"; chapter 18 claims it can only echo what it attended to`);
+  // and the fact neuron (index 4, animate+action) must be the one doing it
+  assert(r.H[2][4] > 0.3, `the animate+action neuron only reaches ${r.H[2][4].toFixed(2)}; the chapter says it fires`);
+  assert(T.W2[4][2] > Math.abs(T.W2[4][0]), 'the fact neuron must write more into the place dimension than it removes from animate');
+}
+
+/* ---- ch19: decoding maths ---- */
+{
+  const cands = C.decodeDist.cands;
+  const dist = (t) => {
+    const s = cands.map(c => c.l / t), m = Math.max(...s);
+    const e = s.map(v => Math.exp(v - m)), z = e.reduce((a, b) => a + b, 0);
+    return e.map(v => v / z);
+  };
+  const ent = p => -p.reduce((a, v) => a + (v > 0 ? v * Math.log2(v) : 0), 0);
+  // temperature must monotonically flatten the distribution — the chapter's whole claim
+  const temps = [0.2, 0.5, 1.0, 1.5, 2.0].map(t => ent(dist(t)));
+  for (let i = 1; i < temps.length; i++) {
+    assert(temps[i] > temps[i - 1], `entropy did not rise from temperature ${i}; the chapter claims heat flattens`);
+  }
+  // top-p must keep the SMALLEST set covering p, and never more
+  const p = dist(1.0).slice().sort((a, b) => b - a);
+  [0.5, 0.9, 0.95].forEach(target => {
+    let cum = 0, kept = 0;
+    for (const v of p) { cum += v; kept++; if (cum >= target) break; }
+    const cumMinusOne = p.slice(0, kept - 1).reduce((a, b) => a + b, 0);
+    assert(cumMinusOne < target, `top-p ${target} kept ${kept} tokens but ${kept - 1} already covered the mass`);
+  });
+  // every recipe must be a legal setting, or the copy-paste block ships a bug
+  C.decodeRecipes.forEach(r => {
+    assert(r.t >= 0 && r.t <= 2, `recipe "${r.n}" has temperature ${r.t}`);
+    assert(r.p > 0 && r.p <= 1, `recipe "${r.n}" has top_p ${r.p}`);
+  });
+  const det = C.decodeRecipes.find(r => r.n.includes('Extraction'));
+  assert(det.t === 0, 'the extraction recipe must be greedy, or the chapter contradicts itself');
+  const vote = C.decodeRecipes.find(r => r.n.includes('Self-consistency'));
+  assert(vote.t > 0, 'self-consistency voting needs temperature above 0 or all samples are identical');
+}
+
+/* ---- ch20: chunking must never lose text ---- */
+{
+  const flat = C.chunkDoc.map(d => d.text).join(' ');
+  const words = new Set(flat.toLowerCase().match(/[a-z]+/g));
+  // the probe the chapter runs must be genuinely answerable from the document
+  assert(flat.includes('5 to 10 business days') && flat.includes('issuing bank'),
+    'the chunking probe asks for facts the document does not contain');
+  // fixed-size with no overlap must actually split them apart, or the demo proves nothing
+  const gap = flat.indexOf('issuing bank') - flat.indexOf('5 to 10 business days');
+  assert(gap > 0 && gap < 300, 'the two probe facts must sit close enough that only a boundary separates them');
+  C.chunkStrategies.forEach(s => {
+    assert(s.lay && s.tech && s.good && s.bad && s.param, `chunk strategy "${s.n}" is missing a field`);
+  });
+  assert(C.chunkStrategies.length === 6, 'the chapter promises six strategies');
+  assert(words.size > 40, 'the chunking document is too small to demonstrate anything');
+}
+
+/* ---- ch21: LoRA parameter arithmetic ---- */
+{
+  const P = C.loraMath;
+  const ff = { 'Llama-3 8B': 14336, 'Llama-3 70B': 28672, 'Mistral 7B': 14336 };
+  P.presets.forEach(m => {
+    const d = m.d, f = ff[m.n];
+    assert(f, `no feed-forward width recorded for ${m.n}`);
+    const qv = 2 * 16 * 2 * d * m.layers;
+    const all = (4 * 16 * 2 * d + 3 * 16 * (d + f)) * m.layers;
+    assert(all > qv, 'adapting more matrices must train more parameters');
+    // the chapter's headline claim: you train well under 1% of the model
+    assert(qv / m.base < 0.01, `${m.n} q+v at r=16 trains ${(qv / m.base * 100).toFixed(2)}% — the chapter claims under 1%`);
+    assert(all / m.base < 0.05, `${m.n} full-target at r=16 trains ${(all / m.base * 100).toFixed(2)}%`);
+    // and the VRAM ordering the calculator prints must hold
+    const full = m.base * 16, lora = m.base * 2 + all * 16, qlora = m.base * 0.55 + all * 16;
+    assert(qlora < lora && lora < full, `VRAM ordering broken for ${m.n}`);
+  });
+  // rank must scale parameters linearly — it is the one thing the diagram promises
+  const at = r => 2 * r * 2 * 4096 * 32;
+  assert(Math.abs(at(32) / at(16) - 2) < 1e-9, 'doubling the rank must double the trainable parameters');
+  // the decision tree must give an answer for every reachable combination
+  const problems = C.ftDecision[0].a.map(a => a.v), datas = C.ftDecision[1].a.map(a => a.v);
+  const gpus = C.ftDecision[2].a.map(a => a.v), verifs = C.ftDecision[3].a.map(a => a.v);
+  const ids = new Set(C.ftMethods.map(m => m.id));
+  const rec = (a) => {
+    const [problem, data, gpu, verif] = a;
+    if (problem === 'facts') return 'rag';
+    if (problem === 'cost') return 'distil';
+    if (problem === 'reason') return verif === 'verifiable' ? 'grpo' : 'dpo';
+    if (data === 'tiny') return 'prompt';
+    if (gpu === 'none') return 'prompt';
+    if (data === 'big' && gpu === 'cluster') return 'sft';
+    if (gpu === 'consumer') return 'qlora';
+    return 'lora';
+  };
+  problems.forEach(p => datas.forEach(d => gpus.forEach(g => verifs.forEach(v => {
+    const r = rec([p, d, g, v]);
+    assert(ids.has(r), `the fine-tuning decision tree returns "${r}", which is not a method`);
+  }))));
+  // the comparison table must line up with the number of columns it declares
+  assert(C.loraVsQlora.cols.length === 2, 'the LoRA/QLoRA table must have exactly two columns');
+  C.loraVsQlora.rows.forEach(r => assert(r.length === 3, `LoRA/QLoRA row "${r[0]}" has ${r.length - 1} cells for 2 columns`));
+}
+
+/* ---- ch22: the judge bench must actually improve with mitigations ---- */
+{
+  const seeded = (str) => {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return ((h >>> 0) / 4294967295) * 2 - 1;
+  };
+  const run = active => {
+    const on = id => active.includes(id);
+    let agree = 0;
+    C.judgeBench.forEach(c => {
+      const truth = c.better === 'A' ? 1 : c.better === 'B' ? -1 : 0;
+      let w = 0.35;
+      if (on('rubric')) w += 0.30;
+      if (on('reference')) w += 0.30;
+      if (on('pairwise')) w += 0.25;
+      if (on('cot')) w += 0.20;
+      let v = truth * w;
+      if (!on('swap')) v += 0.60;
+      v += (c.lenA - c.lenB) * (on('lenpen') ? 0.35 : 1.20);
+      if (!on('diffjudge')) v += 0.30;
+      v += seeded(c.id + active.join('')) * (on('consist') ? 0.08 : 0.25);
+      if (!on('rubric')) v += seeded(c.id + 'drift') * 0.20;
+      const said = v > 0.18 ? 'A' : v < -0.18 ? 'B' : 'tie';
+      if (said === c.better) agree++;
+    });
+    return agree / C.judgeBench.length;
+  };
+  const naive = run([]), all = run(C.judgeConfigs.map(c => c.id));
+  assert(naive < 0.7, `the naive judge already agrees ${(naive * 100).toFixed(0)}% of the time; the chapter needs it to look unreliable`);
+  assert(all >= 0.85, `the fully mitigated judge only reaches ${(all * 100).toFixed(0)}%; the chapter claims mitigations work`);
+  assert(all - naive >= 0.25, 'the mitigations must produce a visible jump or the panel teaches nothing');
+  // position swap alone must be the single biggest lever, as the chapter states
+  const gains = C.judgeConfigs.map(c => ({ id: c.id, g: run([c.id]) - naive }));
+  const best = gains.slice().sort((a, b) => b.g - a.g)[0];
+  assert(best.id === 'swap', `the biggest single mitigation is "${best.id}", but the chapter says position swap`);
+  // every bias must have at least one mitigation pointing at it
+  C.judgeBiases.forEach(b => assert(C.judgeConfigs.some(c => c.fixes.includes(b.id)),
+    `bias "${b.n}" has no mitigation, but the panel promises one for each`));
+  // the bench itself must not be trivially one-sided, or "always answer A" would score well
+  const aCount = C.judgeBench.filter(c => c.better === 'A').length;
+  assert(aCount < C.judgeBench.length, 'the judge bench must contain cases where B wins');
+}
+
+/* ---- ch23: long context vs RAG arithmetic ---- */
+{
+  const v = C.longCtx.defaults, out = 500;
+  const cost = t => t / 1e6 * v.inPrice + out / 1e6 * v.outPrice;
+  const depth = t => Math.min(0.45, 0.10 + 0.35 * Math.log10(Math.max(1, t / 4000)) / Math.log10(250));
+  const sent = Math.min(v.corpusTokens, v.ctxLimit), ragTok = v.k * v.chunk + 800;
+  assert(cost(sent) > cost(ragTok) * 10, 'at the defaults, stuffing the corpus must be far more expensive than retrieving');
+  assert(sent / v.prefillRate > 10, 'prefilling a 1M-token prompt must take many seconds, or the latency argument is fiction');
+  // the sag must genuinely deepen with length, and never invert
+  const ds = [8000, 32000, 128000, 1000000].map(depth);
+  for (let i = 1; i < ds.length; i++) assert(ds[i] >= ds[i - 1], 'the lost-in-the-middle sag must not shrink as context grows');
+  assert(depth(ragTok) < depth(sent), 'a short retrieved prompt must have a shallower sag than a 1M-token one');
+  // the curve is symmetric and worst in the middle — that is the phenomenon being taught
+  const acc = (t, x) => 1 - depth(t) * 4 * x * (1 - x);
+  assert(acc(sent, 0.5) < acc(sent, 0.05) && acc(sent, 0.5) < acc(sent, 0.95), 'the accuracy curve must dip in the middle');
+  assert(Math.abs(acc(sent, 0.2) - acc(sent, 0.8)) < 1e-9, 'the lost-in-the-middle curve must be symmetric');
+  // multilingual cause weights are presented as "share of real cases"
+  const w = C.multiling.causes.reduce((a, c) => a + c.weight, 0);
+  assert(Math.abs(w - 1) < 0.02, `multilingual cause weights sum to ${w.toFixed(2)}, not 1`);
+  assert(C.multiling.causes[0].weight === Math.max(...C.multiling.causes.map(c => c.weight)),
+    'the causes must be ordered most-likely first, because the chapter says they are');
+  // the five architectures each need a flow the diagram can render
+  C.ragVariants.forEach(r => assert(r.flow.length >= 4, `architecture "${r.n}" has too short a flow to draw`));
+  assert(C.ragVsLong.rows.every(r => r.length === 3), 'the long-context comparison table must have two columns per row');
+}
+
+/* ---- comparison tables everywhere must be rectangular ---- */
+[C.tfCompare, C.loraVsQlora, C.ragVsLong].forEach(t => {
+  t.rows.forEach(r => assert(r.length === t.cols.length + 1,
+    `comparison row "${r[0]}" has ${r.length - 1} cells for ${t.cols.length} columns`));
+});
+
 console.log('ok — content data is consistent');

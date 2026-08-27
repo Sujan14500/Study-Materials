@@ -933,6 +933,260 @@ ASOF JOIN user_features f
 </section>
 
 <!-- ============================================================= -->
+<!-- 19. CACHING                                                   -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="caching" data-title="Caching layers" data-icon="19" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 19 &middot; Putting it together</div>
+    <h2>The same question, <span class="grad">a hundred different ways</span></h2>
+    <p class="lead">Your product gets asked "how long do refunds take" four thousand times a day and never twice in the same words. An exact-match cache hits almost none of them. This chapter builds the answer layer by layer &mdash; and then breaks each layer the way production breaks it.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#127859;</div>
+    <div><b>The layman version.</b> A busy kitchen does three different things to go faster. It keeps <b>finished dishes</b> under a heat lamp for the exact order that repeats (exact cache). It recognises that "no onions burger" and "burger, hold the onion" are the <b>same order</b> (semantic cache). And it keeps the <b>sauce base</b> simmering because every dish starts with it (prompt/prefix cache). Only the middle one can serve you the wrong meal &mdash; which is why it needs the most care.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129513; The cache ladder</h3><span class="panel-tag">interactive diagram</span></div>
+    <p class="panel-sub">Five rungs, cheapest first. Click one to see what it keys on, what it actually saves, and how it fails. The bars are the hit rate each layer typically adds on human support traffic.</p>
+    <div id="cl-ladder"></div>
+    <div class="arch-detail" id="cl-detail"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127919; The semantic cache threshold, tuned live</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">One cached answer, sixteen incoming questions with their true intents already labelled. Drag the similarity threshold. Above it you serve the cached answer; below it you call the model. Watch the two error types trade against each other &mdash; and note that one of them is a wrong answer to a customer.</p>
+    <div class="sc-grid">
+      <div>
+        <div class="ctrl"><label>similarity threshold <span class="val" id="sc-tv">0.90</span></label>
+          <input type="range" id="sc-t" min="0.60" max="1.00" step="0.01" value="0.90"></div>
+        <div class="stat-row" id="sc-stats"></div>
+        <div class="sc-note" id="sc-note"></div>
+      </div>
+      <div>
+        <div class="lab-pane-title">Incoming questions <span class="dim">(cached: "how long do refunds take?")</span></div>
+        <div id="sc-rows" class="sc-rows"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9878; Three caches, compared</h3><span class="panel-tag">comparison</span></div>
+    <div id="cache-compare"></div>
+    <div class="hyb-ok" id="cache-compare-verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128165; Six ways a cache goes wrong</h3><span class="panel-tag">click a card</span></div>
+    <p class="panel-sub">Cache penetration is the one interviewers ask by name. The other five are the ones that page you at 3am.</p>
+    <div class="path-grid" id="cache-paths"></div>
+    <div class="ft-detail" id="cache-path-detail"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128273; The cache key is the whole design</h3></div>
+    <p class="panel-sub">Almost every staleness and correctness bug in an LLM cache is a missing component in the key. Put the version of everything that can change the answer into it, and invalidation stops being a problem you have to solve.</p>
+    <pre class="code" id="cache-key-code"></pre>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>Normalise before you get clever.</b> Lowercasing and stripping punctuation is an afternoon of work and it multiplies exact-match hit rate.</li>
+      <li><b>Only the semantic layer can be wrong.</b> Tune its threshold against labelled paraphrases, not against a hit-rate target.</li>
+      <li><b>Prompt caching is nearly free and nearly always available.</b> Put everything stable at the top of the prompt and everything variable at the bottom.</li>
+      <li><b>Cache penetration is about keys that exist nowhere.</b> Negative caching plus a Bloom filter, and rate limit on miss rate.</li>
+      <li><b>Version the key with prompt, model and retrieved-content versions.</b> Invalidation becomes naming, and naming is easy.</li>
+      <li><b>Never cache an answer from a degraded path.</b> A cached fallback answer is a permanent outage nobody can see.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 20. SHARDING & PARALLELISM                                     -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="parallel" data-title="Sharding &amp; parallelism" data-icon="20" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 20 &middot; Putting it together</div>
+    <h2>When one model <span class="grad">does not fit</span> on one GPU</h2>
+    <p class="lead">"LLM sharding" is not one technique. It is four ways of cutting a model apart, each cutting a different axis, each with a different communication bill. Pick the wrong one for your interconnect and you will spend twice the hardware to go slower.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#128715;</div>
+    <div><b>The layman version.</b> A dish is too big for one chef. <b>Tensor parallel</b>: four chefs each cook a quarter of the same dish and combine after every step &mdash; fast, but they must stand next to each other. <b>Pipeline parallel</b>: an assembly line where each chef owns a few stations &mdash; they can be in different buildings, but the first plate takes a while. <b>Data parallel</b>: four identical chefs cooking four different orders &mdash; more orders per hour, not a faster dish. <b>Expert parallel</b>: eight specialists, and each order only goes to the two who know it.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128202; Will it fit? The arithmetic</h3><span class="panel-tag">live calculator</span></div>
+    <p class="panel-sub">Weights, KV cache and activations, computed from your choices. This is the calculation that decides your entire serving architecture, and it is five lines of multiplication.</p>
+    <div class="par-calc" id="par-calc"></div>
+    <div class="stat-row" id="par-stats"></div>
+    <div id="par-topology"></div>
+    <div class="lc-verdict" id="par-verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9986; Six ways to cut it up</h3><span class="panel-tag">click a card</span></div>
+    <div class="rv-grid" id="par-grid"></div>
+    <div class="ft-detail" id="par-detail"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9878; Four parallelism axes, side by side</h3><span class="panel-tag">comparison</span></div>
+    <div id="par-compare"></div>
+    <div class="hyb-ok" id="par-compare-verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128451; PagedAttention: the memory you were throwing away</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Ten real requests with different output lengths. Toggle between reserving <span class="mono">max_tokens</span> per request and allocating 16-token blocks on demand, and watch how many requests fit in the same memory.</p>
+    <label class="toggle" id="pa-toggle"><span class="toggle-box">&#10003;</span><span>PagedAttention (16-token blocks) &mdash; off means reserve max_tokens up front</span></label>
+    <div id="pa-viz"></div>
+    <div class="stat-row" id="pa-stats"></div>
+    <div class="sc-note" id="pa-note"></div>
+    <dl class="deflist" id="paged-note"></dl>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>Memory is weights + KV cache + activations.</b> Weights are fixed; the KV cache is what actually decides your batch size and therefore your cost per token.</li>
+      <li><b>Tensor parallel inside a node, pipeline parallel across nodes.</b> Put the chattiest split on the fastest wire.</li>
+      <li><b>Data parallel adds throughput, never capacity.</b> If it does not fit on one GPU, replication does not help.</li>
+      <li><b>MoE buys parameters, not free compute.</b> You hold every expert in memory and activate a couple.</li>
+      <li><b>PagedAttention is virtual memory for the KV cache</b> &mdash; bounded waste, and shared prefixes for free.</li>
+      <li><b>Continuous batching is the scheduling half.</b> Without it one long generation holds a whole batch hostage.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 21. LEXICAL SEARCH                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="lexical" data-title="Elasticsearch &amp; BM25" data-icon="21" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 21 &middot; Putting it together</div>
+    <h2>The <span class="grad">inverted index</span>, and why embeddings alone lose</h2>
+    <p class="lead">Every serious retrieval system still has a lexical lane, and the reason is not nostalgia. Dense vectors cannot do exact identifiers, they are weak on numbers and negation, they are blind to jargon invented last week, and they cannot filter or explain themselves. Here is what the other lane actually does.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#128218;</div>
+    <div><b>The layman version.</b> An inverted index is the index at the back of a book. Instead of reading all 400 pages looking for "refund", you look up "refund" once and it tells you pages 12, 88 and 203. BM25 is the rule that decides which of those three pages to show first: a page that says "refund" often, on a topic where "refund" is otherwise rare, and which is short enough that the word is clearly what the page is about.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128269; Build the index, then query it</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Eight documents, analysed and inverted in front of you. Pick a query and watch which postings lists get intersected and how each document's BM25 score is actually computed &mdash; term by term, with the real numbers.</p>
+    <div class="chip-row" id="lex-queries"></div>
+    <input class="input-line" id="lex-custom" placeholder="or type your own query...">
+    <div class="lex-grid">
+      <div>
+        <div class="lab-pane-title">Postings lists touched</div>
+        <div id="lex-postings"></div>
+      </div>
+      <div>
+        <div class="lab-pane-title">Ranked results, with the score maths</div>
+        <div id="lex-results"></div>
+      </div>
+    </div>
+    <div class="sc-note" id="lex-note"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128290; The BM25 formula, decoded</h3><span class="panel-tag">interactive diagram</span></div>
+    <p class="panel-sub">Three ideas in one line. Hover each piece to see what it does and what happens when you turn its knob.</p>
+    <div id="bm25-formula"></div>
+    <div class="arch-detail" id="bm25-detail"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127959; What Elasticsearch actually is</h3></div>
+    <p class="panel-sub">Nine words that every Elasticsearch question is really about. The shard-count one is where most production incidents start.</p>
+    <dl class="deflist" id="lex-es"></dl>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9878; Lexical vs dense vs hybrid</h3><span class="panel-tag">comparison</span></div>
+    <div id="lex-compare"></div>
+    <div class="hyb-ok" id="lex-compare-verdict"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>BM25 is term frequency, saturated; inverse document frequency; and length normalisation.</b> If you can say that sentence you can answer the question.</li>
+      <li><b>The analyser must be identical on index and query.</b> Nearly every "why does nothing match" bug is this.</li>
+      <li><b>Filters are cached, queries are scored.</b> Tenant, date and permission go in filter context, always.</li>
+      <li><b>Shard count is fixed at index creation.</b> Aim for 10-50 GB per shard and think before you type.</li>
+      <li><b>Dense retrieval cannot do exact identifiers.</b> That single fact is the strongest argument for hybrid search.</li>
+      <li><b>Refresh interval is a real tuning knob.</b> 30 seconds during bulk load is several times faster.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 22. BIG FILES, SMALL MEMORY                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="bigdata" data-title="Big files, small RAM" data-icon="22" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 22 &middot; Putting it together</div>
+    <h2>A 5 GB file and <span class="grad">2 GB of RAM</span></h2>
+    <p class="lead">A classic interview question with a one-word answer &mdash; <b>streaming</b> &mdash; and a much more interesting follow-up: what happens when the thing that does not fit is not the file, but the running total? This chapter does both, and first untangles the four different things people mean by "streaming".</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#128230;</div>
+    <div><b>The layman version.</b> You have to move a filing cabinet up a staircase that holds one person. You do not lift the cabinet. You carry one folder at a time, write the running total on a sticky note, and never hold more than one folder plus the note. The folder is your chunk; the sticky note is your aggregate; and the only remaining question is whether the sticky note itself can get too big.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9888; "Streaming" means four different things</h3></div>
+    <p class="panel-sub">Interviewers use the word loosely, and candidates answer the wrong one. Say which you mean before you answer.</p>
+    <div class="three-up" id="stream-meanings"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129518; Will it survive? The memory simulator</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Set the file size and the machine's RAM, then pick an approach. Peak memory is computed from the file size and the expansion factor each approach carries &mdash; the red line is where the process dies.</p>
+    <div class="big-calc" id="big-calc"></div>
+    <div id="big-bars"></div>
+    <div class="stat-row" id="big-stats"></div>
+    <div class="sc-note" id="big-note"></div>
+    <pre class="code code-live" id="big-code"></pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128295; When the aggregate is the thing that does not fit</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Streaming bounds the file. It does not bound your <span class="mono">defaultdict</span>. Drag the number of distinct keys and watch the moment the answer changes from "stream it" to "partition it".</p>
+    <div class="ctrl"><label>distinct group-by keys <span class="val" id="card-v"></span></label>
+      <input type="range" id="card-r" min="1" max="7" step="1" value="3"></div>
+    <div class="stat-row" id="card-stats"></div>
+    <div class="sc-note" id="card-note"></div>
+    <pre class="code" id="card-code"></pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127891; Six principles, and the words to say out loud</h3></div>
+    <dl class="deflist" id="big-principles"></dl>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>The file size is not the constraint &mdash; the largest live object is.</b> Say that first and the rest of the answer follows.</li>
+      <li><b>Reduce inside the loop.</b> Appending chunks to a list is loading the file with extra steps.</li>
+      <li><b>Check the cardinality of the group-by key</b> before choosing an approach. It is the question that separates a senior answer from a junior one.</li>
+      <li><b>When state does not fit, partition by hash and spill.</b> External group-by is fifteen lines and it always works.</li>
+      <li><b>DuckDB or Polars beats a cluster on one machine.</b> Reach for Dask or Spark when you genuinely have many machines.</li>
+      <li><b>Convert to Parquet if you will query more than twice.</b> CSV parsing was most of the cost all along.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
 <!-- 18. QUIZ                                                      -->
 <!-- ============================================================= -->
 <section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Putting it together">
