@@ -110,4 +110,16 @@ assert(visits[visits.length - 1] === 'end', 'graph run must terminate at END');
     assert(chapters.includes(id), `C.plain."${id}" matches no chapter — it can never render`));
 }
 
+
+// ch3: every prompt rule must carry a worked example, and the example must
+// actually demonstrate the rule rather than being a stray one-liner
+C.tplRules.forEach(([title, desc, code], i) => {
+  assert(typeof code === 'string' && code.trim(), `tplRule ${i} ("${title}") has no example`);
+  assert(code.includes('\n'), `tplRule ${i} ("${title}") example is a single line`);
+  assert(!desc.includes('```'), `tplRule ${i} description should be prose, not a code fence`);
+});
+// the escaping rule must itself show a doubled brace, or it teaches nothing
+assert(C.tplRules.find(r => /Escape/.test(r[0]))[2].includes('{{'),
+  'the brace-escaping rule shows no {{ }} example');
+
 console.log('ok — content data is consistent');

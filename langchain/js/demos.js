@@ -11,6 +11,8 @@ const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
 const xp = (n, msg) => window.awardXP && window.awardXP(n, msg);
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// `backticks` in content strings become inline code
+const mono = s => esc(s).replace(/`([^`]+)`/g, '<span class="mono">$1</span>');
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ============================================================
@@ -237,7 +239,8 @@ function initTemplates() {
 
   const rules = $('#tpl-rules');
   if (rules) rules.innerHTML = C.tplRules.map(r =>
-    '<div class="gterm"><b>' + r[0] + '</b><span>' + r[1] + '</span></div>').join('');
+    '<div class="gterm"><b>' + esc(r[0]) + '</b><span>' + mono(r[1]) + '</span>' +
+    (r[2] ? '<pre class="code">' + esc(r[2]) + '</pre>' : '') + '</div>').join('');
 }
 
 /* ============================================================
@@ -807,8 +810,7 @@ function initQuiz() {
    ============================================================ */
 function initPlain() {
   if (!window.C || !C.plain) return;
-  const md = s => esc(s).replace(/`([^`]+)`/g, '<span class="mono">$1</span>');
-  const paras = s => s.split('\n\n').map(p => '<p>' + md(p) + '</p>').join('');
+  const paras = s => s.split('\n\n').map(p => '<p>' + mono(p) + '</p>').join('');
 
   $$('.chapter').forEach(ch => {
     const p = C.plain[ch.dataset.id];

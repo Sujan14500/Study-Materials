@@ -69,11 +69,87 @@ C.tplPresets = [
     vars: { ticket: 'The CSV download is missing the last column' } }
 ];
 C.tplRules = [
-  ['Templates are not f-strings', 'A template is a declared object with named inputs. It validates that you supplied them, it composes with other runnables, and it shows up in traces as a step you can inspect.'],
-  ['Escape literal braces', 'Inside a template, `{` starts a variable. To emit a literal brace — a JSON example, say — write `{{` and `}}`.'],
-  ['Put the variable part last', 'Prompt caching matches on a stable prefix. A timestamp near the top of a long system prompt silently destroys every cache hit below it.'],
-  ['MessagesPlaceholder for history', 'Do not string-concatenate a transcript into one blob. `MessagesPlaceholder("history")` splices in a real list of messages and keeps roles intact.'],
-  ['Partial early', '`prompt.partial(company="Northwind")` locks in what you already know and leaves a smaller template for the caller to fill.']
+  ['Templates are not f-strings',
+   'A template is a declared object with named inputs. It validates that you supplied them, it composes with other runnables, and it shows up in traces as a step you can inspect.',
+   `# f-string: the hole is filled before LangChain ever sees it
+p = f"Translate to {lang}: {text}"      # NameError at best
+
+# template: declares its inputs, and checks them
+tpl = ChatPromptTemplate.from_template(
+    "Translate to {language}: {text}")
+
+tpl.input_variables             # ['language', 'text']  <- it knows
+tpl.invoke({"text": "hi"})      # KeyError: missing {'language'}
+
+# and it is a runnable, so it composes:
+chain = tpl | model | parser`],
+
+  ['Escape literal braces',
+   'Inside a template, \`{\` starts a variable. To emit a literal brace — a JSON example, say — write \`{{\` and \`}}\`.',
+   `# WRONG — and note it does not raise. the brace is silently read
+# as a variable named '"name"', and you find out at call time.
+bad = ChatPromptTemplate.from_template('Return JSON: {"name": str}')
+bad.input_variables         # ['"name"']  <- one you never asked for
+
+# RIGHT — double each brace to emit one
+tpl = ChatPromptTemplate.from_template(
+    'Return JSON matching: {{"name": str}}\\n\\nText: {text}')
+
+tpl.input_variables         # ['text']  <- one variable, as intended
+tpl.format(text="hi")
+# 'Human: Return JSON matching: {"name": str}\\n\\nText: hi'`],
+
+  ['Put the variable part last',
+   'Prompt caching matches on a stable prefix. A timestamp near the top of a long system prompt silently destroys every cache hit below it.',
+   `# WRONG — the timestamp changes every call, so the 2,000 words of
+# policy underneath it are never the same prefix twice. nothing
+# after the first changed token can be cached.
+ChatPromptTemplate.from_messages([
+    ("system", "Now: {now}\\n\\n" + POLICY),
+    ("human",  "{question}"),
+])
+
+# RIGHT — stable bytes first, volatile bytes last
+ChatPromptTemplate.from_messages([
+    ("system", POLICY),             # identical every call -> cache hit
+    ("system", "Now: {now}"),       # volatile, and cheap to re-read
+    ("human",  "{question}"),
+])`],
+
+  ['MessagesPlaceholder for history',
+   'Do not string-concatenate a transcript into one blob. \`MessagesPlaceholder("history")\` splices in a real list of messages and keeps roles intact.',
+   `# WRONG — roles flattened into prose. the model can no longer tell
+# who said what, and any tool calls in the history are destroyed.
+("human", "Earlier:\\n" + "\\n".join(
+    f"{m.type}: {m.content}" for m in history))
+
+# RIGHT — a real list of messages, spliced in with roles intact
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a support engineer at {company}."),
+    MessagesPlaceholder("history"),
+    ("human", "{question}"),
+])
+
+prompt.invoke({"company": "Northwind",
+               "history": [HumanMessage("hi"), AIMessage("hello")],
+               "question": "SSO keeps bouncing me"})`],
+
+  ['Partial early',
+   '\`prompt.partial(company="Northwind")\` locks in what you already know and leaves a smaller template for the caller to fill.',
+   `base = ChatPromptTemplate.from_template(
+    "You are a support engineer at {company}.\\n"
+    "Tone: {tone}.\\n\\n{question}")
+
+base.input_variables        # ['company', 'question', 'tone'] — sorted
+
+# fix what you already know, once, at startup:
+support = base.partial(company="Northwind", tone="direct and warm")
+
+support.input_variables     # ['question']  <- callers fill one thing
+support.invoke({"question": "SSO keeps bouncing me"})
+
+# a callable is re-evaluated on every call, not frozen at partial time:
+base.partial(now=lambda: datetime.now().isoformat())`]
 ];
 
 /* ---------- Ch4: LCEL ---------- */

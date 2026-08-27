@@ -211,7 +211,6 @@ model.invoke([
     </div>
   </div>
 
-  <div class="two-up">
     <div class="panel">
       <div class="panel-head"><h3>💬 The message form</h3></div>
       <p class="panel-sub">Most real prompts are built from messages rather than one string, so roles and history stay intact:</p>
@@ -232,10 +231,10 @@ prompt.invoke({
       <p class="panel-sub" style="margin-top:12px">Note <span class="mono">MessagesPlaceholder</span> takes a real <i>list</i> of messages. Flattening a transcript into one string throws away the role structure the model relies on.</p>
     </div>
     <div class="panel">
-      <div class="panel-head"><h3>📌 Five rules</h3></div>
-      <div class="glossary" id="tpl-rules"></div>
+      <div class="panel-head"><h3>📌 Five rules</h3><span class="panel-tag">with examples</span></div>
+      <p class="panel-sub">Each one has a worked example. The first four are things people get wrong once and remember forever; the fifth is the one nobody finds on their own.</p>
+      <div class="glossary rules" id="tpl-rules"></div>
     </div>
-  </div>
 </section>
 
 <!-- ============================================================= -->
