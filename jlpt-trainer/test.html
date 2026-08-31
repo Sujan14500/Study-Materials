@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>JLPT trainer self-check</title>
+<style>body{font:14px/1.6 monospace;background:#0f1218;color:#e8ecf4;padding:24px}
+.ok{color:#3ddc97}.no{color:#ff6b6b}h1{font-size:16px}</style></head>
+<body>
+<h1>JLPT trainer self-check</h1>
+<pre id="out"></pre>
+<script src="data/kana.js"></script>
+<script src="data/kanji.js"></script>
+<script src="data/mnemonics.js"></script>
+<script src="data/vocab-n5.js"></script>
+<script src="data/vocab-n4.js"></script>
+<script src="data/grammar.js"></script>
+<script src="data/grammar-readings.js"></script>
+<script src="data/exams-n5.js"></script>
+<script src="data/exams-n4.js"></script>
+<script src="app.js"></script>
+<script src="exam.js"></script>
+<script>
+let fails = 0;
+const out = document.getElementById('out');
+function check(name, fn) {
+  let err = null;
+  try { const r = fn(); if (r !== true) err = 'returned ' + r; }
+  catch (e) { err = e.message; }
+  if (err) fails++;
+  out.insertAdjacentHTML('beforeend',
+    `<span class="${err ? 'no' : 'ok'}">${err ? 'FAIL' : 'PASS'}</span>  ${name}` +
+    (err ? `  -- ${err}` : '') + '\n');
+}
+const { ALL, DECKS, nextBox, makeQuestion, BOX_DAYS, MASTER_BOX, romaji } = window.JLPT;
+
+check('every row has 5 non-empty fields', () =>
+  [DATA_KANA.map(r => [r[0], r[1], r[2], 'N5', 'k']), DATA_KANJI, DATA_VOCAB, DATA_GRAMMAR]
+    .flat().every(r => r.length === 5 && r.every(f => typeof f === 'string' && f.length)) || 'bad row');
+
+check('levels are only N5 or N4', () =>
+  // vocab rows keep the level at index 3, kanji and grammar at index 4
+  (DATA_VOCAB.every(r => r[3] === 'N5' || r[3] === 'N4') &&
+   [...DATA_KANJI, ...DATA_GRAMMAR].every(r => r[4] === 'N5' || r[4] === 'N4'))
+  || 'unexpected level');
+
+check('no duplicate card ids', () => {
+  const seen = new Set(), dup = ALL.filter(c => seen.has(c.id) || (seen.add(c.id), false));
+  return dup.length ? dup.slice(0, 3).map(c => c.front).join(', ') : true;
+});
+
+check('kanji entries are single characters', () => {
+  const bad = DATA_KANJI.filter(r => [...r[0]].length !== 1);
+  return bad.length ? bad.map(r => r[0]).join(', ') : true;
+});
+
+check('japanese fields hold no stray foreign letters', () => {
+  // grammar patterns legitimately use A and B as placeholders, so only latin-check the word decks
+  const bad = [];
+  for (const r of [...DATA_KANA, ...DATA_KANJI, ...DATA_VOCAB])
+    if (/[A-Za-z]/.test(r[0])) bad.push(r[0]);
+  for (const r of [...DATA_KANA, ...DATA_KANJI, ...DATA_VOCAB, ...DATA_GRAMMAR])
+    if (/[Ѐ-ӿ]/.test(r.join(''))) bad.push(r[0]);
+  return bad.length ? bad.slice(0, 5).join(', ') : true;
+});
+
+check('romaji handles youon, sokuon, long vowels and syllabic n', () => {
+  const cases = { 'わるい': 'warui', 'がっこう': 'gakkou', 'しんぶん': 'shinbun',
+    'きって': 'kitte', 'しゃしん': 'shashin', 'ちょっと': 'chotto', 'せんせい': 'sensei',
+    'コーヒー': 'koohii', 'ざっし': 'zasshi', 'きんえん': "kin'en", 'ニチ・ジツ': 'nichi / jitsu',
+    'ごはん': 'gohan', 'はな': 'hana', 'へや': 'heya', 'こんばんは': 'konban wa',
+    'わたしは がくせいです。': 'watashi wa gakuseidesu.',
+    'ごはんを たべてから、テレビをみます。': 'gohan o tabetekara, terebi o mimasu.' };
+  const bad = Object.entries(cases).filter(([k, v]) => romaji(k) !== v)
+    .map(([k, v]) => `${k} -> ${romaji(k)} (want ${v})`);
+  return bad.length ? bad.join('; ') : true;
+});
+
+check('romaji stays empty rather than half-converting kanji', () =>
+  (romaji('食べる') === '' && romaji('一番') === '' && romaji('-') === '') || 'leaked partial romaji');
+
+check('every kana reading in the word decks converts', () => {
+  const bad = [...DECKS.vocab, ...DECKS.kanji].filter(c => !c.rom);
+  return bad.length ? bad.slice(0, 5).map(c => c.front).join(', ') : true;
+});
+
+check('every kanji has a mnemonic, and no mnemonic is orphaned', () => {
+  const missing = DECKS.kanji.filter(c => !c.tip).map(c => c.front);
+  const orphan = Object.keys(DATA_MNEMONIC).filter(k => !DECKS.kanji.some(c => c.front === k));
+  return (missing.length || orphan.length)
+    ? `missing ${missing.join('')} / orphan ${orphan.join('')}` : true;
+});
+
+check('every grammar pattern has a stored reading', () => {
+  const missing = DATA_GRAMMAR.filter(r => !DATA_GRAMMAR_READING[r[0]]).map(r => r[0]);
+  const orphan = Object.keys(DATA_GRAMMAR_READING).filter(k => !DATA_GRAMMAR.some(r => r[0] === k));
+  return (missing.length || orphan.length)
+    ? `missing ${missing.join(' | ')} / orphan ${orphan.join(' | ')}` : true;
+});
+
+check('every card in every deck carries romaji', () => {
+  const bad = [...DECKS.vocab, ...DECKS.kanji, ...DECKS.grammar].filter(c => !c.rom)
+    .concat(DECKS.grammar.filter(c => !c.jpRom));
+  return bad.length ? bad.slice(0, 5).map(c => c.front).join(', ') : true;
+});
+
+check('again resets the box, good advances, easy jumps two', () =>
+  (nextBox(3, 'again') === 0 && nextBox(0, 'good') === 1 && nextBox(0, 'easy') === 2 &&
+   nextBox(BOX_DAYS.length - 1, 'good') === BOX_DAYS.length - 1) || 'wrong schedule');
+
+check('a card reaches mastered after enough correct answers', () => {
+  let b = 0;
+  for (let i = 0; i < 10 && b < MASTER_BOX; i++) b = nextBox(b, 'good');
+  return b >= MASTER_BOX || 'never mastered';
+});
+
+check('quiz gives 4 options, all distinct, answer included', () => {
+  for (const kind of ['kana', 'kanji', 'vocab', 'grammar'])
+    for (let i = 0; i < 200; i++) {
+      const q = makeQuestion(kind, ['N5', 'N4']);
+      if (q.opts.length !== 4) return kind + ': ' + q.opts.length + ' options';
+      if (new Set(q.opts.map(o => o.back)).size !== 4) return kind + ': duplicate option text';
+      if (!q.opts.includes(q.card)) return kind + ': answer missing';
+    }
+  return true;
+});
+
+check('every deck has enough cards to build a quiz', () =>
+  ['kana', 'kanji', 'vocab', 'grammar'].every(k =>
+    ['N5', 'N4'].every(lv => {
+      const n = DECKS[k].filter(c => c.level === lv).length;
+      return k === 'kana' ? lv === 'N4' || n >= 4 : n >= 4;
+    })) || 'a level has fewer than 4 cards');
+
+const { EXAMS, PASS, buildExam, genItems, countQuestions } = window.JLPT_EXAM;
+const flat = r => r.sections.flatMap(s => s.parts.flatMap(
+  pt => pt.blocks.length ? pt.blocks.flatMap(b => b.items) : pt.items));
+
+check('every mock paper builds with contiguous question numbers', () => {
+  for (const lv of ['N5', 'N4']) for (const p of EXAMS[lv]) {
+    const r = buildExam(p, lv), items = flat(r);
+    if (items.length !== countQuestions(p)) return `${p.id}: built ${items.length}, expected ${countQuestions(p)}`;
+    if (items.some((x, k) => x.i !== k)) return p.id + ': question numbers are not 0..n-1';
+  }
+  return true;
+});
+
+check('every exam item has 4 distinct options, a valid key and an explanation', () => {
+  for (const lv of ['N5', 'N4']) for (const p of EXAMS[lv]) for (let t = 0; t < 5; t++)
+    for (const it of flat(buildExam(p, lv))) {
+      if (it.a.length !== 4 || new Set(it.a).size !== 4) return `${p.id} q${it.i + 1}: bad options`;
+      if (!(it.c >= 0 && it.c < 4)) return `${p.id} q${it.i + 1}: bad answer index`;
+      if (!it.why) return `${p.id} q${it.i + 1}: no explanation`;
+    }
+  return true;
+});
+
+check('the answer key is not positional', () => {
+  const pos = [0, 0, 0, 0];
+  for (let t = 0; t < 40; t++) flat(buildExam(EXAMS.N5[0], 'N5')).forEach(it => pos[it.c]++);
+  return pos.every(n => n > 0) ? true : 'answers clustered: ' + pos.join('/');
+});
+
+check('generated 漢字読み and 表記 parts fill from the vocab deck', () => {
+  for (const lv of ['N5', 'N4']) for (const g of ['read', 'write']) {
+    const its = genItems({ gen: g, count: 7 }, lv);
+    if (its.length < 5) return `${lv}/${g}: only produced ${its.length}`;
+  }
+  return true;
+});
+
+check('section timings match the real paper', () => {
+  const want = { N5: '20,40', N4: '25,55' };
+  for (const lv of ['N5', 'N4']) for (const p of EXAMS[lv]) {
+    const got = p.sections.map(s => s.min).join();
+    if (got !== want[lv]) return `${p.id}: ${got}, want ${want[lv]}`;
+  }
+  return true;
+});
+
+const counts = ['kana', 'kanji', 'vocab', 'grammar'].map(k =>
+  `${k}: ${DECKS[k].filter(c => c.level === 'N5').length} N5 + ` +
+  `${DECKS[k].filter(c => c.level === 'N4').length} N4`).join('\n  ');
+out.insertAdjacentHTML('beforeend',
+  `\n  ${counts}\n  total cards: ${ALL.length}\n\n` +
+  `<span class="${fails ? 'no' : 'ok'}">${fails ? fails + ' FAILED' : 'ALL PASSED'}</span>\n`);
+</script>
+</body>
+</html>
