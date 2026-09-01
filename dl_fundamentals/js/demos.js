@@ -206,7 +206,7 @@ function initActivations() {
   const cv = $('#act-canvas'); if (!cv) return;
   let show = { relu: true, sigmoid: true, tanh: true, leaky: false, gelu: false };
   let deriv = false;
-  const COLORS = { relu: '#34d399', sigmoid: '#fb7185', tanh: '#fbbf24', leaky: '#22d3ee', gelu: '#f472b6', linear: '#6f7594' };
+  const COLORS = { relu: '#34d399', sigmoid: '#fb7185', tanh: '#fbbf24', leaky: '#22d3ee', gelu: '#f472b6', linear: '#828aa8' };
 
   const row = $('#act-toggles');
   ['relu', 'leaky', 'tanh', 'sigmoid', 'gelu'].forEach(k => {

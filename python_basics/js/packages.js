@@ -112,7 +112,7 @@ function svg(w, h, inner, cls) {
          'style="max-width:' + w + 'px;height:auto;display:block;margin:0 auto"' +
          (cls ? ' class="' + cls + '"' : '') + '>' + inner + '</svg>';
 }
-const AX = '#5b6b85', INK = '#e6edf7', GRID = '#22304a';
+const AX = '#7e8fa6', INK = '#e6edf7', GRID = '#22304a';
 function axes(x0, y0, x1, y1, xlab, ylab, grid) {
   let s = '';
   if (grid) for (let i = 1; i < 5; i++) {
@@ -574,7 +574,7 @@ function initBroadcast() {
     const a = parseShape($('#bc-a', root).value), b = parseShape($('#bc-b', root).value);
     const r = broadcast(a, b);
     const cell = (v, cls) => '<td class="mono" style="padding:6px 12px;text-align:center' +
-      (cls === 'pad' ? ';color:#5b6b85' : cls === 'stretch' ? ';color:#f0b429' : cls === 'bad' ? ';color:#f87171' : '') + '">' +
+      (cls === 'pad' ? ';color:#7e8fa6' : cls === 'stretch' ? ';color:#f0b429' : cls === 'bad' ? ';color:#f87171' : '') + '">' +
       (v == null ? '—' : v) + '</td>';
     let tbl = '<table class="tbl" style="margin:12px 0"><tr><th></th>' +
       r.rows.map((_, i) => '<th class="mono">axis ' + i + '</th>').join('') + '</tr>' +
@@ -849,9 +849,9 @@ function initAnatomy() {
     '" fill="transparent" style="cursor:pointer"/>';
   const inner =
     '<rect x="8" y="8" width="544" height="304" rx="10" fill="#0e1421" stroke="#2b3a50" data-p="fig" class="mp-part" style="cursor:pointer"/>' +
-    '<text x="20" y="28" fill="#5b6b85" font-size="10" font-family="monospace">Figure</text>' +
+    '<text x="20" y="28" fill="#7e8fa6" font-size="10" font-family="monospace">Figure</text>' +
     '<rect x="86" y="48" width="400" height="212" rx="4" fill="#0a0f18" stroke="#3a4d6b" data-p="axes" class="mp-part" style="cursor:pointer"/>' +
-    '<text x="94" y="64" fill="#5b6b85" font-size="10" font-family="monospace">Axes</text>' +
+    '<text x="94" y="64" fill="#7e8fa6" font-size="10" font-family="monospace">Axes</text>' +
     /* grid + data */
     '<g stroke="#1b2740">' + [1, 2, 3].map(i => '<line x1="86" y1="' + (48 + i * 53) + '" x2="486" y2="' + (48 + i * 53) + '"/>').join('') + '</g>' +
     '<polyline points="120,224 190,180 260,196 330,132 400,150 460,92" fill="none" stroke="#38bdf8" stroke-width="2.5" data-p="line" class="mp-part" style="cursor:pointer"/>' +
@@ -1111,7 +1111,7 @@ function initPalette() {
       $('#pl-body', root).innerHTML =
         '<div class="btn-row" style="gap:0;justify-content:center;margin-bottom:10px">' +
         p.c.map(c => '<div title="' + c + '" style="width:56px;height:44px;background:' + c + '"></div>').join('') + '</div>' +
-        '<div class="btn-row" style="gap:0;justify-content:center;font:11px monospace;color:#5b6b85;margin-bottom:12px">' +
+        '<div class="btn-row" style="gap:0;justify-content:center;font:11px monospace;color:#7e8fa6;margin-bottom:12px">' +
         p.c.map(c => '<div style="width:56px;text-align:center">' + c.slice(1) + '</div>').join('') + '</div>' +
         twoUp('sns.set_palette("' + p.n + '")\n' +
               'sns.scatterplot(data=df, x="x", y="y", hue="g",\n                palette="' + p.n + '")\n\n' +

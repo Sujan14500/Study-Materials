@@ -131,7 +131,18 @@ function observeReveals() {
   }, { threshold: 0.15 });
   $$('.chapter.active .reveal:not(.in)').forEach(r => io.observe(r));
 }
+/* any widget that rebuilds .reveal cards after load (the ecosystem filter,
+   for one) must say so, or its new cards are never observed. */
+window.observeReveals = observeReveals;
 
 goto(state.at, true);
 paint();
+
+/* This file runs at parse time, which is BEFORE demos.js and packages.js
+   build their cards on DOMContentLoaded. So the goto() above observed a
+   chapter that was still half empty, and any JS-built .reveal in it would
+   have stayed at opacity 0 until you navigated away and back — which is
+   exactly what a reload onto chapter 10, 11 or a deep dive looked like.
+   app.js is the last script on the page, so this listener runs after theirs. */
+document.addEventListener('DOMContentLoaded', observeReveals);
 })();

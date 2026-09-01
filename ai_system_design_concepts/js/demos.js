@@ -406,7 +406,7 @@ function initFunnel() {
 
     out.innerHTML =
       '<div class="funnel">' +
-        '<div class="fstage" style="--c:#6f7594"><div class="fs-n">' + fmt(N) + '</div><div class="fs-l">catalogue</div></div>' +
+        '<div class="fstage" style="--c:#828aa8"><div class="fs-n">' + fmt(N) + '</div><div class="fs-l">catalogue</div></div>' +
         '<div class="fs-arrow">▼</div>' +
         S.map((s, i) => {
           const kept = [a, b, c][i];
@@ -844,7 +844,7 @@ function initKv() {
     $('#kv-bars').innerHTML =
       bar('weights', gpu ? w / gpu * 100 : 0, '#7c5cff', w.toFixed(0) + ' GB') +
       bar('KV cache', gpu ? kvUsed / gpu * 100 : 0, '#14b8a6', kvUsed.toFixed(0) + ' GB') +
-      bar('runtime overhead', C.kvOverhead * 100, '#64748b', oh.toFixed(0) + ' GB');
+      bar('runtime overhead', C.kvOverhead * 100, '#808fab', oh.toFixed(0) + ' GB');
 
     const note = $('#kv-note');
     if (!r.max) {
@@ -1706,7 +1706,7 @@ function initIvf() {
       const y = B - (B - T) * p / 100;
       g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 1;
       g.beginPath(); g.moveTo(L, y); g.lineTo(R, y); g.stroke();
-      g.fillStyle = '#6f7594'; g.textAlign = 'right';
+      g.fillStyle = '#828aa8'; g.textAlign = 'right';
       g.fillText(p + '%', L - 8, y + 4);
     }
     const X = np => L + (R - L) * (curve.length === 1 ? .5 : (np - 1) / (curve.length - 1));
@@ -1728,7 +1728,7 @@ function initIvf() {
       g.fillStyle = col; g.beginPath(); g.arc(X(here.np), Y(here[k]), 4.5, 0, 6.2832); g.fill();
     });
 
-    g.textAlign = 'center'; g.fillStyle = '#6f7594';
+    g.textAlign = 'center'; g.fillStyle = '#828aa8';
     curve.forEach(d => { if (curve.length <= 12 || d.np % 2 === 1) g.fillText(d.np, X(d.np), B + 16); });
     g.fillText('nprobe (cells opened per query)', (L + R) / 2, CH - 2);
     g.textAlign = 'left';

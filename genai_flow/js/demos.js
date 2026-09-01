@@ -175,7 +175,7 @@ function initTokenizer() {
       n.style.animationDelay = Math.min(i * 12, 420) + 'ms';
       out.appendChild(n);
     });
-    if (!toks.length) out.innerHTML = '<span style="color:#6f7594;font-size:13px">Type something above…</span>';
+    if (!toks.length) out.innerHTML = '<span style="color:#828aa8;font-size:13px">Type something above…</span>';
     const words = (text.trim().match(/\S+/g) || []).length;
     const cards = [
       ['characters', text.length],
@@ -798,7 +798,7 @@ function initTraining() {
     const b = el('button', 'tstage' + (i === 0 ? ' on' : ''),
       '<div class="tstage-n">' + s.n + '</div><h4>' + s.name + '</h4><p>' + s.tag + '</p>' +
       '<div class="tstage-bar"><i style="width:' + Math.max(4, s.pct) + '%"></i></div>' +
-      '<div style="font-size:10.5px;color:#6f7594;margin-top:6px">' + s.pct + '% of total training compute</div>');
+      '<div style="font-size:10.5px;color:#828aa8;margin-top:6px">' + s.pct + '% of total training compute</div>');
     b.onclick = () => { cur = i; $$('.tstage', track).forEach(x => x.classList.remove('on')); b.classList.add('on'); show(); xp(3); };
     track.appendChild(b);
   });
@@ -1087,7 +1087,7 @@ function initAgent() {
     if (s.k === 'final') { stop(); xp(8, '+8 XP — the agent finished the job'); }
   }
   function stop() { if (auto) { clearInterval(auto); auto = null; $('#agent-auto').textContent = '▶ Run to completion'; } }
-  function reset() { stop(); step = 0; trace.innerHTML = '<div class="trace" style="border-left-color:#6f7594;color:#6f7594">Task: <b>' + C.agentTasks[task].label + '</b> — press Next step.</div>'; $$('.loop-node').forEach(n => n.classList.remove('on')); }
+  function reset() { stop(); step = 0; trace.innerHTML = '<div class="trace" style="border-left-color:#828aa8;color:#828aa8">Task: <b>' + C.agentTasks[task].label + '</b> — press Next step.</div>'; $$('.loop-node').forEach(n => n.classList.remove('on')); }
 
   $('#agent-step').onclick = () => { next(); xp(1); };
   $('#agent-auto').onclick = e => { if (auto) return stop(); e.target.textContent = '⏸ Pause'; auto = setInterval(next, 1100); };
@@ -1346,7 +1346,7 @@ function initMem0() {
   function stop() { if (auto) { clearInterval(auto); auto = null; $('#mem-run').textContent = '▶ Run the whole conversation'; } }
   function reset() {
     stop(); at = 0; store = []; opCount = 0;
-    log.innerHTML = '<div class="trace" style="border-left-color:#6f7594;color:#6f7594">Press <b>Next turn</b>. Each turn is two LLM calls: one to extract candidate facts, one to reconcile them with what is already stored.</div>';
+    log.innerHTML = '<div class="trace" style="border-left-color:#828aa8;color:#828aa8">Press <b>Next turn</b>. Each turn is two LLM calls: one to extract candidate facts, one to reconcile them with what is already stored.</div>';
     paintStore(); paintStats(); light(-1);
   }
 

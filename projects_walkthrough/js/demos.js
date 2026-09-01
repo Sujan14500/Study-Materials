@@ -839,7 +839,7 @@ function initMemory() {
 
   function reset() {
     at = 0; store = []; nextId = 1;
-    log.innerHTML = '<div class="trace" style="border-left-color:#6f7594;color:#6f7594">' +
+    log.innerHTML = '<div class="trace" style="border-left-color:#828aa8;color:#828aa8">' +
       'Press <b>next turn</b>. Each turn costs two model calls: one to extract candidate facts, ' +
       'one to reconcile each candidate against what is already stored.</div>';
     paint();

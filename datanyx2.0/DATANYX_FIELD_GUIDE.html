@@ -10,6 +10,7 @@
 <body>
 <style>
   :root {
+    color-scheme: light dark;   /* honour whichever theme is active */
     --ground: #EDF0F3;
     --surface: #FFFFFF;
     --surface-2: #E3E8ED;
@@ -27,6 +28,7 @@
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
+      color-scheme: dark;
       --ground: #0B1116;
       --surface: #121B22;
       --surface-2: #182430;
@@ -44,6 +46,7 @@
     }
   }
   :root[data-theme="dark"] {
+    color-scheme: dark;
     --ground: #0B1116;
     --surface: #121B22;
     --surface-2: #182430;

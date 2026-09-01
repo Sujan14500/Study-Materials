@@ -389,6 +389,45 @@ for (const m of demos.matchAll(/\$\$?\('#([a-z0-9-]+)/g)) if (!m[1].endsWith('-'
 ids.forEach(id => assert(html.includes('id="' + id + '"') || demos.includes('id="' + id + '"'),
   `demos.js targets #${id}, which nothing ever creates`));
 
+/* ---------------------------------------------------------------
+   Dark-theme legibility. Two things go wrong silently here: a native
+   <select> popup drawn white by the OS, and a text colour that drifts
+   under the WCAG AA 4.5:1 body-text line.
+   --------------------------------------------------------------- */
+{
+  const css = fs.readFileSync('css/styles.css', 'utf8');
+  assert(/:root\s*\{[^}]*color-scheme:\s*dark/.test(css),
+    'without color-scheme:dark the OS draws <select> popups white and the option text vanishes');
+
+  const srgb = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16) / 255)
+    .map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  const lum = h => { const [r, g, b] = srgb(h); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const contrast = (a, b) => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  const vars = {};
+  for (const m of css.matchAll(/(--[a-z0-9-]+)\s*:\s*(#[0-9a-f]{6})\b/gi)) vars[m[1]] = vars[m[1]] || m[2];
+  const bg = vars['--bg'];
+  assert(bg, 'the theme must define --bg');
+  Object.keys(vars).filter(k => /^--txt/.test(k)).forEach(k => {
+    const r = contrast(vars[k], bg);
+    assert(r >= 4.5, `${k} (${vars[k]}) is only ${r.toFixed(2)}:1 on ${bg} — under the 4.5:1 body-text line`);
+  });
+}
+
+/* Reveal wiring. app.js runs at parse time, so its first observeReveals()
+   sees a chapter whose JS-built cards do not exist yet. Without these two
+   lines, a reload straight onto chapter 10, 11 or a deep dive shows empty
+   panels — the cards are there at opacity 0, unobserved forever. */
+const app = fs.readFileSync('js/app.js', 'utf8');
+assert(/DOMContentLoaded['"]\s*,\s*observeReveals/.test(app),
+  'app.js must re-run observeReveals after the widgets have built themselves');
+assert(app.includes('window.observeReveals = observeReveals'),
+  'app.js must expose observeReveals for widgets that rebuild cards later');
+assert(/observeReveals\(\);\s*\/\/ these cards are rebuilt on filter/.test(demos),
+  'techCards rebuilds .reveal cards on filter and must re-observe them');
+
 // every chapter in the markup needs the data- attributes app.js builds the nav from
 const chapters = [...html.matchAll(/<section class="chapter"([^>]*)>/g)].map(m => m[1]);
 assert(chapters.length >= 10, `only ${chapters.length} chapters found`);
@@ -396,6 +435,54 @@ chapters.forEach(attrs => ['data-id', 'data-title', 'data-icon', 'data-group']
   .forEach(a => assert(attrs.includes(a), `a chapter is missing ${a}`)));
 const chapterIds = chapters.map(a => /data-id="([^"]+)"/.exec(a)[1]);
 assert.strictEqual(new Set(chapterIds).size, chapterIds.length, 'two chapters share a data-id');
+
+/* ---------------------------------------------------------------
+   Ch11 — every card on the page must carry a plain-English gloss,
+   and every gloss must belong to a card that still exists.
+   --------------------------------------------------------------- */
+[['api', C.sklearnApi, t => t.name],
+ ['pipe', C.mlPipeline, t => t.n],
+ ['pick', C.modelPicks, t => t.ask],
+ ['trap', C.mlTraps, t => t.t],
+ ['eco', C.mlEcosystem, t => t.name]].forEach(([set, items, key]) => {
+  const keys = items.map(key);
+  assert.strictEqual(new Set(keys).size, keys.length, `C.plain.${set} cannot key on a duplicated field`);
+  keys.forEach(k => assert(C.plain[set][k], `no plain-English gloss for ${set} item "${k}"`));
+  Object.keys(C.plain[set]).forEach(k =>
+    assert(keys.includes(k), `C.plain.${set} has an orphan gloss for "${k}" — the card it explained is gone`));
+});
+/* the model chooser must be a walkable tree: every answer leads somewhere
+   real, and nothing in it is unreachable. */
+{
+  const T = C.plain.chooser;
+  const seen = new Set();
+  (function walk(id, depth) {
+    assert(depth < 12, 'the chooser has a loop');
+    seen.add(id);
+    if (T.leaves[id]) {
+      ['name', 'tag', 'plain', 'code', 'watch'].forEach(f =>
+        assert(T.leaves[id][f], `chooser leaf "${id}" is missing ${f}`));
+      return;
+    }
+    const node = T.nodes[id];
+    assert(node, `chooser answer points at "${id}", which is neither a question nor a result`);
+    assert(node.q && node.hint, `chooser node "${id}" needs a question and a hint`);
+    assert(node.opts.length >= 2, `chooser node "${id}" needs a real choice`);
+    node.opts.forEach(o => {
+      assert(o.a && o.go, `an option in "${id}" is incomplete`);
+      walk(o.go, depth + 1);
+    });
+  })(T.start, 0);
+  Object.keys(T.nodes).concat(Object.keys(T.leaves)).forEach(id =>
+    assert(seen.has(id), `chooser "${id}" can never be reached by answering questions`));
+  assert(T.always, 'the chooser needs its always-true footer');
+}
+
+assert(C.plain.story.length >= 10, 'the everyday story needs enough rows to map the chapter');
+C.plain.story.concat(C.plain.jargon).forEach(r =>
+  assert(r.every(cell => typeof cell === 'string' && cell.trim()), 'a story/jargon row has an empty cell'));
+C.plain.jargon.forEach(r => assert.strictEqual(r.length, 3,
+  `jargon row "${r[0]}" must be [term, meaning, everyday example]`));
 
 /* ---------------------------------------------------------------
    Package deep dives — the maths the widgets show must be real.

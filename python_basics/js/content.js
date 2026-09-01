@@ -629,6 +629,208 @@ C.mlEcosystem = [
     code: 'streamlit run app.py' }
 ];
 
+/* ---------- Ch11: the plain-English layer ----------
+   Every card, stage, quiz and library on the scikit-learn page gets a
+   no-jargon gloss, keyed by the item it explains. Kept separate from the
+   items themselves so the technical text stays technical.            */
+C.plain = {
+
+  /* one everyday story the whole chapter maps onto */
+  story: [
+    ['the job', 'You are training a new hire to spot which customers are about to cancel, so someone can phone them first.'],
+    ['a row', 'One past customer. You have thousands of them.'],
+    ['features (X)', 'What you know about that customer before they cancelled: how long they had been with you, what they pay, which plan, which region.'],
+    ['label (y)', 'What actually happened: did they cancel, yes or no. You only have this for the past.'],
+    ['the model', 'The rule of thumb your new hire ends up with. Not a person, not magic — a formula that turns those facts into an answer.'],
+    ['fit / training', 'The afternoon you sit them down with the old files, answers attached, and let them work out the pattern.'],
+    ['the test set', 'A stack of old cases you photocopy and lock in a drawer <b>before</b> that afternoon. They never see it while learning.'],
+    ['predict', 'Handing them a customer they have never seen and asking for one answer.'],
+    ['overfitting', 'They memorised the practice files instead of learning the pattern. Perfect on those, useless on a new one.'],
+    ['data leakage', 'The practice files accidentally had the outcome written on the back. They look brilliant and have learned nothing.'],
+    ['cross-validation', 'Instead of one quiz, five quizzes, each holding back a different fifth of the files. Consistent marks mean they really know it.'],
+    ['hyperparameter', 'A dial you set before training — like telling them how cautious to be. You try a few settings and keep the best.'],
+    ['the metric', 'How you mark them. "How many did you get right" is one choice, and often the wrong one.'],
+    ['the threshold', 'How sure they must be before they flag someone. Move it and you trade missed cancellations against wasted phone calls.']
+  ],
+
+  /* jargon → plain English → an everyday example */
+  jargon: [
+    ['feature', 'A fact you know about each row, used as an input.', 'a customer’s age, plan, monthly bill'],
+    ['label / target', 'The answer you want to predict. You only have it for the past.', 'did they cancel: yes / no'],
+    ['supervised', 'You have past answers to learn from.', 'old customers, and whether each one left'],
+    ['unsupervised', 'No answers at all — you are looking for structure.', '“do our customers fall into natural groups?”'],
+    ['classification', 'The answer is one of a few categories.', 'spam / not spam'],
+    ['regression', 'The answer is a number on a scale.', 'the price this house will sell for'],
+    ['estimator / model', 'The object that learns and then answers.', 'the trained new hire'],
+    ['fit', 'Learn the pattern from examples.', 'the training afternoon'],
+    ['predict', 'Give one answer for a new row.', '“this one will probably cancel”'],
+    ['transform', 'Tidy the data — same rows, cleaner columns. No answers involved.', 'converting every price to the same currency'],
+    ['train / test split', 'Hide some of the past so you can honestly check the model later.', 'photocopy 20% of the files, lock them in a drawer'],
+    ['overfitting', 'Learned the examples, not the pattern.', 'memorising past exam papers word for word'],
+    ['underfitting', 'Too simple to have learned anything useful.', '“always say no” — never wrong enough to notice'],
+    ['data leakage', 'A clue about the answer sneaked into the inputs.', 'a “cancellation_date” column when predicting cancellation'],
+    ['cross-validation', 'Repeat the quiz several times on different held-back slices.', 'five mock exams instead of one'],
+    ['parameter', 'A number the model works out for itself during training.', '“each extra year of tenure lowers risk by this much”'],
+    ['hyperparameter', 'A dial <b>you</b> set before training.', 'how strict / how many trees / how long'],
+    ['class imbalance', 'One outcome is far rarer than the other.', '1 in 100 transactions is fraud'],
+    ['precision', 'Of the ones you flagged, how many were real.', 'of 50 people you phoned, 30 were really leaving'],
+    ['recall', 'Of the real ones, how many you caught.', 'of 40 leavers, you spotted 30'],
+    ['threshold', 'How confident the model must be before it says yes.', '“only flag if over 80% sure”'],
+    ['pipeline', 'The tidy-up steps stapled to the model so they always run together.', 'a recipe card taped to the machine'],
+    ['one-hot encoding', 'Turning a word column into yes/no columns, because models do arithmetic.', '“plan = gold” becomes gold?1 silver?0 bronze?0'],
+    ['scaling', 'Putting different units on a comparable footing.', 'age 0–90 and salary 0–90,000 in the same sentence']
+  ],
+
+  /* "which model do I use?" as four plain questions, no maths */
+  chooser: {
+    start: 'q_labels',
+    nodes: {
+      q_labels: {
+        q: 'Do you already have past examples where you know the right answer?',
+        hint: 'Old rows with the outcome recorded — customers and whether they left, houses and what they sold for.',
+        opts: [
+          { a: 'Yes — the outcome is recorded for the past', go: 'q_answer' },
+          { a: 'No — nothing is labelled, I am looking for structure', go: 'q_unsup' }
+        ]
+      },
+      q_answer: {
+        q: 'What does the answer look like?',
+        hint: 'Say the answer out loud for one row. Is it a quantity, or is it a bucket?',
+        opts: [
+          { a: 'A number on a scale — a price, a count, days remaining', go: 'q_reg_data' },
+          { a: 'One of a few labels — yes/no, gold/silver/bronze', go: 'q_clf_data' }
+        ]
+      },
+      q_reg_data: {
+        q: 'What is the data, and does anyone need to be told why?',
+        hint: 'Rows and columns is one world. Photos, audio and sentences are a different one.',
+        opts: [
+          { a: 'A table, and I have to explain each prediction', go: 'linreg' },
+          { a: 'A table, and I just want the most accurate number', go: 'gbr' },
+          { a: 'Photos, audio or free text', go: 'deep' }
+        ]
+      },
+      q_clf_data: {
+        q: 'What is the data, and does anyone need to be told why?',
+        hint: 'Same fork as before — the shape of the data decides the toolbox.',
+        opts: [
+          { a: 'A table, and I want a probability I can set a cut-off on', go: 'logreg' },
+          { a: 'A table, big and messy, and I want the best accuracy', go: 'gbc' },
+          { a: 'Photos, audio or free text', go: 'deep' }
+        ]
+      },
+      q_unsup: {
+        q: 'What do you actually want out of it?',
+        hint: 'With no answers to learn from, the honest question is what shape of finding would be useful.',
+        opts: [
+          { a: 'Sort the rows into groups that resemble each other', go: 'kmeans' },
+          { a: 'Squash a lot of columns into a few, so I can plot it', go: 'pca' },
+          { a: 'Find the handful of rows that do not look like the rest', go: 'iforest' }
+        ]
+      }
+    },
+    leaves: {
+      linreg: { name: 'Ridge / LinearRegression', tag: 'the explainable one',
+        plain: 'The straight-line model. It gives you a number <b>and</b> a sentence per feature — “each extra bedroom is worth about £18,000, holding the rest still”. That sentence is why you pick it: a forest of 500 trees may be a little more accurate and cannot tell you anything.',
+        code: 'from sklearn.linear_model import Ridge\n\nmodel = Ridge(alpha=1.0).fit(X_train, y_train)\nmodel.coef_          # one weight per feature',
+        watch: 'Watch for: it assumes the effect is a straight line. If doubling the size does not double the price, it will quietly under-fit.' },
+      gbr: { name: 'HistGradientBoostingRegressor', tag: 'the accurate one',
+        plain: 'Hundreds of small rules of thumb stacked up, each one fixing the mistakes of the last. This is what usually wins on spreadsheet data: it copes with gaps, mixes numbers and categories, and barely cares about scaling.',
+        code: 'from sklearn.ensemble import HistGradientBoostingRegressor\n\nmodel = HistGradientBoostingRegressor().fit(X_train, y_train)',
+        watch: 'The price: you cannot read it. If someone will ask “why did it say that?”, add SHAP — or start with the straight line and only move here if it is genuinely not good enough.' },
+      logreg: { name: 'LogisticRegression', tag: 'the baseline',
+        plain: 'Despite the name it answers yes/no — and it gives you a confidence, not just a verdict, so you can decide “only act when we are more than 80% sure”. Move that cut-off and you trade missed cases against false alarms, which is a business decision, not a modelling one.',
+        code: 'from sklearn.linear_model import LogisticRegression\n\nclf = LogisticRegression(max_iter=1000).fit(X_train, y_train)\nclf.predict_proba(X_test)[:, 1]      # the confidence',
+        watch: 'This is the bar. Every fancier model has to beat this one before it has earned the extra complexity and the extra thing that can break at 3am.' },
+      gbc: { name: 'HistGradientBoostingClassifier', tag: 'the accurate one',
+        plain: 'Same stack-of-small-rules idea, answering a label instead of a number. On a big messy table of mixed columns this is the strongest thing in scikit-learn, and it handles missing values without you filling them in first.',
+        code: 'from sklearn.ensemble import HistGradientBoostingClassifier\n\nclf = HistGradientBoostingClassifier().fit(X_train, y_train)',
+        watch: 'Still fit the logistic regression first, on the same split. If the gap is 0.86 against 0.85, take the simple one — you can explain it, and it will not surprise you later.' },
+      deep: { name: 'PyTorch + a pretrained model', tag: 'different toolbox',
+        plain: 'Photos, audio and sentences are not spreadsheet columns, and this is where scikit-learn stops. The important part is that you almost never start from nothing: you take a model someone already trained on millions of examples and nudge it towards your job with your few thousand.',
+        code: 'from transformers import AutoModelForSequenceClassification\n\nmodel = AutoModelForSequenceClassification.from_pretrained(\n    "distilbert-base-uncased", num_labels=2)',
+        watch: 'Needs a GPU, more data and more patience. If you can turn the problem into a table of features first, do that and go back to the boring model.' },
+      kmeans: { name: 'KMeans', tag: 'grouping',
+        plain: 'You tell it how many huddles to look for, and it sorts every row into the nearest one. Useful for “do our customers fall into types?” — as long as you remember nobody has told it what a good grouping is.',
+        code: 'from sklearn.cluster import KMeans\n\nlabels = KMeans(n_clusters=4, n_init="auto").fit_predict(X_scaled)',
+        watch: 'It will always hand you groups, even from pure noise. Scale the columns first, try a few values of k, and sanity-check the groups against something you already know.' },
+      pca: { name: 'PCA', tag: 'squashing',
+        plain: 'Turns 300 overlapping columns into 2 or 3 that keep most of the information — like summarising a long CV into two lines. Mostly used to plot something you cannot otherwise see, or to speed up what comes next.',
+        code: 'from sklearn.decomposition import PCA\n\npca = PCA(n_components=2)\nXY = pca.fit_transform(X_scaled)\npca.explained_variance_ratio_.sum()   # how much you kept',
+        watch: 'Scale first, and always check how much you kept. Two components holding 31% of the variance is a picture of almost nothing.' },
+      iforest: { name: 'IsolationForest', tag: 'odd ones out',
+        plain: 'Points at the rows that do not look like the others — the unusual transaction, the sensor having a bad day. It is not fraud detection on its own; it is a shortlist for a human to look at.',
+        code: 'from sklearn.ensemble import IsolationForest\n\nflags = IsolationForest(contamination=0.01).fit_predict(X)\n# -1 = unusual, 1 = ordinary',
+        watch: '“Unusual” is not the same as “wrong”. You are setting how much of the data to call weird with <span class="mono">contamination</span>, so that number is your assumption, not a discovery.' }
+    },
+    always: 'Whatever it lands on: <b>fit the simple version first</b>, and decide how you will be marked <i>before</i> you look at any score. A boring model you can explain, shipped this week, beats a clever one still being tuned.'
+  },
+
+  api: {
+    'fit(X, y)': 'The training afternoon. You hand over thousands of past customers <b>with the answers attached</b> and let the model work out the pattern. Nothing is predicted here — it is only learning.',
+    'predict(X)': 'Now hand it one customer it has never seen and ask for a single answer. Same shape of facts in, one verdict out.',
+    'transform(X)': 'Not an answer — a tidy-up. Like converting every receipt to the same currency before you compare them: same receipts, comparable numbers.',
+    'fit_transform(X)': 'Work out the exchange rate from the <b>training</b> receipts (fit), then convert them (transform). Test receipts get converted using that same rate — you never recalculate it from the pile you are supposed to be predicting.',
+    'score(X, y)': 'One number for “how did it do”, like a single exam mark. Handy, and it quietly hides which questions were failed and how badly.'
+  },
+
+  pipe: {
+    'split': 'Photocopy a fifth of last year’s cases and lock them in a drawer. Nobody opens the drawer until the very last step — that is the whole trick.',
+    'preprocess': 'Numbers and words need different tidying. Ages and bills get put on a comparable scale; “plan type” becomes a row of yes/no boxes, because a model can only do arithmetic — it cannot read the word “gold”.',
+    'Pipeline': 'Staple the tidy-up instructions to the model itself. Now the same tidy-up happens every single time — while training, while testing, and at 3am in production — because it is physically part of the same object.',
+    'fit': 'The training afternoon, run as one command. Each tidy-up step happens in order, then the model learns. Notice there is nowhere for the drawer to sneak in.',
+    'cross-validate': 'Five quizzes instead of one, each holding back a different fifth of the training files. Marks of 81, 80, 82, 79, 83 mean it knows the job. Marks of 95, 62, 88, 70, 91 mean it got lucky once.',
+    'tune': 'How cautious should it be? Try three settings, mark each one with the quiz, keep the best. The drawer stays shut the whole time.',
+    'evaluate': 'Open the drawer. This is the real exam, sat once. Any number you produce after peeking in here is no longer an honest estimate of anything.',
+    'save': 'Put the trained model — tidy-up instructions included — into a box. Tomorrow you take it out ready to work instead of retraining from scratch.'
+  },
+
+  pick: {
+    'Predict a house price from ten numeric features, and explain which feature moved it':
+      'You want a <b>number</b>, and you want to be able to say “each extra bedroom adds about £18,000”. A straight-line model hands you that sentence directly; a forest of 500 trees does not.',
+    'Flag whether an email is spam, and get a probability you can threshold':
+      'You want <b>yes/no plus a confidence</b>, so you can decide “only bin it if we are more than 90% sure”. A model that answers 1.4 or −0.2 to a yes/no question is answering the wrong question.',
+    'Best possible accuracy on a messy 200k-row table of mixed numbers and categories':
+      'Lots of rows, mixed columns, gaps everywhere, and nobody needs an explanation for each decision. This is the workhorse that simply wins on spreadsheet-shaped data.',
+    'Split customers into groups when nobody has labelled anything':
+      'Nobody has told you what the groups are — you are asking “do our customers fall into natural huddles?”. Be warned: it will always hand you huddles, even if the data is pure noise.',
+    'Squeeze 300 correlated features down to 2 so you can plot them':
+      '300 columns and you want one flat picture. Like summarising a long CV into two lines that keep most of what mattered — some detail is gone, and you should check how much.',
+    'Classify photographs, or fine-tune a language model':
+      'Photos and sentences are not spreadsheet columns. Different tool entirely — and you start from a model someone else already trained on millions of examples, rather than starting from nothing.'
+  },
+
+  trap: {
+    'Scaling before the split': 'You worked out the class average using the exam papers as well as the homework. The average now has the exam baked into it, so the mark it produces is flattering and fake.',
+    'Accuracy on imbalanced data': 'A doctor who tells everyone “you’re fine” is right 99% of the time in a healthy town, and completely useless. The 99% is measuring the town, not the doctor.',
+    'Tuning against the test set': 'Sitting the same exam over and over, tweaking after each attempt, then reporting your best mark as your ability. The exam stopped measuring you the second time you sat it.',
+    'A random split on time-ordered data': 'Studying next year’s news to predict last year’s. Brilliant on paper, impossible in real life — and in production you only ever have the past.',
+    'A perfect score': 'If someone scores 100%, the answer key was stapled to the question paper. Go and find the column that gives it away, because it will not exist when the model goes live.',
+    'No random_state': 'Weighing yourself on a different set of scales every morning, then arguing about whether you lost 200 grams. Pin the scales down before you measure anything.'
+  },
+
+  eco: {
+    'scikit-learn': 'The standard toolbox — and every tool in it is held the same way, which is why it is worth learning first.',
+    'XGBoost / LightGBM / CatBoost': 'The tools that win spreadsheet competitions. Same idea as scikit-learn’s boosting, with more dials and more speed.',
+    'statsmodels': 'For when the question is “is this effect real?” rather than “what happens next?”. This is the stats-class end of the room.',
+    'imbalanced-learn': 'For when the thing you care about is rare — fraud, a rare disease, the customer about to leave.',
+    'PyTorch': 'The workshop where you build the machine yourself, on a graphics card. Where photos, audio and language live.',
+    'TensorFlow / Keras': 'The other big workshop. Keras is the friendly front desk on top of it.',
+    'Hugging Face transformers': 'A library of models someone else already trained, ready to borrow. Almost always cheaper than training your own.',
+    'ONNX': 'A universal plug: train the model in one place, run it somewhere that has never heard of Python.',
+    'spaCy': 'Turns a paragraph into labelled pieces — who is mentioned, which word is the verb, where the dates are.',
+    'NLTK / gensim': 'The older text toolkit. Still what most textbooks and courses use.',
+    'Pillow / OpenCV': 'Opening and resizing pictures. Pillow for simple jobs, OpenCV when the computer actually has to see something.',
+    'librosa': 'Turns sound into a picture, because that is the form models can actually read.',
+    'Optuna': 'Tries dial settings intelligently instead of trying all of them, and gives up early on bad ones.',
+    'MLflow': 'The lab notebook. Answers “which run produced that 0.91, and what was it set to?” three weeks later.',
+    'Polars / DuckDB': 'For when the spreadsheet no longer fits in memory and pandas starts crawling.',
+    'SHAP': 'Asks the model “which facts made you say that?” about one single decision — the closest thing to an explanation for a model you cannot read.',
+    'joblib': 'Saves the trained model to a file, so tomorrow you load it instead of retraining it.',
+    'Streamlit / Gradio': 'A clickable web page for your model in about twenty lines, which is what “can I have a look?” usually means.'
+  }
+};
+
 /* ---------- Ch12: gotchas ---------- */
 C.gotchas = [
   { q: 'a = [1, 2, 3]<br>b = a<br>b.append(4)<br><b>len(a)</b> is ?', guess: ['3', '4'], a: 1,

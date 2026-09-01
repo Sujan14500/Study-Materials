@@ -699,7 +699,22 @@ if __name__ == "__main__":
 
   <div class="callout">
     <div class="callout-ico">📦</div>
-    <div><b>Install and import differ.</b> <span class="mono">python -m pip install scikit-learn</span>, then <span class="mono">import sklearn</span>. Same trap as <span class="mono">pip install pillow</span> / <span class="mono">import PIL</span> and <span class="mono">pip install opencv-python</span> / <span class="mono">import cv2</span>. When an import fails, check the package name before you doubt the install.</div>
+    <div><b>Install and import differ.</b> <span class="mono">python -m pip install scikit-learn</span>, then <span class="mono">import sklearn</span>. Same trap as <span class="mono">pip install pillow</span> / <span class="mono">import PIL</span> and <span class="mono">pip install opencv-python</span> / <span class="mono">import cv2</span>. When an import fails, check the package name before you doubt the install.
+      <div class="plain"><span class="plain-k">in plain English</span>The name on the box is not always the name inside it. You buy a packet labelled “scikit-learn”, and the thing you unwrap is called <span class="mono">sklearn</span>. Nothing is broken — you just typed the shop’s name instead of the product’s.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧑‍🏫 Before any code — the whole thing as one story</h3><span class="panel-tag">plain English</span></div>
+    <p class="panel-sub">Every term on this page maps onto one everyday situation: <b>you are training a new hire to spot which customers are about to cancel.</b> Keep this picture in your head and the jargon stops mattering.</p>
+    <div id="ml-story"></div>
+    <div class="plain"><span class="plain-k">the one sentence</span>Machine learning is: <b>show a formula thousands of past examples with the answers attached, let it work out the pattern, then check it honestly on examples it has never seen.</b> Everything else on this page is a detail of how you do that without fooling yourself.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔤 Jargon, translated</h3><span class="panel-tag">plain English</span></div>
+    <p class="panel-sub">The words that make ML sound harder than it is. Left column is what you will read in the docs; right column is what it actually means in the churn story above.</p>
+    <div id="ml-jargon" style="overflow-x:auto"></div>
   </div>
 
   <div class="panel">
@@ -712,6 +727,12 @@ if __name__ == "__main__":
     <div class="panel-head"><h3>🔬 A real project, step by step</h3><span class="panel-tag">animated</span></div>
     <p class="panel-sub">Predicting churn from a table. Step through it — the order is the lesson, especially where the test set is allowed to appear.</p>
     <div id="ml-pipe"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧭 How do I choose a model?</h3><span class="panel-tag">plain English</span></div>
+    <p class="panel-sub">Four questions, no maths. Answer them about your own problem and it names the thing to reach for — and, more usefully, tells you what it costs you. Click any earlier answer to go back.</p>
+    <div id="ml-chooser"></div>
   </div>
 
   <div class="panel">
@@ -742,6 +763,12 @@ if __name__ == "__main__":
       <li>Accuracy is rarely the metric. Pick the one that matches the cost of being wrong, before you see any number.</li>
       <li>Tabular data → scikit-learn or gradient boosting. Images, audio, free text → PyTorch and a pretrained model.</li>
     </ul>
+    <div class="plain"><span class="plain-k">all five, without the jargon</span>
+      Lock some of the past in a drawer before you start, and only open it once, at the very end.
+      Staple the tidy-up instructions to the model so they can never be applied inconsistently.
+      Try the simple, boring model first — it is usually good enough and you can explain it.
+      Decide how you will be marked <i>before</i> you see any mark, because “how many did I get right” flatters you whenever one answer is rare.
+      And if the job is photos, audio or sentences, this is the wrong toolbox — borrow a model someone else already trained.</div>
   </div>
 </section>
 

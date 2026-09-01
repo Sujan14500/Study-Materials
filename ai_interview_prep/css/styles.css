@@ -3,6 +3,7 @@
    Shares the visual language of the other courses in this repo.
    ============================================================ */
 :root{
+  color-scheme: dark;   /* native selects, scrollbars, form controls */
   --bg:#080a12;
   --bg-2:#0d1020;
   --panel:rgba(255,255,255,.035);
@@ -11,7 +12,7 @@
   --line-2:rgba(255,255,255,.16);
   --txt:#e8eaf3;
   --txt-2:#a5abc4;
-  --txt-3:#6f7594;
+  --txt-3:#828aa8;
   --violet:#7c5cff;
   --cyan:#22d3ee;
   --green:#34d399;
@@ -412,3 +413,17 @@ table.cmp tbody tr:hover td{background:rgba(255,255,255,.035);color:var(--txt)}
   .fc,.dgm-n,.mode,.qz-card,.mk-card{transition:none;animation:none}
   .brand-mark,.brand-mark span{animation:none}
 }
+
+
+/* ---------- native controls ----------
+   The real fix is `color-scheme: dark` in :root — without it the browser asks
+   the OS to draw the <select> popup, the OS draws it white, and pale option
+   text on white is unreadable. These cover what color-scheme does not reach,
+   and deliberately do not restyle a control a project already styles. */
+select, option, optgroup, input, textarea, button { font-family: inherit }
+option { background: var(--bg-2, #0d1020); color: var(--txt) }   /* opaque: --panel is translucent white */
+input::placeholder, textarea::placeholder { color: var(--txt-3) }
+select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 2px solid var(--violet, #7c5cff); outline-offset: 1px;
+}
+::selection { background: rgba(124, 92, 255, .35); color: #fff }

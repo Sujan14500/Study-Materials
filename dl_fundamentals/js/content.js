@@ -99,7 +99,7 @@ C.moonsArchs = [
     note: 'More capacity than the problem needs. It fits quickly, and the boundary is visibly made of straight segments — ReLU networks are piecewise linear, always.' }
 ];
 C.lrCards = [
-  { lr: 0.01,  tag: 'too small', c: '#6f7594', note: 'Correct direction, no progress. On a real model this is a run you cancel after an hour, unsure whether it was ever going to work.' },
+  { lr: 0.01,  tag: 'too small', c: '#828aa8', note: 'Correct direction, no progress. On a real model this is a run you cancel after an hour, unsure whether it was ever going to work.' },
   { lr: 0.5,   tag: 'good',      c: '#34d399', note: 'A clean drop, then a flattening. This is the loss curve shape you are looking for.' },
   { lr: 3.0,   tag: 'too big',   c: '#fbbf24', note: 'It gets there, but the loss bounces — each step overshoots and has to come back. Usually a sign to lower the rate or add momentum.' },
   { lr: 20,    tag: 'chaos',     c: '#fb7185', note: 'The steps are so large the network is thrown somewhere random each time. Loss stops meaning anything, and in float32 this is where NaN appears.' }

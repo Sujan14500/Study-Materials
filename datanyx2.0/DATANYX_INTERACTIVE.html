@@ -6,8 +6,9 @@
 <title>Datanyx — Interactive Interview Trainer</title>
 <style>
 :root{
+  color-scheme: dark;   /* native selects, scrollbars, form controls */
   --bg:#0a0e16; --panel:#111725; --panel2:#0e1421; --line:#1e293b; --line2:#2b3a50;
-  --txt:#e6edf7; --dim:#93a3b8; --dim2:#64748b;
+  --txt:#e6edf7; --dim:#93a3b8; --dim2:#808fab;
   --acc:#38bdf8; --acc2:#a78bfa; --acc3:#f472b6;
   --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
@@ -99,7 +100,7 @@ svg .node text.s{fill:#7e8fa6;font:400 10.5px var(--mono)}
 svg .edge{stroke:#334a68;stroke-width:1.6;fill:none}
 svg .flow{stroke:var(--acc);stroke-width:2;fill:none;stroke-dasharray:7 12;animation:dash 1.4s linear infinite;opacity:.9}
 @keyframes dash{to{stroke-dashoffset:-38}}
-svg .lbl{fill:#64748b;font:400 10px var(--mono)}
+svg .lbl{fill:#808fab;font:400 10px var(--mono)}
 
 /* pipeline */
 .stagebar{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}

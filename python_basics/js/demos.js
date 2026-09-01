@@ -827,14 +827,21 @@ function initQuiz() {
    ============================================================ */
 
 /* Three panels are the same card, so they share one renderer. */
-function techCards(sel, items) {
+/* the plain-English gloss block, used on every chapter-11 widget */
+function plainBox(text) {
+  return text ? '<div class="plain"><span class="plain-k">in plain English</span>' + text + '</div>' : '';
+}
+
+function techCards(sel, items, plainMap) {
   const root = $(sel); if (!root) return;
   root.innerHTML = '';
   items.forEach(t => root.appendChild(el('div', 'tech reveal',
     '<h5>' + t.name + (t.tag ? ' <span class="pill">' + t.tag + '</span>' : '') + '</h5>' +
     '<p>' + t.what + '</p>' +
     (t.code ? '<pre class="code">' + esc(t.code) + '</pre>' : '') +
-    (t.why ? '<p class="pcard-desc">' + t.why + '</p>' : ''))));
+    (t.why ? '<p class="pcard-desc">' + t.why + '</p>' : '') +
+    plainBox(plainMap && plainMap[t.name]))));
+  if (window.observeReveals) window.observeReveals();   // these cards are rebuilt on filter
 }
 
 function initDataStack() { techCards('#data-stack', C.dataStack); }
@@ -913,7 +920,66 @@ function initPandas() {
 /* ============================================================
    Ch11 — scikit-learn
    ============================================================ */
-function initSkApi() { techCards('#sk-api', C.sklearnApi); }
+function initSkApi() { techCards('#sk-api', C.sklearnApi, C.plain.api); }
+
+/* "which model do I use?" — four plain questions, no maths */
+function initChooser() {
+  const root = $('#ml-chooser'); if (!root) return;
+  const T = C.plain.chooser;
+  let path = [];                                     // [{q, answer}] so far
+
+  function at() {                                    // current node id
+    return path.length ? path[path.length - 1].go : T.start;
+  }
+  function draw() {
+    const id = at(), node = T.nodes[id], leaf = T.leaves[id];
+    const trail = path.length
+      ? '<div class="chip-row" style="margin-bottom:10px">' + path.map((p, i) =>
+          '<button class="chip" data-back="' + i + '" title="go back to this answer">' + p.answer + '</button>').join('') + '</div>'
+      : '';
+    if (node) {
+      root.innerHTML = trail +
+        '<div class="ct-ask">' + node.q + '</div>' +
+        '<p class="panel-sub" style="margin-top:4px">' + node.hint + '</p>' +
+        '<div class="ct-opts">' + node.opts.map((o, i) =>
+          '<button class="qopt ct-opt" data-go="' + i + '">' + o.a + '</button>').join('') + '</div>';
+      $$('[data-go]', root).forEach(b => b.onclick = () => {
+        const o = node.opts[+b.dataset.go];
+        path.push({ answer: o.a, go: o.go });
+        draw();
+      });
+    } else if (leaf) {
+      root.innerHTML = trail +
+        '<div class="pcard hot"><h3>' + leaf.name + ' <span class="pcard-badge">' + leaf.tag + '</span></h3>' +
+        '<div class="plain"><span class="plain-k">why this one</span>' + leaf.plain + '</div>' +
+        '<pre class="code">' + esc(leaf.code) + '</pre>' +
+        '<p class="pcard-desc">' + leaf.watch + '</p></div>' +
+        '<div class="plain"><span class="plain-k">true whatever you picked</span>' + T.always + '</div>' +
+        '<div class="btn-row"><button class="btn" id="ch-again">start again</button></div>';
+      $('#ch-again', root).onclick = () => { path = []; draw(); };
+      xp(3, '🧭 you can choose a model from the question, not the hype');
+    }
+    $$('[data-back]', root).forEach(b => b.onclick = () => {
+      path = path.slice(0, +b.dataset.back);
+      draw();
+    });
+  }
+  draw();
+}
+
+/* the everyday story + jargon table that open the chapter */
+function initPlainIntro() {
+  const story = $('#ml-story');
+  if (story) story.innerHTML =
+    '<div class="plain-story">' +
+    C.plain.story.map(r => '<div>' + r[0] + '</div><div>' + r[1] + '</div>').join('') +
+    '</div>';
+  const jar = $('#ml-jargon');
+  if (jar) jar.innerHTML =
+    '<table class="tbl jargon"><tr><th>you will read</th><th>it means</th><th>everyday example</th></tr>' +
+    C.plain.jargon.map(r => '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td></tr>').join('') +
+    '</table>';
+}
 
 function initMlPipe() {
   const root = $('#ml-pipe'); if (!root) return;
@@ -948,7 +1014,7 @@ function initMlPipe() {
       b.classList.toggle('done', bi < i);
     });
     $('#mp-code', root).textContent = s.code;
-    $('#mp-say', root).innerHTML = s.say;
+    $('#mp-say', root).innerHTML = s.say + plainBox(C.plain.pipe[s.n]);
     $('#mp-pos', root).textContent = 'step ' + (i + 1) + ' / ' + C.mlPipeline.length;
     if (i > reached) { reached = i; xp(2, i === C.mlPipeline.length - 1 ? '🔬 that is a whole ML project' : null); }
   }
@@ -972,7 +1038,7 @@ function initModelPicks() {
         body.innerHTML =
           '<div class="ct-two"><div><div class="ct-tag good">reach for this</div><pre class="code">' + esc(t.good) + '</pre></div>' +
           '<div><div class="ct-tag bad">not this</div><pre class="code">' + esc(t.bad) + '</pre></div></div>' +
-          '<div class="ct-why">' + t.why + '</div>';
+          '<div class="ct-why">' + t.why + '</div>' + plainBox(C.plain.pick[t.ask]);
         body.classList.add('show');
         done.add(i);
         xp(k === t.pick ? 4 : 1, done.size === C.modelPicks.length ? '🎯 you can pick an estimator on purpose' : null);
@@ -989,7 +1055,7 @@ function initTraps() {
     '<h3>' + t.t + '</h3>' +
     '<div class="ct-tag bad">what people write</div><pre class="code">' + esc(t.bad) + '</pre>' +
     '<div class="ct-tag good">what to write instead</div><pre class="code">' + esc(t.good) + '</pre>' +
-    '<p class="pcard-desc">' + t.why + '</p>')));
+    '<p class="pcard-desc">' + t.why + '</p>' + plainBox(C.plain.trap[t.t]))));
 }
 
 function initEco() {
@@ -1001,12 +1067,12 @@ function initEco() {
     b.onclick = () => {
       $$('.chip', tabs).forEach(x => x.classList.remove('active'));
       b.classList.add('active');
-      techCards('#ml-eco', i ? C.mlEcosystem.filter(e => e.g === g) : C.mlEcosystem);
+      techCards('#ml-eco', i ? C.mlEcosystem.filter(e => e.g === g) : C.mlEcosystem, C.plain.eco);
       xp(1);
     };
     tabs.appendChild(b);
   });
-  techCards('#ml-eco', C.mlEcosystem);
+  techCards('#ml-eco', C.mlEcosystem, C.plain.eco);
 }
 
 /* ---------- boot ---------- */
@@ -1014,7 +1080,7 @@ document.addEventListener('DOMContentLoaded', () => {
   [initBackground, initTypes, initBind, initStrings, initSlice, initFstrings,
    initCollRace, initCollTable, initCollTasks, initTrace, initFuncs, initMutDefault,
    initErrors, initTryPatterns, initComp, initFiles, initEnv, initClass,
-   initDataStack, initVec, initPandas, initSkApi, initMlPipe, initModelPicks,
+   initDataStack, initVec, initPandas, initPlainIntro, initChooser, initSkApi, initMlPipe, initModelPicks,
    initTraps, initEco, initGotchas, initQuiz].forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 });
 })();

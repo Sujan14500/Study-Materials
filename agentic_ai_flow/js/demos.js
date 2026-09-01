@@ -147,7 +147,7 @@ function initLoop() {
   function stop() { if (auto) { clearInterval(auto); auto = null; $('#loop-auto').textContent = '▶ Run to completion'; } }
   function reset() {
     stop(); step = 0;
-    trace.innerHTML = '<div class="trace" style="border-left-color:#6f7594;color:#6f7594">Task: <b>' + esc(C.loopTasks[task].label) + '</b> — press Next step.</div>';
+    trace.innerHTML = '<div class="trace" style="border-left-color:#828aa8;color:#828aa8">Task: <b>' + esc(C.loopTasks[task].label) + '</b> — press Next step.</div>';
     $$('.loop-node').forEach(n => n.classList.remove('on'));
     $('#loop-count').textContent = '0 steps';
   }

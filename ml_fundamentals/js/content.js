@@ -83,7 +83,7 @@ C.regData = [
 /* The demo starts the sliders here so gradient descent has visible work to do. */
 C.regStart = { w: 2.0, b: 55 };
 C.gdRates = [
-  { lr: 0.001, tag: 'too small', c: '#6f7594', say: 'It moves in the right direction, just barely. With a hundred features and a real dataset this is a training run that never finishes.' },
+  { lr: 0.001, tag: 'too small', c: '#828aa8', say: 'It moves in the right direction, just barely. With a hundred features and a real dataset this is a training run that never finishes.' },
   { lr: 0.010, tag: 'good',      c: '#34d399', say: 'Steady, monotonic descent. This is what a healthy loss curve looks like — steep at first, then flattening.' },
   { lr: 0.028, tag: 'fast',      c: '#22d3ee', say: 'Faster, and it still lands. Near the edge of stable, which is where you want to be if you are watching the curve.' },
   { lr: 0.045, tag: 'diverges',  c: '#fb7185', say: 'Each step overshoots the minimum by more than it started, so the error grows without limit. A loss going to NaN is almost always this.' }
