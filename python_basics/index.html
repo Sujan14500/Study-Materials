@@ -746,6 +746,276 @@ if __name__ == "__main__":
 </section>
 
 <!-- ============================================================= -->
+<!-- DEEP DIVE · NUMPY                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="np-deep" data-title="NumPy" data-icon="▦" data-group="Package deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Deep dive · NumPy</div>
+    <h2>One buffer, one dtype, <span class="grad">no loops</span></h2>
+    <p class="lead">Chapter 10 said an array beats a list. This page is the rest of it: the three ideas that make NumPy make sense — <b>shape</b>, <b>broadcasting</b> and <b>view versus copy</b> — and the six errors you will hit in your first fortnight. Get these and pandas, scikit-learn and PyTorch all stop being surprising, because every one of them is arrays underneath.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The operations, with real output</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Six groups. Click one — the output is what the interpreter actually prints, not a paraphrase.</p>
+    <div class="chip-row" id="np-tabs"></div>
+    <div id="np-body"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📐 Broadcasting, axis by axis</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Pick two shapes. NumPy right-aligns them and compares each axis: equal, or one of them is 1. Anything else is the error everyone meets on day two.</p>
+    <div id="np-bcast"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🧭</div>
+    <div><b>Say it as "the axis that disappears".</b> <span class="mono">axis=0</span> does not mean "do it to the rows" — it means "collapse axis 0". A (3, 4) summed along axis 0 gives four numbers, one per column. Everyone gets this backwards once; saying it the other way round fixes it permanently.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Which axis?</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Same 3 × 4 array, three calls. Watch which direction collapses and what shape survives.</p>
+    <div id="np-axis"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪟 View or copy — the aliasing lab</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Same array, same write, two different index styles. One of them reaches back into the original.</p>
+    <div id="np-view"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪤 Six errors you will actually hit</h3></div>
+    <p class="panel-sub">Each one is a real message, and each one has a one-line fix.</p>
+    <div class="three-up" id="np-traps"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Shape first. Nine NumPy bugs in ten are answered by printing <span class="mono">a.shape</span> at three points and finding where it stopped being what you thought.</li>
+      <li>Broadcasting stretches length-1 axes for free — no memory is copied. <span class="mono">a[:, None]</span> is how you ask for it deliberately.</li>
+      <li>Slices are views, fancy and boolean indexing are copies. If a mutation travels somewhere unexpected, check <span class="mono">.base</span>.</li>
+      <li>Use <span class="mono">&amp;</span>, <span class="mono">|</span>, <span class="mono">~</span> with parentheses — never <span class="mono">and</span>/<span class="mono">or</span> — and never <span class="mono">==</span> between computed floats.</li>
+      <li>If you are writing <span class="mono">for</span> over an array, there is a shorter, faster expression. That is the whole point of the library.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- DEEP DIVE · PANDAS                                            -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="pd-deep" data-title="pandas" data-icon="🐼" data-group="Package deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Deep dive · pandas</div>
+    <h2>Split, apply, combine — and the <span class="grad">indexing rules</span></h2>
+    <p class="lead">Most of a data job is this library, and most pandas bugs are two things: picking the wrong indexer, and a join that quietly changed how many rows you have. Everything on this page is one of those two, or the reshape that makes plotting work.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔀 groupby, one step at a time</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Split, apply, combine. Press run — the group keys becoming the index is the part that surprises people.</p>
+    <div id="pd-groupby"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔗 merge — pick the join, count the rows</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Three rows on each side, one key in common. Switch <span class="mono">how=</span> and watch the row count move.</p>
+    <div id="pd-merge"></div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">⚠️</div>
+    <div><b>Check <span class="mono">len(df)</span> before and after every merge.</b> An inner join silently drops the rows that did not match; a duplicated key silently multiplies them. Neither raises. <span class="mono">validate="one_to_one"</span> (or <span class="mono">"one_to_many"</span>) turns both into a loud error instead of a wrong number three cells later.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🏷️ .loc, .iloc, and the assignment that does nothing</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Labels versus positions — and the chained-assignment bug that has confused every pandas user alive.</p>
+    <div class="chip-row" id="pd-ix-tabs"></div>
+    <div id="pd-ix-body"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🕳️ Missing data</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Find it, then decide. The order matters — deciding first is how you end up with a mean over a third of your rows.</p>
+    <div class="chip-row" id="pd-na-tabs"></div>
+    <div id="pd-na-body"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔄 Long or wide — melt and pivot</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The reshape behind every "how do I plot these three columns" question.</p>
+    <div id="pd-reshape"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>⚡ Six habits that decide whether it takes 2s or 20 minutes</h3></div>
+    <div class="three-up" id="pd-perf"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li><span class="mono">.loc</span> is labels and includes the end of a slice; <span class="mono">.iloc</span> is positions and excludes it. After a filter or sort they disagree — that is when picking wrong gives a plausible wrong row.</li>
+      <li>One indexer, one call: <span class="mono">df.loc[rows, cols] = value</span>. Never bracket-then-bracket.</li>
+      <li>groupby is split → apply → combine, and the keys come back as the <b>index</b>. <span class="mono">.reset_index()</span> is not an afterthought, it is the other half of the idiom.</li>
+      <li>Long format for plotting and grouping; wide only at the very end, for humans to read.</li>
+      <li><span class="mono">df.isna().sum()</span>, <span class="mono">df.dtypes</span>, <span class="mono">len(df)</span> — before and after everything.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- DEEP DIVE · MATPLOTLIB                                        -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="mpl-deep" data-title="Matplotlib" data-icon="📈" data-group="Package deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Deep dive · Matplotlib</div>
+    <h2>Figure, Axes, Artist — and <span class="grad">why plt. confuses you</span></h2>
+    <p class="lead">Matplotlib feels inconsistent until you see that there are two APIs stacked on top of each other: a stateful <span class="mono">plt.</span> one aimed at the interactive prompt, and an object one where you hold the Figure and the Axes yourself. Learn the objects and every tutorial you have ever half-copied suddenly parses.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔍 Anatomy of a figure</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Click any part of the chart — or any chip — for what it is called and the method that changes it.</p>
+    <div id="mpl-anatomy"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🧭</div>
+    <div><b>An Axes is a plot. An Axis is one direction of it.</b> A Figure holds Axes; each Axes holds two Axis objects and every Artist you drew. <span class="mono">fig, ax = plt.subplots()</span> is the first line of almost every chart worth keeping, because from there everything is <span class="mono">ax.something(...)</span>.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎛️ Build a chart, read the code</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Change the plot; the code changes with it. Note what <span class="mono">figsize</span> × <span class="mono">dpi</span> does to the pixel size of the file you save.</p>
+    <div id="mpl-builder"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪤 Six traps</h3></div>
+    <p class="panel-sub">Blocking, leaking, cropping — the ones that only show up once your plot is inside a script or a loop.</p>
+    <div class="three-up" id="mpl-traps"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Start with <span class="mono">fig, ax = plt.subplots()</span>. The <span class="mono">plt.</span> shortcuts act on whichever figure is "current", which is exactly the ambiguity you do not want twice.</li>
+      <li><span class="mono">savefig</span> before <span class="mono">show</span>, and <span class="mono">bbox_inches="tight"</span> so rotated labels are not cropped out.</li>
+      <li><span class="mono">plt.close(fig)</span> inside any loop that makes figures.</li>
+      <li>Pixel size is <span class="mono">figsize × dpi</span>. Want a bigger label relative to the chart? Shrink the figure, do not raise the dpi.</li>
+      <li>Hiding the top and right spines takes one line and does more for a chart than any colour choice.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- DEEP DIVE · SEABORN                                           -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="sns-deep" data-title="seaborn" data-icon="🎨" data-group="Package deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Deep dive · seaborn</div>
+    <h2>Statistical plots from a <span class="grad">tidy frame</span></h2>
+    <p class="lead">seaborn is a layer over Matplotlib that takes a DataFrame and column names instead of arrays, and does the aggregation, the colouring and the faceting for you. Two things explain nearly every seaborn question ever asked: <b>long-format data</b>, and the split between figure-level and axes-level functions.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧱 Figure-level or axes-level?</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The distinction behind <span class="mono">"scatterplot() got an unexpected keyword argument 'col'"</span> and <span class="mono">"relplot() got an unexpected keyword argument 'ax'"</span>.</p>
+    <div id="sns-level"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Which plot for which question?</h3><span class="panel-tag">quiz</span></div>
+    <p class="panel-sub">Answer for yourself first, then open it. Choosing by the <i>shape of the question</i> is the skill; the function name is just vocabulary.</p>
+    <div class="three-up" id="sns-pick"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🪟 Faceting — hue, col, row</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Add a facet and watch the code jump from axes-level to figure-level. That jump <i>is</i> the API distinction.</p>
+    <div id="sns-facet"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🌈 Palettes — and picking the right kind</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Categorical, sequential, diverging. Using the wrong family is the most common way a correct chart still misleads.</p>
+    <div id="sns-palette"></div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-ico">🎨</div>
+    <div><b>Match the palette to the data, not to your taste.</b> Unordered categories → categorical. A magnitude → sequential. Something signed, with a meaningful zero → diverging, and set <span class="mono">center=0</span>. A rainbow map on ordered data invents boundaries that are not in your numbers.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>seaborn wants <b>long</b> data: one row per observation, one column per variable. Reshape with <span class="mono">melt</span> first and the plotting call becomes one line.</li>
+      <li>Axes-level (<span class="mono">scatterplot</span>, <span class="mono">boxplot</span>) draws into your <span class="mono">ax</span>. Figure-level (<span class="mono">relplot</span>, <span class="mono">displot</span>, <span class="mono">catplot</span>) owns the whole figure and can facet.</li>
+      <li>The moment you want <span class="mono">col=</span> or <span class="mono">row=</span>, you need the figure-level version. There is no <span class="mono">ax=</span> on it, and that is not a bug.</li>
+      <li>It returns Matplotlib objects, so every <span class="mono">ax.set_*</span> you learned still works — seaborn for the statistics, Matplotlib for the finish.</li>
+      <li>Default to the <span class="mono">colorblind</span> palette. It costs nothing and it is legible to everyone.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- DEEP DIVE · SCIPY                                             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="sp-deep" data-title="SciPy" data-icon="∫" data-group="Package deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Deep dive · SciPy</div>
+    <h2>The algorithms someone <span class="grad">already wrote</span></h2>
+    <p class="lead">SciPy is eight or so submodules of numerical work built on NumPy arrays — statistics, optimisation, interpolation, signal processing, sparse matrices. You import from the submodule, never from the top level, and the rule for using it is simple: if you are about to implement a formula from a textbook, look here first. Whoever wrote it here also handled the degenerate cases you have not thought about.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🗺️ The map</h3></div>
+    <p class="panel-sub">Eight submodules, by the job they do. <span class="mono">from scipy import stats</span> — not <span class="mono">import scipy</span>, which loads almost nothing.</p>
+    <div class="three-up" id="sp-modules"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧪 A t-test, and what a p-value is not</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Two groups, one difference. Drag the sample size and watch significance appear without the data changing.</p>
+    <div id="sp-ttest"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📉 curve_fit, and one bad reading</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Least squares fits a line. Then add a single sensor glitch and watch what squaring the residuals does.</p>
+    <div id="sp-fit"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>📊 Distributions — one API, three shapes</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">pdf, cdf, sf, ppf. Learn them on the normal and every other distribution in the module answers the same way.</p>
+    <div id="sp-dist"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🕸️ Sparse matrices — when zeros cost too much</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Drag the density. Somewhere around a third, storing the indices costs more than the zeros you saved.</p>
+    <div id="sp-sparse"></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>Import the submodule: <span class="mono">from scipy import stats, optimize, interpolate</span>.</li>
+      <li>Every distribution answers to <span class="mono">pdf</span>/<span class="mono">pmf</span>, <span class="mono">cdf</span>, <span class="mono">sf</span>, <span class="mono">ppf</span>, <span class="mono">rvs</span>. Learn the four verbs once.</li>
+      <li>A p-value is about sample size as much as effect. Report the effect size next to it, always.</li>
+      <li>Least squares is not robust — one outlier moves the fit. Plot the residuals, then reach for a robust loss.</li>
+      <li>Sparse when the matrix is mostly zeros, and never <span class="mono">.toarray()</span> it afterwards.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
 <!-- 12. GOTCHAS                                                   -->
 <!-- ============================================================= -->
 <section class="chapter" data-id="gotchas" data-title="Gotchas" data-icon="🪤" data-group="Finish line">
@@ -830,6 +1100,7 @@ items = [i for i in items if not bad(i)]</pre>
 
 <script src="js/content.js"></script>
 <script src="js/demos.js"></script>
+<script src="js/packages.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

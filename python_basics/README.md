@@ -38,6 +38,20 @@ open index.html           # macOS
 | 12 | Gotchas | Nine guess-the-output cards |
 | 13 | Final quiz | 21 questions with explanations, plus a 45-term glossary |
 
+### Package deep dives
+
+Chapter 10 introduces the data stack in five cards. These five pages are one per package, and they
+sit in their own sidebar group after chapter 11. They are unnumbered on purpose — reference pages
+you come back to, not steps in the path.
+
+| Page | The interactive bit |
+|------|---------------------|
+| NumPy | **Broadcasting lab** — pick two shapes, watch them right-align axis by axis and either stretch or raise the real `ValueError`. Plus an axis-collapse visual, a view-vs-copy aliasing lab, six operation groups with real output, and the six errors you actually hit |
+| pandas | **groupby** stepped through split → apply → combine; a **merge** visualiser where switching `how=` recomputes the join and the row count; `.loc`/`.iloc`/chained-assignment; missing data; melt ↔ pivot; six performance habits |
+| Matplotlib | **Clickable anatomy** of a figure — Figure, Axes, Axis, ticks, spines, artists, legend — and a **chart builder** whose generated code updates as you change kind, colour, grid, spines, figsize and dpi |
+| seaborn | Figure-level vs axes-level side by side; a which-plot-for-which-question quiz; a **facet builder** that shows the code jumping from `scatterplot` to `relplot` the moment you add `col=`; palette picker with the categorical/sequential/diverging rule |
+| SciPy | A **t-test lab** where dragging *n* makes the same difference "significant" — real Student's t p-values; **curve_fit** with a one-click outlier that drags the least-squares line; a distribution explorer (normal/binomial/poisson) with real pdf/cdf/pmf; a sparse-vs-dense memory model |
+
 Progress, XP and answers persist in `localStorage`.
 
 ## Files
@@ -47,9 +61,14 @@ index.html        all chapter markup
 css/styles.css    one theme, no framework
 js/content.js     every piece of course content — edit here to change the course
 js/demos.js       the interactive widgets
+js/packages.js    the five package deep-dive pages: their content AND their widgets
 js/app.js         navigation, progress, XP
 test.js           node test.js — fails if the course data goes inconsistent
 ```
+
+`packages.js` is deliberately self-contained — data and widgets in one file — so a deep-dive page
+can be added or removed without touching `content.js` or `demos.js`. It exports its pure helpers
+under `module.exports` when required from Node, which is how `test.js` checks the maths.
 
 ## Editing the course
 
@@ -98,5 +117,14 @@ That last one has already caught two real wiring bugs.
 - The pandas outputs are recomputed from the source table by `test.js`, and formatted the way
   pandas 2.x prints them. Older pandas differs in small ways (`value_counts` gained its
   `Name: count` line in 2.0).
+- The deep-dive pages compute rather than recite. Broadcasting runs NumPy's real right-alignment
+  rule (and quotes NumPy's own error text when it fails); the t-test uses a regularised incomplete
+  beta, so its p-values match published t-tables to five decimals; the binomial and Poisson bars are
+  real pmfs (`test.js` checks they sum to 1); the merge visualiser actually performs the join; the
+  outlier demo re-runs ordinary least squares. `test.js` recomputes all of it against known values.
+- Two things on those pages are illustrative, and say so on screen: the sparse-vs-dense figures are
+  a byte model of CSR (values + int32 indices + one offset per row), not a measurement, and the
+  Matplotlib preview is an SVG standing in for what the call would draw — the generated code is the
+  real deliverable there.
 - Chapter 11 teaches conventional practice — split first, pipeline everything, touch the test set
   once. That is the consensus, not a law; time series, tiny datasets and nested CV all bend it.

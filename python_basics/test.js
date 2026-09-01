@@ -382,7 +382,7 @@ assert(C.mlEcosystem.some(e => /scikit-learn/.test(e.code)),
 /* ---------------------------------------------------------------
    Wiring — every id the demos reach for must exist somewhere
    --------------------------------------------------------------- */
-const demos = fs.readFileSync('js/demos.js', 'utf8');
+const demos = fs.readFileSync('js/demos.js', 'utf8') + fs.readFileSync('js/packages.js', 'utf8');
 const html = fs.readFileSync('index.html', 'utf8');
 const ids = new Set();
 for (const m of demos.matchAll(/\$\$?\('#([a-z0-9-]+)/g)) if (!m[1].endsWith('-')) ids.add(m[1]);
@@ -396,5 +396,52 @@ chapters.forEach(attrs => ['data-id', 'data-title', 'data-icon', 'data-group']
   .forEach(a => assert(attrs.includes(a), `a chapter is missing ${a}`)));
 const chapterIds = chapters.map(a => /data-id="([^"]+)"/.exec(a)[1]);
 assert.strictEqual(new Set(chapterIds).size, chapterIds.length, 'two chapters share a data-id');
+
+/* ---------------------------------------------------------------
+   Package deep dives — the maths the widgets show must be real.
+   These recompute against known values, not against themselves.
+   --------------------------------------------------------------- */
+const P = require('./js/packages.js');
+const near = (a, b, tol, what) => assert(Math.abs(a - b) < tol, `${what}: got ${a}, expected ~${b}`);
+
+// broadcasting follows the real right-aligned rule
+assert(P.broadcast([3, 1], [1, 4]).ok, '(3,1)+(1,4) must broadcast');
+assert.deepStrictEqual(P.broadcast([3, 1], [1, 4]).shape, [3, 4], '(3,1)+(1,4) -> (3,4)');
+assert.deepStrictEqual(P.broadcast([2, 3, 4], [4]).shape, [2, 3, 4], 'trailing axis broadcasts');
+assert(!P.broadcast([3, 4], [4, 3]).ok, '(3,4)+(4,3) must NOT broadcast');
+assert(P.broadcast([3, 4], [4, 3]).err.includes('could not be broadcast'),
+  'the failure must quote the real numpy message');
+assert.strictEqual(P.showShape([3]), '(3,)', 'a 1-d shape prints with a trailing comma');
+
+// Student's t two-sided p — checked against published table values
+near(P.tSF2(2.100922, 18), 0.05, 5e-5, 't(18) at 2.101 is the 5% point');
+near(P.tSF2(2.228139, 10), 0.05, 5e-5, 't(10) at 2.228 is the 5% point');
+near(P.tSF2(0, 30), 1.0, 1e-9, 'no difference means p = 1');
+assert(P.tSF2(4, 60) < P.tSF2(2, 60), 'a bigger t must give a smaller p');
+// the claim the widget makes out loud: same effect, more n, smaller p
+const se = n => 15 * Math.sqrt(2 / n);
+assert(P.tSF2(6 / se(200), 398) < P.tSF2(6 / se(10), 18),
+  'the n-slider lesson only holds if p really falls with n');
+
+// normal cdf/ppf pair
+near(P.normCdf(1.959964, 0, 1), 0.975, 1e-4, 'ppf(0.975) is 1.96');
+near(P.normCdf(0, 0, 1), 0.5, 1e-9, 'the normal is symmetric about the mean');
+near(P.normPdf(0, 0, 1), 0.3989423, 1e-6, 'peak height of the standard normal');
+
+// lgamma backs the binomial and poisson bars — check a factorial it must reproduce
+near(Math.exp(P.lgamma(6)), 120, 1e-6, 'lgamma(6) = ln(5!)');
+// binomial pmf over all k must sum to 1
+const logC = (n, k) => P.lgamma(n + 1) - P.lgamma(k + 1) - P.lgamma(n - k + 1);
+for (const [n, p] of [[20, 0.3], [7, 0.85], [40, 0.05]]) {
+  let tot = 0;
+  for (let k = 0; k <= n; k++) tot += Math.exp(logC(n, k) + k * Math.log(p) + (n - k) * Math.log(1 - p));
+  near(tot, 1, 1e-9, `binom(${n}, ${p}) pmf sums to 1`);
+}
+// poisson too
+for (const lam of [0.5, 4, 15]) {
+  let tot = 0;
+  for (let k = 0; k <= 200; k++) tot += Math.exp(-lam + k * Math.log(lam) - P.lgamma(k + 1));
+  near(tot, 1, 1e-9, `poisson(${lam}) pmf sums to 1`);
+}
 
 console.log(`ok — ${chapters.length} chapters, ${C.quiz.length} quiz questions, content is consistent`);
