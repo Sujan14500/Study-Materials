@@ -1,8 +1,8 @@
 # AI Interview Prep
 
-486 GenAI and AI-engineer interview questions, each answered twice — once in plain
+558 GenAI and AI-engineer interview questions, each answered twice — once in plain
 English so it sticks, once at interview depth so it survives the follow-up — plus
-203 multiple-choice questions, flashcards with spaced repetition, and a timed mock
+236 multiple-choice questions, flashcards with spaced repetition, and a timed mock
 interview that makes you answer out loud.
 
 Built because the gap between *"I know this"* and *"I can say this in ninety
@@ -21,7 +21,7 @@ open index.html           # macOS
 
 | Mode | What it is for |
 |------|----------------|
-| **Study** | Browse and search all 486 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
+| **Study** | Browse and search all 558 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
 | **Flashcards** | Recall, not recognition. Say the answer out loud, flip, then rate yourself. Cards you rate badly come back sooner — the schedule is SM-2-lite and lives in `localStorage`. |
 | **Quiz** | Multiple choice with an explanation after every question, optionally timed. Every wrong option is a real misconception, and the explanation says why the tempting answer is wrong. |
 | **Mock interview** | A timed round for a chosen role and level. Questions arrive one at a time with a clock and a target answer length. Reveal, self-rate, and get a report with your weakest topic and how often you ran long. |
@@ -43,6 +43,7 @@ open index.html           # macOS
 | Evaluation | 35 | the eval pyramid, LLM-as-judge and its biases, RAGAS, A/B testing, agent eval |
 | Safety & guardrails | 28 | injection, memory poisoning, PII, tenant isolation, over-refusal, OWASP LLM Top 10 |
 | Production & cost | 42 | caching layers, routing, observability, incidents, SLOs, cost arithmetic |
+| Production drills | 40 | the scenario round: 10× spikes, provider outages, 429 storms, shedding, canaries, idempotency |
 | Data engineering | 24 | streaming a 5 GB file, external group-by, ingestion, freshness, Parquet, PDFs |
 | System design | 22 | long-form whiteboard questions with a structure to follow |
 | Behavioural | 20 | the questions that decide the offer, asked of AI engineers specifically |
@@ -87,7 +88,7 @@ test.js                 node test.js — fails if the bank goes inconsistent
 `node test.js` checks that every question is well formed and every claim the project
 makes is still true:
 
-- 486+ questions, at least 15 per topic, spread across three levels
+- 550+ questions, at least 15 per topic, spread across three levels
 - every one of the 57 seed questions is answered by at least one card
 - **the plain-English answer contains no jargon** — the word list is enforced, with an
   exception only when the question is *about* that term

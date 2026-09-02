@@ -9,7 +9,33 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/notes.css">
+<link rel="stylesheet" href="css/prod40.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+<style id="mm-css">
+.mf-panel{background:rgba(0,0,0,.26);border:1px solid var(--line);border-top:3px solid var(--c);
+  border-radius:15px;padding:18px}
+.mf-panel.in{animation:chapterIn .3s var(--ease)}
+.mf-h{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+.mf-ico{width:40px;height:40px;flex:none;border-radius:11px;display:grid;place-items:center;font-size:19px}
+.mf-h b{display:block;font-size:16.5px;margin-bottom:3px}
+.mf-h span{font-size:12.8px;color:var(--txt-3);line-height:1.6}
+.mf-svg{width:100%;height:auto;display:block;margin-bottom:14px}
+.mf-box{fill:rgba(255,255,255,.05);stroke:var(--line-2)}
+.mf-t{fill:var(--txt-2);font-size:10.5px;font-family:var(--sans);text-anchor:middle}
+.mf-join{fill:#fff;font-size:13px;text-anchor:middle}
+.mf-wire{fill:none;stroke-width:1.8;opacity:.75}
+.mf-how{font-size:13px;color:var(--txt-2);line-height:1.65;margin-bottom:14px}
+.mf-how b{color:var(--txt)}
+.mf-ex{margin-top:14px;font-size:12.4px;color:var(--txt-2);line-height:1.6;
+  background:rgba(0,0,0,.3);border:1px solid var(--line);border-left:2px solid var(--c);
+  border-radius:11px;padding:11px 13px}
+.mf-ex b{display:block;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--txt-3);margin-bottom:4px}
+.mm-pill{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:99px;
+  border:1px solid rgba(96,165,250,.4);color:#93c5fd;white-space:nowrap}
+.mm-pill.out{border-color:rgba(52,211,153,.4);color:#6ee7b7}
+</style>
 </head>
 <body>
 
@@ -202,6 +228,7 @@ model.predict(new_email)
     <div class="callout-ico">🔤</div>
     <div><b>Token → ID → vector.</b> "cat" might be token <span class="mono">#4937</span>. That number is only an address; the meaning lives in the vector it points to. That's the next chapter.</div>
   </div>
+  <div data-toolstrip="tokens"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -255,6 +282,7 @@ sim("dog", "database")  -> 0.07</pre>
       </ul>
     </div>
   </div>
+  <div data-toolstrip="embeddings"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -442,6 +470,7 @@ sim("dog", "database")  -> 0.07</pre>
     <h4>Key takeaways</h4>
     <ul class="fact-list" id="spd-takeaways"></ul>
   </div>
+  <div data-toolstrip="speed"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -521,6 +550,7 @@ sim("dog", "database")  -> 0.07</pre>
     <div class="callout-ico">⚠️</div>
     <div><b>Prompt injection.</b> The moment your prompt includes text from users, web pages or files, that text can try to give the model instructions. Never let retrieved content carry authority — keep instructions and data clearly separated, and never wire an untrusted string straight into a tool that can spend money or delete things.</div>
   </div>
+  <div data-toolstrip="prompting"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -623,6 +653,7 @@ sim("dog", "database")  -> 0.07</pre>
     <div class="callout-ico">🎯</div>
     <div><b>Retrieval quality is the product.</b> If the right chunk isn't retrieved, no model and no prompt can save the answer. Debug retrieval before you blame the LLM.</div>
   </div>
+  <div data-toolstrip="rag"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -890,6 +921,7 @@ hits = index.search(q, k=50)</pre>
       </ul>
     </div>
   </div>
+  <div data-toolstrip="agents"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -931,7 +963,151 @@ hits = index.search(q, k=50)</pre>
       </ul>
     </div>
   </div>
+  <div data-toolstrip="eval"></div>
+
+  <div class="panel" id="bench-panel">
+    <div class="panel-head"><h3>&#128218; The benchmarks people name</h3></div>
+    <p class="panel-sub">You will be asked "how do you evaluate a model" and someone will drop one of these names.
+      What matters is knowing what each one actually measures and why none of them tells you whether the model is
+      good <em>at your job</em>.</p>
+    <div class="procon-wrap"><table class="procon">
+      <thead><tr><th>Benchmark</th><th>What it measures</th><th class="pro">Useful for</th><th class="con">Why it misleads</th></tr></thead>
+      <tbody>
+        <tr><td>MMLU</td><td>Multiple-choice questions across 57 academic subjects.</td>
+          <td>A rough general-knowledge floor when comparing model families.</td>
+          <td>Saturated at the frontier, heavily contaminated by training data, and multiple choice is not a task anyone has.</td></tr>
+        <tr><td>TruthfulQA</td><td>Whether the model repeats common human misconceptions.</td>
+          <td>Sanity-checking that a model resists confident folklore.</td>
+          <td>Small and adversarial by construction; a good score does not mean grounded on your documents.</td></tr>
+        <tr><td>HumanEval / MBPP</td><td>Whether generated Python passes hidden unit tests.</td>
+          <td>Code generation, with an objective pass/fail signal.</td>
+          <td>Short self-contained functions. Nothing like working inside an existing codebase.</td></tr>
+        <tr><td>BBH (BIG-Bench Hard)</td><td>Tasks earlier models failed, chosen for difficulty.</td>
+          <td>Separating reasoning ability once the easy benchmarks saturate.</td>
+          <td>Puzzle-shaped. Strong here does not imply strong on messy business text.</td></tr>
+        <tr><td>MT-Bench / Arena</td><td>Human or judge preference over multi-turn conversation.</td>
+          <td>The closest public proxy for "which one do people prefer talking to".</td>
+          <td>Preference is not correctness; verbose and confident answers win votes they should not.</td></tr>
+        <tr><td>HELM</td><td>A framework scoring many models on many axes, including fairness and cost.</td>
+          <td>A structured comparison rather than a single number.</td>
+          <td>Breadth costs specificity; still not your task, your data or your latency budget.</td></tr>
+        <tr><td>LongBench / needle tests</td><td>Retrieval and reasoning across very long inputs.</td>
+          <td>Deciding whether long context can replace retrieval for a document.</td>
+          <td>Finding one planted fact is far easier than reasoning over the whole document.</td></tr>
+        <tr><td class="pro">Your own eval set</td><td>Your task, your data, your definition of correct.</td>
+          <td>Every decision you will actually make: ship, switch, roll back.</td>
+          <td>It does not. It only misleads if you never look at the cases it gets wrong.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="goldrule">
+    <div class="kp-ico">&#128161;</div>
+    <div><h4>Golden rule</h4>
+      <p>Public benchmarks choose a shortlist; your own eval set makes the decision. Fifty real cases from your
+      domain, with an agreed answer for each, beats every leaderboard on this page &mdash; and it is the artefact
+      an interviewer is actually listening for.</p></div>
+  </div>
+
+  <div class="checkbox-list warn">
+    <h4>What to say about benchmark scores</h4>
+    <ul>
+      <li><b>Contamination.</b> These are public, so they may sit in the training data. A high score can mean memorisation.</li>
+      <li><b>Saturation.</b> When every frontier model scores in the nineties, the remaining gap is noise, not ability.</li>
+      <li><b>Construct gap.</b> Multiple choice measures recognition. Your product needs generation, grounding and refusal.</li>
+      <li><b>No cost axis.</b> A one-point gain for four times the price is a bad trade nobody writes on the chart.</li>
+      <li><b>Prompt sensitivity.</b> Reported scores assume a specific prompt format. Yours is different.</li>
+    </ul>
+  </div>
 </section>
+
+<!-- ============================================================= -->
+<!-- MULTIMODAL                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="multimodal" data-title="Multimodal" data-icon="&#127912;" data-group="Deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Deep dive &middot; beyond text</div>
+    <h2>One model, <span class="grad">several senses</span></h2>
+    <p class="lead">A multimodal model takes more than one kind of input &mdash; text, images, audio, video &mdash; and
+      often produces more than one kind of output. The interesting question is never "can it see", it is
+      <b>where the two streams meet</b>, because that single design choice decides what the model can and
+      cannot reason about.</p>
+  </header>
+
+  <div class="keypoint">
+    <div class="kp-ico">&#11088;</div>
+    <div><h4>Key point</h4>
+      <p><b>Everything in this chapter follows from where fusion happens.</b> Fuse late and the model compares two
+      summaries, which is perfect for search and useless for "what is written on the third sign". Fuse early or
+      with cross-attention and a word can attend to one region of one image, which is what grounding actually
+      means. The architecture is the capability.</p></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128295; The five ways to wire it</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Same two inputs, same output, five places to join them. Watch the diagram: the join
+      moves left or right and everything else about the model follows from that.</p>
+    <div id="mmfuse"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128257; How a request actually flows</h3></div>
+    <div class="pipeline">
+      <div class="pl-step"><div class="pl-n">STEP 1</div><span class="pl-ico">&#128229;</span><h5>Input</h5>
+        <p>One or more modalities arrive: text, an image, an audio clip, a PDF page.</p></div>
+      <div class="pl-step"><div class="pl-n">STEP 2</div><span class="pl-ico">&#129518;</span><h5>Encode</h5>
+        <p>Each modality goes through its own encoder into vectors. An image becomes a grid of patch features.</p></div>
+      <div class="pl-step"><div class="pl-n">STEP 3</div><span class="pl-ico">&#8853;</span><h5>Fuse</h5>
+        <p>The streams are aligned into a shared space and joined &mdash; early, late, or by attention.</p></div>
+      <div class="pl-step"><div class="pl-n">STEP 4</div><span class="pl-ico">&#9881;</span><h5>Generate</h5>
+        <p>The trunk produces the output sequence, conditioned on everything it was given.</p></div>
+      <div class="pl-step"><div class="pl-n">STEP 5</div><span class="pl-ico">&#128228;</span><h5>Output</h5>
+        <p>Text, structured JSON, an image, audio &mdash; whichever head the model has.</p></div>
+    </div>
+    <div class="callout">
+      <div class="callout-ico">&#128161;</div>
+      <div><b>The cost lives in step 2.</b> An image is not one token. Depending on resolution and the detail
+        setting, a single screenshot can cost anywhere from a few hundred to a few thousand tokens &mdash; every
+        turn it stays in the conversation. Resizing before you send is the cheapest optimisation in this chapter.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127919; What you can actually ask for</h3></div>
+    <p class="panel-sub">The task names matter: an interviewer asking about "document understanding" and one
+      asking about "OCR" want different answers.</p>
+    <div id="mmtask"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9888;&#65039; What goes wrong</h3></div>
+    <p class="panel-sub">Four of these five are specific to multimodal work and do not appear in a text-only system.</p>
+    <div id="mmrisk"></div>
+  </div>
+
+  <div class="checkbox-list">
+    <h4>Practices that actually help</h4>
+    <ul>
+      <li>Resize and compress before sending. Most tasks do not need full resolution, and you pay per pixel.</li>
+      <li>Ask for structured output with a source reference, so a wrong number is traceable to a region.</li>
+      <li>Treat text read out of an image as untrusted input &mdash; it is a prompt-injection surface.</li>
+      <li>Carry timestamps through audio and video pipelines as metadata, not as prose.</li>
+      <li>Build a small human-labelled eval set first. There is no exact-match score for a caption.</li>
+      <li>Check whether you need a multimodal model at all &mdash; a dedicated OCR or ASR model is often cheaper and better.</li>
+    </ul>
+  </div>
+
+  <div class="goldrule">
+    <div class="kp-ico">&#128161;</div>
+    <div><h4>Golden rule</h4>
+      <p>Reach for a multimodal model when the modalities have to be reasoned about <em>together</em>. If the job
+      is "turn this audio into text" or "read this scan", a specialist model is usually cheaper, faster and more
+      accurate, and the general model is a convenience you are paying for.</p></div>
+  </div>
+
+  <div data-toolstrip="multimodal"></div>
+</section>
+
 
 <!-- ============================================================= -->
 <!-- 14. SHIPPING                                                  -->
@@ -959,6 +1135,13 @@ hits = index.search(q, k=50)</pre>
     <div class="panel-head"><h3>🏗️ A reference architecture</h3></div>
     <div class="arch" id="arch"></div>
   </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🎤 Forty production questions</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The interview version of this chapter. Prototype thinking asks <i>does it work?</i>; production thinking asks <i>does it keep working?</i> — and almost every answer below is a way of surviving something you do not control. Filter by theme, open a card for what the interviewer is really testing, the mechanism, and the line that lands it.</p>
+    <div id="prod40"></div>
+  </div>
+  <div data-toolstrip="ship"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -1492,6 +1675,7 @@ SUMX(Sales,
       <li><b>Chunk size is measured, not argued.</b> Sweep it against an eval set and read recall@10.</li>
     </ul>
   </div>
+  <div data-toolstrip="chunking"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -1554,6 +1738,7 @@ SUMX(Sales,
       <li><b>Distillation is a cost project, not a quality project.</b> The student inherits every mistake the teacher makes.</li>
     </ul>
   </div>
+  <div data-toolstrip="tuning"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -1741,7 +1926,11 @@ SUMX(Sales,
 <div class="toast" id="toast"></div>
 
 <script src="js/content.js"></script>
+<script src="js/tools.js"></script>
 <script src="js/demos.js"></script>
 <script src="js/app.js"></script>
+<script src="js/multimodal.js"></script>
+<script src="js/toolstrip.js"></script>
+<script src="js/prod40.js"></script>
 </body>
 </html>

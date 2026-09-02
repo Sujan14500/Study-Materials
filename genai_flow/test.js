@@ -583,4 +583,165 @@ ids.forEach(id => assert(html.includes('id="' + id + '"') || demos.includes('id=
     `comparison row "${r[0]}" has ${r.length - 1} cells for ${t.cols.length} columns`));
 });
 
+/* ---- tools & frameworks strips ---- */
+/* Every strip mounted in the page must have data, every strip with data must be
+   mounted, and every tool must carry both advantages and drawbacks — a one-sided
+   tool card is marketing, not a study note. */
+{
+  const tsHtml = fs.readFileSync('index.html', 'utf8');
+  vm.runInContext(fs.readFileSync('js/tools.js', 'utf8'), ctx);
+  const TS = ctx.window.C.toolstrips || {};
+  const mounted = [...tsHtml.matchAll(/data-toolstrip="([a-z0-9-]+)"/g)].map(m => m[1]);
+  mounted.forEach(k => assert(TS[k], `index.html mounts a tools strip "${k}" with no data in js/tools.js`));
+  Object.keys(TS).forEach(k => {
+    assert(mounted.includes(k), `js/tools.js defines strip "${k}" that the page never renders`);
+    const s = TS[k];
+    assert(s.tools.length >= 3, `tools strip "${k}" has fewer than three tools`);
+    s.tools.forEach(t => {
+      ['n', 'by', 'mark', 'what', 'use'].forEach(f =>
+        assert(t[f] && String(t[f]).trim(), `tools strip "${k}": ${t.n || '?'} is missing ${f}`));
+      assert(t.pro && t.pro.length >= 2, `tools strip "${k}": ${t.n} needs at least two advantages`);
+      assert(t.con && t.con.length >= 2, `tools strip "${k}": ${t.n} needs at least two drawbacks`);
+    });
+  });
+  if (mounted.length) console.log(`  ${mounted.length} tools strips, ` +
+    `${Object.values(TS).reduce((a, s) => a + s.tools.length, 0)} tools with advantages and drawbacks`);
+}
+
+/* ---- multimodal ---- */
+/* The chapter claims five fusion architectures, each with real trade-offs
+   on both sides. A one-sided architecture card is marketing, not a note. */
+{
+  const mmCtx = { window: {} };
+  mmCtx.window = mmCtx;
+  vm.createContext(mmCtx);
+  mmCtx.document = { querySelector: () => null, querySelectorAll: () => [] };
+  vm.runInContext(fs.readFileSync('js/multimodal.js', 'utf8'), mmCtx);
+  const MM = mmCtx.window.MM;
+  const page = fs.readFileSync('index.html', 'utf8');
+
+  assert(page.includes('data-id="multimodal"'), 'the multimodal chapter is missing from the page');
+  ['mmfuse', 'mmtask', 'mmrisk'].forEach(id =>
+    assert(page.includes('id="' + id + '"'), 'index.html is missing #' + id));
+
+  assert(MM.fusion.length === 5, `expected 5 fusion architectures, found ${MM.fusion.length}`);
+  MM.fusion.forEach(f => {
+    ['id', 'n', 'ico', 'c', 'one', 'how', 'ex'].forEach(k =>
+      assert(f[k] && String(f[k]).trim(), `fusion "${f.n || f.id}" is missing ${k}`));
+    assert(f.pro.length >= 3 && f.con.length >= 3,
+      `fusion "${f.n}" needs at least three advantages and three drawbacks`);
+  });
+  const ids = new Set(MM.fusion.map(f => f.id));
+  assert(ids.size === MM.fusion.length, 'duplicate fusion id');
+
+  // the task table must always name both ends, or it is not teaching the mapping
+  MM.tasks.forEach(t => ['t', 'i', 'o', 'ex'].forEach(k =>
+    assert(t[k], `task "${t.t || '?'}" is missing ${k}`)));
+  assert(MM.tasks.length >= 8, 'the task matrix is too short to be useful');
+
+  // every risk must come with a mitigation, not just a warning
+  MM.risks.forEach(r => {
+    assert(r.length === 3, `risk "${r[0]}" is malformed`);
+    assert(r[2].length > 40, `risk "${r[0]}" has no real mitigation`);
+  });
+
+  console.log(`  multimodal: ${MM.fusion.length} fusion architectures, ${MM.tasks.length} tasks, ` +
+              `${MM.risks.length} risks each with a mitigation`);
+}
+
+/* ---- the production question deck ---- */
+/* Shared with ai_system_design_concepts and agentic_ai_flow, which mount subsets
+   of it. So the checks live here in full: every card must be complete, every
+   diagram must match the renderer that will draw it, and every data-cats mount
+   in the page must name categories that exist. */
+{
+  vm.runInContext(fs.readFileSync('js/prod40.js', 'utf8'), ctx);
+  const P = ctx.window.PROD40;
+  assert(P, 'prod40.js did not publish its data');
+  const cats = new Set(P.CATS.map(c => c.id));
+  const KINDS = ['flow', 'branch', 'cycle', 'span', 'bars', 'table', 'code', 'list'];
+  const LICO = ['ok', 'bad', 'warn', 'go'];
+  const seen = new Set();
+
+  P.Q.forEach(q => {
+    const at = `prod40 card ${q.n}`;
+    assert(Number.isInteger(q.n) && !seen.has(q.n), `${at} has a duplicate or missing number`);
+    seen.add(q.n);
+    assert(cats.has(q.cat), `${at} has unknown category "${q.cat}"`);
+    assert(/\?|^Design /.test(q.q), `${at} does not read as an interview question`);
+    assert(q.expects && q.expects.length > 30, `${at} does not say what the interviewer is testing`);
+    // the explanation is the reason this exists at all; a one-liner is a slide, not a lesson
+    assert(q.why && q.why.length > 300, `${at} has an explanation too thin to teach anything`);
+    assert(q.tip && q.tip.length > 40, `${at} is missing the line that lands the answer`);
+
+    const v = q.viz;
+    assert(v && KINDS.includes(v.k), `${at} has diagram kind "${v && v.k}" with no renderer`);
+    if (v.k === 'flow' || v.k === 'cycle') assert(v.n && v.n.length >= 3, `${at} ${v.k} needs three nodes`);
+    if (v.k === 'branch') assert(v.from && v.to && v.to.length >= 2, `${at} branch needs a source and two targets`);
+    if (v.k === 'span') {
+      assert(v.seg.length >= 2 && v.total, `${at} span needs a total and two segments`);
+      v.seg.forEach(s => assert(typeof s.v === 'number' && s.v > 0, `${at} span segment "${s.t}" has no width`));
+      if (v.mark) assert(v.mark.at >= 0 && v.mark.at <= 100, `${at} span marker sits off the bar`);
+    }
+    if (v.k === 'bars') v.rows.forEach(r =>
+      assert(r.v > 0 && r.v <= 100 && r.l, `${at} bar "${r.t}" needs a 0-100 width and a label`));
+    if (v.k === 'table') v.rows.forEach(r => assert(r.length === v.cols.length + 1,
+      `${at} table row "${r[0]}" has ${r.length - 1} cells for ${v.cols.length} columns`));
+    if (v.k === 'code') assert(v.t && v.src && v.src.includes('\n'), `${at} code block is empty or single-line`);
+    if (v.k === 'list') v.rows.forEach(r => {
+      assert(r.length === 3, `${at} list row "${r[1]}" is not [icon, label, text]`);
+      assert(LICO.includes(r[0]), `${at} list row "${r[1]}" uses icon "${r[0]}", which has no colour`);
+    });
+  });
+
+  // numbering must be contiguous, or the card labels lie about how many there are
+  for (let i = 1; i <= P.Q.length; i++) assert(seen.has(i), `prod40 is missing card ${i}`);
+  // a category chip with nothing behind it renders an empty list
+  P.CATS.forEach(c => assert(P.Q.some(q => q.cat === c.id),
+    `prod40 category "${c.id}" has no cards`));
+  assert(P.SHEET.length >= 8, 'the cheat sheet is too short to be a summary');
+
+  // whatever this page asks the widget to show must exist
+  const html40 = fs.readFileSync('index.html', 'utf8');
+  const mount = html40.match(/id="prod40"[^>]*data-cats="([^"]+)"/);
+  if (mount) mount[1].split(/[,\s]+/).filter(Boolean).forEach(c =>
+    assert(cats.has(c), `index.html mounts prod40 with unknown category "${c}"`));
+  /* Data checks cannot catch a typo inside a diagram renderer, so open every card
+     against a stub DOM and confirm the right drawing came out of it. */
+  const CLASS = { flow: 'p40-flow', branch: 'p40-branch', cycle: 'p40-cycle', span: 'p40-span',
+                  bars: 'p40-bars', table: 'p40-table', code: 'p40-code', list: 'p40-list' };
+  let out = '', heads = [];
+  const stub = {
+    dataset: {},
+    set innerHTML(v) { out = v; },
+    get innerHTML() { return out; },
+    querySelectorAll(sel) {
+      if (sel !== '.p40-head') return [{ dataset: { c: 'all' } }];
+      // a fresh handle per card per repaint, exactly as re-rendering the real DOM gives
+      heads = P.Q.map(q => ({ parentElement: { dataset: { n: String(q.n) } } }));
+      return heads;
+    },
+    querySelector() { return null; }
+  };
+  ctx.document = { getElementById: id => (id === 'prod40' ? stub : null) };
+  vm.runInContext(fs.readFileSync('js/prod40.js', 'utf8'), ctx);
+  assert(out.includes('p40-cards'), 'prod40 rendered nothing on mount');
+
+  const click = n => {
+    const h = heads.find(x => +x.parentElement.dataset.n === n);
+    assert(h && h.onclick, `no click handler wired for prod40 card ${n}`);
+    h.onclick();
+  };
+  P.Q.forEach(q => {
+    click(q.n);
+    assert(out.includes('p40-body'), `prod40 card ${q.n} did not open`);
+    assert(out.includes(CLASS[q.viz.k]), `prod40 card ${q.n} drew no ${q.viz.k} diagram`);
+    assert(!/undefined|\[object Object\]/.test(out), `prod40 card ${q.n} rendered undefined content`);
+    click(q.n);                              // and closes again
+  });
+  delete ctx.document;
+
+  console.log(`  ${P.Q.length} production questions across ${P.CATS.length} categories, every diagram renders`);
+}
+
 console.log('ok — content data is consistent');

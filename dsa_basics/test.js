@@ -258,4 +258,29 @@ function adjacency() {
     'doubling n must roughly quadruple the work — that is what O(n^2) means');
 }
 
+/* ---- tools & frameworks strips ---- */
+/* Every strip mounted in the page must have data, every strip with data must be
+   mounted, and every tool must carry both advantages and drawbacks — a one-sided
+   tool card is marketing, not a study note. */
+{
+  const tsHtml = fs.readFileSync('index.html', 'utf8');
+  vm.runInContext(fs.readFileSync('js/tools.js', 'utf8'), ctx);
+  const TS = ctx.window.C.toolstrips || {};
+  const mounted = [...tsHtml.matchAll(/data-toolstrip="([a-z0-9-]+)"/g)].map(m => m[1]);
+  mounted.forEach(k => assert(TS[k], `index.html mounts a tools strip "${k}" with no data in js/tools.js`));
+  Object.keys(TS).forEach(k => {
+    assert(mounted.includes(k), `js/tools.js defines strip "${k}" that the page never renders`);
+    const s = TS[k];
+    assert(s.tools.length >= 3, `tools strip "${k}" has fewer than three tools`);
+    s.tools.forEach(t => {
+      ['n', 'by', 'mark', 'what', 'use'].forEach(f =>
+        assert(t[f] && String(t[f]).trim(), `tools strip "${k}": ${t.n || '?'} is missing ${f}`));
+      assert(t.pro && t.pro.length >= 2, `tools strip "${k}": ${t.n} needs at least two advantages`);
+      assert(t.con && t.con.length >= 2, `tools strip "${k}": ${t.n} needs at least two drawbacks`);
+    });
+  });
+  if (mounted.length) console.log(`  ${mounted.length} tools strips, ` +
+    `${Object.values(TS).reduce((a, s) => a + s.tools.length, 0)} tools with advantages and drawbacks`);
+}
+
 console.log('ok — content data and every animated algorithm are correct');

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Tooling Landscape — Two Lines and Five Points on Everything</title>
+<meta name="description" content="An interactive map of the modern AI tool ecosystem: LLMs, agent frameworks, RAG, embeddings, MCP, guardrails, observability, memory, automation, vector databases and the serving layer — with two lines and five interview points on every single tool.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/notes.css">
+<link rel="stylesheet" href="css/tooling.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧰</text></svg>">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<canvas id="bg-particles" class="bg-particles" aria-hidden="true"></canvas>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark"><span>⬢</span></div>
+    <div>
+      <div class="brand-name">AI Tooling</div>
+      <div class="brand-sub">two lines, five points, every tool</div>
+    </div>
+  </div>
+
+  <div class="progress-block">
+    <div class="progress-top">
+      <span>Progress</span><span id="progress-label">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="xp-row">
+      <span class="xp-badge" id="xp-badge">0 XP</span>
+      <button class="reset-btn" id="reset-btn" title="Clear saved progress">reset</button>
+    </div>
+  </div>
+
+  <nav class="chapter-nav" id="chapter-nav" aria-label="Chapters"></nav>
+
+  <div class="sidebar-foot">
+    <kbd>&larr;</kbd><kbd>&rarr;</kbd> to navigate
+  </div>
+</aside>
+
+<button class="menu-toggle" id="menu-toggle" aria-label="Toggle chapters">&#9776;</button>
+
+<!-- ============ MAIN ============ -->
+<main class="main" id="main">
+<div class="stage" id="stage">
+
+<!-- ============================================================= -->
+<!-- 0. WELCOME                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="welcome" data-title="Welcome" data-icon="&#10022;" data-group="Start here">
+  <div class="hero">
+    <div class="hero-tag">interactive course · no signup · no server</div>
+    <h1 class="hero-title">Every box on<br><span class="grad">that diagram</span></h1>
+    <p class="hero-sub">
+      You have seen the poster: eighty logos arranged around a hub, and the quiet worry that
+      an interviewer will point at one of them. This course covers each layer and each tool
+      with the same two things — <b>two lines on what it is</b>, and <b>five points you can
+      actually say out loud</b> — plus when to reach for it and the objection you will get
+      when you do.
+    </p>
+
+    <div class="hero-anim">
+      <svg viewBox="0 0 640 180" class="flow-svg" id="hero-flow">
+        <defs>
+          <linearGradient id="gradFlow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#7c5cff"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#34d399"/>
+          </linearGradient>
+        </defs>
+        <path id="flow-path" d="M40,90 C160,30 240,150 360,90 S560,40 600,90" fill="none" stroke="url(#gradFlow)" stroke-width="2" stroke-dasharray="6 6" opacity=".45"/>
+        <circle r="6" fill="#fff"><animateMotion dur="4.4s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#22d3ee"><animateMotion dur="4.4s" begin="1.4s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+        <circle r="4" fill="#7c5cff"><animateMotion dur="4.4s" begin="2.8s" repeatCount="indefinite"><mpath href="#flow-path"/></animateMotion></circle>
+      </svg>
+      <div class="hero-flow-labels">
+        <span>a request</span><span>retrieval</span><span>the model</span><span>a tool</span><span>an answer</span>
+      </div>
+    </div>
+
+    <div class="cv-row" id="coverage" style="margin-bottom:26px"></div>
+
+    <div class="hero-cards">
+      <div class="hcard"><div class="hcard-ico">🗺️</div><h4>Map first</h4><p>Twelve layers, each answering one question. Learn the layers and the logos stop mattering.</p></div>
+      <div class="hcard"><div class="hcard-ico">🎙️</div><h4>Five points, always</h4><p>Never fewer. Enough to hold ninety seconds on any tool without bluffing.</p></div>
+      <div class="hcard"><div class="hcard-ico">🎯</div><h4>Then get drilled</h4><p>Scenario picker, rapid fire, and a quiz that punishes brand-name answers.</p></div>
+    </div>
+
+    <button class="btn btn-lg" data-goto="next">Open the map <span class="arr">&rarr;</span></button>
+    <p class="hero-note">Progress saves in your browser. Close the tab, come back, keep going.<br>
+      This is the <b>breadth</b> course. For depth on how any of it works, do <b>GenAI Flow</b> and <b>Agentic AI Flow</b>.</p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- 1. THE MAP                                                    -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="map" data-title="The map" data-icon="0" data-group="Start here">
+  <header class="ch-head">
+    <div class="ch-kicker">Orientation</div>
+    <h2>Twelve layers, <span class="grad">twelve questions</span></h2>
+    <p class="lead">The ecosystem looks like chaos because it is drawn as a logo cloud. It is not chaos — it is a
+      dozen layers, and each one answers exactly one question about your system. If you can name the
+      question, you can place any tool anyone throws at you, including ones that did not exist last week.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🗺️ The ecosystem, by layer</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Click a layer. It cycles on its own until you touch it.</p>
+    <div class="eco-wrap">
+      <div><svg id="eco-svg"></svg></div>
+      <div class="eco-info in" id="eco-info"></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">💡</div>
+    <div><b>The thing that actually gets tested.</b> Nobody senior is checking whether you memorised
+      logos. They are checking whether you can hear a problem and name the layer it belongs to —
+      and then say honestly which tool you would reach for and what it would cost you. Tools change
+      every quarter. The twelve questions do not.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>❓ One question per layer</h3></div>
+    <ul class="fact-list">
+      <li><b>What produces the words?</b> → the LLM layer</li>
+      <li><b>Who decides what happens next?</b> → agentic orchestration</li>
+      <li><b>Where do the facts come from?</b> → RAG</li>
+      <li><b>How does text become a number?</b> → embeddings</li>
+      <li><b>How does the model reach my systems?</b> → MCP and tools</li>
+      <li><b>What stops it doing something stupid?</b> → AI security and guardrails</li>
+      <li><b>How do I know what it did?</b> → observability and evals</li>
+      <li><b>What does it remember next time?</b> → memory</li>
+      <li><b>What runs the loop in production?</b> → agent SDKs and runtimes</li>
+      <li><b>What triggers it, and what happens after?</b> → automation and workflow</li>
+      <li><b>Where do the vectors live?</b> → vector databases</li>
+      <li><b>How does a human actually reach it?</b> → the app and serving layer</li>
+    </ul>
+  </div>
+
+  <div class="keypoint">
+    <div class="kp-ico">&#11088;</div>
+    <div><h4>Key point</h4>
+      <p><b>Name the layer before the tool.</b> Layers outlive logos. A tool that did not exist last quarter
+      still belongs to one of these twelve questions, and placing it correctly is the skill being tested &mdash;
+      not recalling a name.</p></div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- LAYER CHAPTERS                                                -->
+<!-- ============================================================= -->
+
+<section class="chapter" data-id="llm" data-title="LLM" data-icon="1" data-group="The model and its data">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 1 · the engine</div>
+    <h2>LLM — <span class="grad">the engine</span></h2>
+    <p class="lead" data-cattwo="llm"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">If someone says "talk to me about model selection", this is the ninety seconds.</p>
+    <div data-catpts="llm"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="llm"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Pick any one. Two lines on what it is, five points to say, when to reach for it, and the pushback you will get.</p>
+    <div data-toolcat="llm"></div>
+  </div>
+</section>
+
+<section class="chapter" data-id="agentic" data-title="Agentic AI" data-icon="2" data-group="The model and its data">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 2 · orchestration</div>
+    <h2>Agentic AI — <span class="grad">who runs the loop</span></h2>
+    <p class="lead" data-cattwo="agentic"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🔄 The loop, and who holds the leash</h3><span class="panel-tag">animated</span></div>
+    <div data-arch="agent"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">The graph-versus-conversation axis is the one that makes you sound like you have shipped something.</p>
+    <div data-catpts="agentic"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="agentic"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Every one of these is the same loop with different decorations. The difference is how much control you keep.</p>
+    <div data-toolcat="agentic"></div>
+  </div>
+</section>
+
+<section class="chapter" data-id="rag" data-title="RAG" data-icon="3" data-group="The model and its data">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 3 · grounding</div>
+    <h2>RAG — <span class="grad">where the facts come from</span></h2>
+    <p class="lead" data-cattwo="rag"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🔁 The retrieval path, end to end</h3><span class="panel-tag">animated</span></div>
+    <div data-arch="rag"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">The five-stage pipeline and the upgrade order are the two things that get asked, every time.</p>
+    <div data-catpts="rag"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="rag"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Frameworks, ingestion and one technique. Knowing which is which is half the answer.</p>
+    <div data-toolcat="rag"></div>
+  </div>
+</section>
+
+<section class="chapter" data-id="embed" data-title="Embedding" data-icon="4" data-group="The model and its data">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 4 · text to vectors</div>
+    <h2>Embedding — <span class="grad">meaning as a number</span></h2>
+    <p class="lead" data-cattwo="embed"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">Bi-encoder versus cross-encoder is the highest-value distinction in this whole chapter.</p>
+    <div data-catpts="embed"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="embed"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Hosted, open and self-hosted. The gotchas here are quiet — a missing prefix or task type costs accuracy with no error.</p>
+    <div data-toolcat="embed"></div>
+  </div>
+</section>
+
+<section class="chapter" data-id="mcp" data-title="MCP" data-icon="5" data-group="Plumbing and control">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 5 · the tool port</div>
+    <h2>MCP — <span class="grad">one plug, many tools</span></h2>
+    <p class="lead" data-cattwo="mcp"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🔌 One host, three servers, one protocol</h3><span class="panel-tag">animated</span></div>
+    <div data-arch="mcp"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">Tools, resources and prompts differ by <em>who decides</em>. Getting that right is the whole credibility test.</p>
+    <div data-catpts="mcp"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="mcp"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The SDKs, the registry, and four servers you will actually be asked about.</p>
+    <div data-toolcat="mcp"></div>
+  </div>
+  <div class="callout">
+    <div class="callout-ico">⚠️</div>
+    <div><b>The second question is always security.</b> An MCP server runs with your credentials, and
+      everything it returns is untrusted text that can carry an instruction. The complete answer names
+      four controls: least-privilege tokens, an allowlist of servers, human approval on writes, and
+      never letting tool output be treated as instruction.</div>
+  </div>
+</section>
+
+<section class="chapter" data-id="sec" data-title="AI Security" data-icon="6" data-group="Plumbing and control">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 6 · guardrails</div>
+    <h2>AI Security — <span class="grad">a prompt is not a boundary</span></h2>
+    <p class="lead" data-cattwo="sec"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">Direct versus indirect injection, and input versus output guardrails. Both distinctions get probed.</p>
+    <div data-catpts="sec"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="sec"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Open-source toolkits, commercial classifiers, and the two cloud-native guardrail services.</p>
+    <div data-toolcat="sec"></div>
+  </div>
+</section>
+
+<section class="chapter" data-id="obs" data-title="Observability" data-icon="7" data-group="Plumbing and control">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 7 · traces and evals</div>
+    <h2>Observability — <span class="grad">what actually happened</span></h2>
+    <p class="lead" data-cattwo="obs"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">Offline versus online evaluation, and the known biases of an LLM judge. Both are exam material.</p>
+    <div data-catpts="obs"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="obs"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Tracing platforms, evaluation libraries, and one gateway. TruLens carries the single most quotable framework here.</p>
+    <div data-toolcat="obs"></div>
+  </div>
+</section>
+
+<section class="chapter" data-id="mem" data-title="Memory" data-icon="8" data-group="State and scale">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 8 · what survives</div>
+    <h2>Memory — <span class="grad">context is not memory</span></h2>
+    <p class="lead" data-cattwo="mem"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">Four kinds of memory, and the fact that the hard part is forgetting, not storing.</p>
+    <div data-catpts="mem"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="mem"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Dedicated memory services, and the ordinary databases that do the job perfectly well.</p>
+    <div data-toolcat="mem"></div>
+  </div>
+</section>
+
+<section class="chapter" data-id="agent" data-title="AI Agent SDKs" data-icon="9" data-group="State and scale">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 9 · SDKs and runtimes</div>
+    <h2>AI Agent — <span class="grad">whose process runs it</span></h2>
+    <p class="lead" data-cattwo="agent"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">The difference from the framework layer is <em>who holds the state</em>. That is the whole distinction.</p>
+    <div data-catpts="agent"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="agent"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Provider SDKs and three managed cloud runtimes. All converge on the same six primitives.</p>
+    <div data-toolcat="agent"></div>
+  </div>
+</section>
+
+<section class="chapter" data-id="auto" data-title="Automation" data-icon="10" data-group="State and scale">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 10 · triggers and workflows</div>
+    <h2>Automation — <span class="grad">the unglamorous majority</span></h2>
+    <p class="lead" data-cattwo="auto"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">Three families that a slide deck flattens into one, separated by their failure semantics.</p>
+    <div data-catpts="auto"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="auto"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Connector platforms, data orchestrators and one durable execution engine. Do not confuse them.</p>
+    <div data-toolcat="auto"></div>
+  </div>
+  <div class="callout">
+    <div class="callout-ico">💡</div>
+    <div><b>The answer that scores highest here.</b> Sometimes the honest response to "how would you build
+      this agent" is that it is not an agent — it is a cron job with one model call in it. Saying that
+      out loud, with the reason, is worth more than naming five frameworks.</div>
+  </div>
+</section>
+
+<section class="chapter" data-id="vdb" data-title="Vector Database" data-icon="11" data-group="State and scale">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 11 · where vectors live</div>
+    <h2>Vector Database — <span class="grad">approximate, on purpose</span></h2>
+    <p class="lead" data-cattwo="vdb"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">HNSW versus IVF, and pre- versus post-filtering. Those two comparisons are the whole layer.</p>
+    <div data-catpts="vdb"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="vdb"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Managed, open-source, and the two you already run without noticing.</p>
+    <div data-toolcat="vdb"></div>
+  </div>
+</section>
+
+<section class="chapter" data-id="app" data-title="App &amp; Serving" data-icon="12" data-group="State and scale">
+  <header class="ch-head">
+    <div class="ch-kicker">Layer 12 · API and UI</div>
+    <h2>App &amp; Serving — <span class="grad">how a human reaches it</span></h2>
+    <p class="lead" data-cattwo="app"></p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🎙️ Five points on the layer</h3><span class="panel-tag">say these</span></div>
+    <p class="panel-sub">Streaming, async and background tasks. LLM endpoints are slow, and that changes the architecture.</p>
+    <div data-catpts="app"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🧰 The tools <span class="dim">(<span data-catcount="app"></span>)</span></h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">FastAPI for software, Streamlit and friends for humans, Pydantic underneath all of it.</p>
+    <div data-toolcat="app"></div>
+  </div>
+  <div class="callout">
+    <div class="callout-ico">🎈</div>
+    <div><b>The tell interviewers listen for.</b> Presenting a Streamlit app as a production service.
+      Streamlit reruns the entire script on every interaction, has no routing and no real auth —
+      it is superb for internal tools and demos, and the right answer is to say so and then describe
+      the FastAPI service behind it.</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- CHOOSING                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="ladder" data-title="Build vs buy" data-icon="↑" data-group="Choosing">
+  <header class="ch-head">
+    <div class="ch-kicker">Judgement</div>
+    <h2>Add one rung <span class="grad">at a time</span></h2>
+    <p class="lead">The strongest thing you can demonstrate in a system-design round is restraint. Every tool on the
+      map is also a thing to operate, secure, upgrade and pay for. This is the order to add them in, and
+      the trigger that justifies each one.</p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🪜 The ladder</h3></div>
+    <p class="panel-sub">Stop at the rung that solves the problem you actually measured.</p>
+    <div id="ladder-box"></div>
+  </div>
+  <div class="two-up">
+    <div class="panel">
+      <div class="panel-head"><h3>✅ Reasons that justify a new tool</h3></div>
+      <ul class="fact-list">
+        <li>A measured failure the current stack cannot fix.</li>
+        <li>A compliance or residency requirement with a name attached.</li>
+        <li>A cost curve you have actually plotted and crossed.</li>
+        <li>A latency SLO the current design misses.</li>
+        <li>An operational burden that is now bigger than the vendor bill.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🚩 Reasons that do not</h3></div>
+      <ul class="fact-list">
+        <li>It was on a diagram someone shared.</li>
+        <li>Everyone in the meeting had heard of it.</li>
+        <li>It might be needed later, at a scale nobody has forecast.</li>
+        <li>The current thing is boring.</li>
+        <li>The demo was very good.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" data-id="picker" data-title="Pick the tool" data-icon="🎯" data-group="Choosing">
+  <header class="ch-head">
+    <div class="ch-kicker">Drill</div>
+    <h2>Hear a problem, <span class="grad">name the layer</span></h2>
+    <p class="lead">Fourteen scenarios of the kind that get read out in an interview. Some accept more than one answer.
+      The reasoning under each one is the part worth reading — it is what you would say after picking.</p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🎯 Pick the right tool</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">There is a right answer, and it is usually the least exciting one.</p>
+    <div id="picker"></div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- DRILLING                                                      -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="catalogue" data-title="The catalogue" data-icon="🔎" data-group="Drilling">
+  <header class="ch-head">
+    <div class="ch-kicker">Reference</div>
+    <h2>Every tool, <span class="grad">one keystroke away</span></h2>
+    <p class="lead">The night before an interview, this is the page to have open. Type a name, get the two lines, expand
+      for the five points. Filter by layer if you want to revise a whole category at once.</p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>🔎 Search everything</h3><span class="panel-tag"><span id="cat-count" class="cg-count"></span></span></div>
+    <input type="search" id="cat-search" class="input-line" placeholder="type a tool, a vendor, or a word like &quot;vector&quot; or &quot;guardrail&quot;…">
+    <div class="chip-row" id="cat-chips"></div>
+    <div class="cg-grid" id="cat-out"></div>
+  </div>
+</section>
+
+<section class="chapter" data-id="rapid" data-title="Rapid fire" data-icon="⚡" data-group="Drilling">
+  <header class="ch-head">
+    <div class="ch-kicker">Drill</div>
+    <h2>The comparisons <span class="grad">you will be asked</span></h2>
+    <p class="lead">Almost every tooling question in an interview is a comparison — this versus that, and when would you
+      not. Cover the answer, say yours out loud, then tap. Out loud matters; recognising an answer and
+      producing one are different skills.</p>
+  </header>
+  <div class="panel">
+    <div class="panel-head"><h3>⚡ Rapid fire</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Tap a card to reveal.</p>
+    <div class="btn-row" style="margin-bottom:14px"><button class="btn btn-ghost" id="rf-all">Reveal all answers</button></div>
+    <div class="rf-grid" id="rapid"></div>
+  </div>
+</section>
+
+<section class="chapter" data-id="quiz" data-title="Quiz" data-icon="🏁" data-group="Drilling">
+  <header class="ch-head">
+    <div class="ch-kicker">Check yourself</div>
+    <h2>Fourteen questions <span class="grad">that punish logo answers</span></h2>
+    <p class="lead">Every one of these has a wrong answer that sounds impressive. No time limit, instant explanations,
+      retake as often as you like.</p>
+  </header>
+  <div class="panel">
+    <div id="quiz" class="quiz"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>📌 If you remember five things</h3></div>
+    <ul class="fact-list">
+      <li>Name the <b>layer</b> before the tool. Layers outlive logos.</li>
+      <li>Retrieval quality beats model quality, and reranking is the cheapest fix.</li>
+      <li>Irreversible actions are gated in <b>code</b>, never in a prompt.</li>
+      <li>Instrument before you optimise, or you will tune the wrong stage for a month.</li>
+      <li>Every tool you add is a system to operate. The best architecture is the smallest one that meets the requirement.</li>
+    </ul>
+  </div>
+</section>
+
+</div><!-- /stage -->
+
+<div class="pager" id="pager">
+  <button class="btn btn-ghost" data-goto="prev">&larr; Back</button>
+  <div class="pager-dots" id="pager-dots"></div>
+  <button class="btn" data-goto="next">Next &rarr;</button>
+</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/content.js"></script>
+<script src="js/cat-core.js"></script>
+<script src="js/cat-infra.js"></script>
+<script src="js/cat-state.js"></script>
+<script src="js/cat-app.js"></script>
+<script src="js/demos.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

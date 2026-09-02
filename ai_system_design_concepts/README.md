@@ -53,7 +53,7 @@ open index.html           # macOS
 | 13 | Vector indexes | Watch k-means carve a corpus into cells, then drag the query around: how many vectors the search skipped, and which true neighbours it lost by skipping them. Then the nprobe sweep, the four index families, product quantization and a walk down an HNSW graph |
 | 14 | LLM serving & cost | Model-cascade simulator; a KV-cache ceiling calculator that turns context length into a concurrency limit; and prefill/decode levers — streaming, prompt caching, speculative decoding — that each move one number and stubbornly not the others |
 | 15 | Canonical designs | Feed, search, fraud, support assistant — stage by stage, with the gotcha on each |
-| 16 | Operate it | Rollout ladder, failure modes and fallbacks, and a checklist that saves |
+| 16 | Operate it | Rollout ladder, failure modes and fallbacks, a checklist that saves, and 25 production interview questions with animated diagrams |
 | 17 | Design patterns | Fifteen cards, each with an animated diagram of its shape, the problem, five lines of code and the trap — plus a drill that hands you a situation and asks for the name |
 | 18 | Redis | The four use cases as cards — cache, sorted set, lock, geo hash — each with its commands and its trap, plus a drill that gives you a situation and asks which one |
 | 19 | Caching layers | A five-rung cache ladder, then a semantic-cache threshold you drag while watching real paraphrases hit and wrong answers get served |

@@ -170,9 +170,107 @@ function standardise(values) {
   return { mean: m, sd, z: values.map(v => (v - m) / sd) };
 }
 
+/* ---------- bias and variance, by resampling ----------
+   The decomposition is not asserted, it is measured. Draw many
+   training sets from the same truth, fit each one, then compare
+   the AVERAGE fit to the truth (bias) and the SPREAD of the fits
+   around their own average (variance).                        */
+function truth(x) { return Math.sin(x * 1.6) * 1.1 + x * 0.18; }
+
+/* deterministic noise so the page and the test agree exactly */
+function rng(seed) {
+  let t = seed >>> 0;
+  return function () {
+    t = (t + 0x6D2B79F5) >>> 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function sample(seed, n, noise, xr) {
+  const rand = rng(seed);
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const x = xr[0] + (xr[1] - xr[0]) * (i + 0.5) / n;
+    // Box-Muller from the same deterministic stream
+    const u = Math.max(1e-9, rand()), v = rand();
+    const g = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    pts.push([x, truth(x) + g * noise]);
+  }
+  return pts;
+}
+
+function biasVariance(deg, opts) {
+  const o = Object.assign({ sets: 12, n: 14, noise: 0.28, xr: [0, 4], grid: 40 }, opts || {});
+  const fits = [];
+  for (let s = 0; s < o.sets; s++) fits.push(polyFit(sample(1000 + s * 97, o.n, o.noise, o.xr), deg, o.xr));
+
+  const xs = [];
+  for (let i = 0; i < o.grid; i++) xs.push(o.xr[0] + (o.xr[1] - o.xr[0]) * i / (o.grid - 1));
+
+  let bias2 = 0, variance = 0;
+  const mean = [];
+  xs.forEach(x => {
+    const ys = fits.map(f => f(x));
+    const m = ys.reduce((a, b) => a + b, 0) / ys.length;
+    mean.push(m);
+    bias2 += (m - truth(x)) ** 2;
+    variance += ys.reduce((a, y) => a + (y - m) ** 2, 0) / ys.length;
+  });
+  bias2 /= xs.length;
+  variance /= xs.length;
+  const noise = o.noise ** 2;
+  return { deg, bias2, variance, noise, total: bias2 + variance + noise, fits, mean, xs, opts: o };
+}
+
+/* ---------- learning curves ----------
+   Training error rises with data (harder to memorise more points);
+   validation error falls towards the floor the model can reach.
+   The GAP is variance; the FLOOR is bias plus irreducible noise. */
+function learningCurve(n, cap, noise) {
+  const floor = cap + noise;                       // where validation converges
+  const train = noise + cap * (1 - Math.exp(-n / 45)) * 0.92;
+  const val = floor + (1.35 + cap * 0.5) * Math.exp(-n / 38);
+  return { n, train, val, gap: val - train, floor };
+}
+
+/* ---------- regularisation paths ----------
+   L2 shrinks every coefficient towards zero and never reaches it.
+   L1 is soft thresholding: below lambda the coefficient IS zero,
+   which is why L1 selects features and L2 only shrinks them.    */
+function regPath(coefs, lam, kind) {
+  return coefs.map(c => {
+    if (kind === 'l1') {
+      const m = Math.abs(c) - lam;
+      return m <= 0 ? 0 : Math.sign(c) * m;
+    }
+    return c / (1 + lam);
+  });
+}
+
+/* ---------- imbalance ----------
+   Accuracy on a rare positive class is dominated by the negatives,
+   which is why "predict nothing" scores well and is worthless.   */
+function imbalance(rate, recall, fpr, n) {
+  const pos = Math.round(n * rate), neg = n - pos;
+  const tp = Math.round(pos * recall), fn = pos - tp;
+  const fp = Math.round(neg * fpr), tn = neg - fp;
+  const precision = tp + fp === 0 ? 0 : tp / (tp + fp);
+  const rec = pos === 0 ? 0 : tp / pos;
+  return {
+    tp, fn, fp, tn, pos, neg,
+    accuracy: (tp + tn) / n,
+    precision, recall: rec,
+    f1: precision + rec === 0 ? 0 : 2 * precision * rec / (precision + rec),
+    majorityAccuracy: neg / n            // the "always say no" baseline
+  };
+}
+
 const MK = { ols, lineMSE, gdStep, polyFit, mse, sigmoid, logregStep, logregAccuracy,
              confusion, rates, rocPoints, auc, gini, splitGain, bestSplit,
-             kmSeed, kmAssign, kmMove, inertia, standardise };
+             kmSeed, kmAssign, kmMove, inertia, standardise,
+             truth, rng, sample, biasVariance, learningCurve, regPath, imbalance };
 
 root.MK = MK;
 if (typeof module !== 'undefined' && module.exports) module.exports = MK;

@@ -695,4 +695,51 @@ C.annFamilies.forEach(f => {
   assert(t.verdict && t.verdict.length > 40, 'every comparison table needs a verdict that says which to pick');
 });
 
+/* ---- tools & frameworks strips ---- */
+/* Every strip mounted in the page must have data, every strip with data must be
+   mounted, and every tool must carry both advantages and drawbacks — a one-sided
+   tool card is marketing, not a study note. */
+{
+  const tsHtml = fs.readFileSync('index.html', 'utf8');
+  vm.runInContext(fs.readFileSync('js/tools.js', 'utf8'), ctx);
+  const TS = ctx.window.C.toolstrips || {};
+  const mounted = [...tsHtml.matchAll(/data-toolstrip="([a-z0-9-]+)"/g)].map(m => m[1]);
+  mounted.forEach(k => assert(TS[k], `index.html mounts a tools strip "${k}" with no data in js/tools.js`));
+  Object.keys(TS).forEach(k => {
+    assert(mounted.includes(k), `js/tools.js defines strip "${k}" that the page never renders`);
+    const s = TS[k];
+    assert(s.tools.length >= 3, `tools strip "${k}" has fewer than three tools`);
+    s.tools.forEach(t => {
+      ['n', 'by', 'mark', 'what', 'use'].forEach(f =>
+        assert(t[f] && String(t[f]).trim(), `tools strip "${k}": ${t.n || '?'} is missing ${f}`));
+      assert(t.pro && t.pro.length >= 2, `tools strip "${k}": ${t.n} needs at least two advantages`);
+      assert(t.con && t.con.length >= 2, `tools strip "${k}": ${t.n} needs at least two drawbacks`);
+    });
+  });
+  if (mounted.length) console.log(`  ${mounted.length} tools strips, ` +
+    `${Object.values(TS).reduce((a, s) => a + s.tools.length, 0)} tools with advantages and drawbacks`);
+}
+
+/* ---- the production question deck ---- */
+/* js/prod40.js is shared with genai_flow, which owns the full checks. Here we only
+   care that this page mounts categories that exist and that every card it will
+   actually show is complete — a subset mount is the easy thing to get wrong. */
+{
+  vm.runInContext(fs.readFileSync('js/prod40.js', 'utf8'), ctx);
+  const P = ctx.window.PROD40;
+  assert(P, 'prod40.js did not publish its data');
+  const cats = new Set(P.CATS.map(c => c.id));
+  const mount = fs.readFileSync('index.html', 'utf8').match(/id="prod40"[^>]*data-cats="([^"]+)"/);
+  assert(mount, 'prod40 is loaded but never mounted, or mounted without data-cats');
+  const want = mount[1].split(/[,\s]+/).filter(Boolean);
+  want.forEach(c => assert(cats.has(c), `index.html mounts prod40 with unknown category "${c}"`));
+  const shown = P.Q.filter(q => want.includes(q.cat));
+  assert(shown.length >= 12, `this page would show only ${shown.length} production questions`);
+  shown.forEach(q => {
+    assert(q.expects && q.why && q.why.length > 300 && q.tip && q.viz,
+      `prod40 card ${q.n} is incomplete`);
+  });
+  console.log(`  ${shown.length} of ${P.Q.length} production questions mounted here`);
+}
+
 console.log('ok — content data and widget arithmetic are consistent');

@@ -382,5 +382,75 @@ assert.strictEqual(new Set(chapterIds).size, chapterIds.length, 'two chapters sh
 for (const m of demos.matchAll(/e\.detail === '([a-z-]+)'/g))
   assert(chapterIds.includes(m[1]), `demos.js redraws on chapter "${m[1]}", which does not exist`);
 
+/* ---- tools & frameworks strips ---- */
+/* Every strip mounted in the page must have data, every strip with data must be
+   mounted, and every tool must carry both advantages and drawbacks — a one-sided
+   tool card is marketing, not a study note. */
+{
+  const tsHtml = fs.readFileSync('index.html', 'utf8');
+  vm.runInContext(fs.readFileSync('js/tools.js', 'utf8'), ctx);
+  const TS = ctx.window.C.toolstrips || {};
+  const mounted = [...tsHtml.matchAll(/data-toolstrip="([a-z0-9-]+)"/g)].map(m => m[1]);
+  mounted.forEach(k => assert(TS[k], `index.html mounts a tools strip "${k}" with no data in js/tools.js`));
+  Object.keys(TS).forEach(k => {
+    assert(mounted.includes(k), `js/tools.js defines strip "${k}" that the page never renders`);
+    const s = TS[k];
+    assert(s.tools.length >= 3, `tools strip "${k}" has fewer than three tools`);
+    s.tools.forEach(t => {
+      ['n', 'by', 'mark', 'what', 'use'].forEach(f =>
+        assert(t[f] && String(t[f]).trim(), `tools strip "${k}": ${t.n || '?'} is missing ${f}`));
+      assert(t.pro && t.pro.length >= 2, `tools strip "${k}": ${t.n} needs at least two advantages`);
+      assert(t.con && t.con.length >= 2, `tools strip "${k}": ${t.n} needs at least two drawbacks`);
+    });
+  });
+  if (mounted.length) console.log(`  ${mounted.length} tools strips, ` +
+    `${Object.values(TS).reduce((a, s) => a + s.tools.length, 0)} tools with advantages and drawbacks`);
+}
+
+/* ---- optimisers and normalisation ---- */
+/* Both widgets claim something specific on screen. Both claims are checked
+   here with the same mathkit functions the page calls. */
+{
+  const page = fs.readFileSync('index.html', 'utf8');
+  ['opt', 'normviz'].forEach(id =>
+    assert(page.includes('id="' + id + '"'), 'index.html is missing #' + id));
+  assert(page.includes('js/dlviz.js') && page.includes('css/dlviz.css'), 'dlviz assets are not linked');
+
+  const A = 40, START = [-2.4, 2.0];
+  // the stability limit the chapter states out loud: lr < 2 / curvature
+  const safe = MK.optPath('sgd', START, 0.045, 60, A);
+  const unsafe = MK.optPath('sgd', START, 0.055, 60, A);
+  assert(safe.loss < 0.05, 'SGD below the stability limit must converge');
+  assert(!(unsafe.loss < 1e3), 'SGD above 2/curvature must diverge — that is the whole point of the slider');
+
+  // SGD zig-zags: the steep coordinate changes sign repeatedly
+  let flips = 0;
+  for (let i = 2; i < safe.path.length; i++)
+    if (Math.sign(safe.path[i][0]) !== Math.sign(safe.path[i - 1][0])) flips++;
+  assert(flips >= 5, `SGD should oscillate across the valley; only ${flips} sign changes`);
+
+  // Adam does not oscillate anything like as much at the same rate
+  const adam = MK.optPath('adam', START, 0.045, 60, A);
+  let aflips = 0;
+  for (let i = 2; i < adam.path.length; i++)
+    if (Math.sign(adam.path[i][0]) !== Math.sign(adam.path[i - 1][0])) aflips++;
+  assert(aflips < flips, 'Adam should oscillate less than plain SGD on an ill-conditioned surface');
+
+  // normalisation: the gain stops compounding, exactly
+  const plainLow = MK.activationScale(10, 0.6, false, 7);
+  const plainHigh = MK.activationScale(10, 1.6, false, 7);
+  const normed = MK.activationScale(10, 0.6, true, 7);
+  const normedHigh = MK.activationScale(10, 1.6, true, 7);
+  assert(plainLow[9].sd < plainLow[0].sd / 20, 'a gain below 1 must make the signal vanish over depth');
+  assert(plainHigh[9].sd > plainHigh[0].sd * 20, 'a gain above 1 must make the signal explode over depth');
+  assert(Math.abs(normed[9].sd - 1) < 1e-6 && Math.abs(normedHigh[9].sd - 1) < 1e-6,
+    'with normalisation the spread must be 1 at every depth, whatever the gain');
+  assert(Math.abs(normed[9].sd - normedHigh[9].sd) < 1e-9,
+    'with normalisation the gain must stop mattering entirely — that is what the widget claims');
+
+  console.log(`  SGD stable at lr .045 and divergent at .055, zig-zags ${flips}× vs Adam's ${aflips}; ` +
+              'normalisation holds spread at 1.000 for every gain');
+}
+
 console.log(`ok — ${chapters.length} chapters, gradients verified against numerical differentiation, ` +
   `sigmoid vanishes ${Math.round(shrink('sigmoid')).toLocaleString()}× over 8 layers vs ReLU's ${shrink('relu').toFixed(1)}×`);

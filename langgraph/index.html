@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/notes.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕸️</text></svg>">
 </head>
 <body>
@@ -499,6 +500,7 @@ builder.add_conditional_edges("retrieve", fan_out)</pre>
       <div class="glossary" id="persist-notes"></div>
     </div>
   </div>
+  <div data-toolstrip="persist"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -537,6 +539,7 @@ builder.add_conditional_edges("retrieve", fan_out)</pre>
     <div class="callout-ico">🔁</div>
     <div><b>The node re-runs from the top.</b> On resume, everything before <span class="mono">interrupt()</span> in that node executes a second time. If you sent an email above the interrupt line, you have now sent two. Keep side effects strictly after the interrupt, or in a node of their own.</div>
   </div>
+  <div data-toolstrip="hitl"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -690,6 +693,7 @@ builder.add_conditional_edges("retrieve", fan_out)</pre>
       <div class="glossary" id="mem-notes"></div>
     </div>
   </div>
+  <div data-toolstrip="memory"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -741,6 +745,7 @@ langgraph dev        # local server + Studio UI</pre>
     <div class="callout-ico">📌</div>
     <div><b>A note on versions.</b> LangGraph's core ideas — state, reducers, super-steps, checkpoints, interrupts — have been stable for a long time. The surface around them still moves: names get aliased, keyword arguments get added, prebuilts get better. When something here does not match your installed version, trust the docs for the exact call and this course for what the call is <i>for</i>.</div>
   </div>
+  <div data-toolstrip="ship"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -776,7 +781,9 @@ langgraph dev        # local server + Studio UI</pre>
 <div class="toast" id="toast"></div>
 
 <script src="js/content.js"></script>
+<script src="js/tools.js"></script>
 <script src="js/demos.js"></script>
 <script src="js/app.js"></script>
+<script src="js/toolstrip.js"></script>
 </body>
 </html>

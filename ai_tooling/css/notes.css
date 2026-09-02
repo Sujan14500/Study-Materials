@@ -1,0 +1,116 @@
+/* ============================================================
+   notes.css — layout primitives borrowed from good handwritten
+   study notes, adapted to this repo's dark theme.
+
+   The five that earn their place:
+     .keypoint   the one sentence to remember
+     .goldrule   the rule of thumb, in a dashed box
+     .pipeline   numbered stages with an arrow between them
+     .procon     a pros/cons table that colours the two columns
+     .toolstrip  named tools with a mark, advantages and drawbacks
+     .domains    real-world application row
+   Every one of these is class-only — drop it straight into HTML.
+   ============================================================ */
+
+/* ---------- key point ---------- */
+.keypoint,.goldrule{display:flex;gap:14px;align-items:flex-start;border-radius:14px;
+  padding:16px 18px;margin:0 0 18px;font-size:14px;line-height:1.65;color:var(--txt-2)}
+.keypoint{background:linear-gradient(100deg,rgba(124,92,255,.14),rgba(124,92,255,.03));
+  border:1px solid rgba(124,92,255,.34)}
+.goldrule{background:rgba(0,0,0,.24);border:1.5px dashed rgba(251,191,36,.42)}
+.keypoint .kp-ico,.goldrule .kp-ico{font-size:20px;line-height:1.2;flex:none}
+.keypoint h4,.goldrule h4{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;
+  margin-bottom:5px}
+.keypoint h4{color:var(--violet)}
+.goldrule h4{color:var(--amber)}
+.keypoint b,.goldrule b{color:var(--txt)}
+.keypoint p+p,.goldrule p+p{margin-top:6px}
+
+/* ---------- numbered pipeline ---------- */
+.pipeline{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin-bottom:20px}
+.pl-step{flex:1 1 132px;min-width:132px;background:var(--panel);border:1px solid var(--line);
+  border-radius:13px;padding:13px 14px;position:relative;
+  transition:transform .2s var(--ease),border-color .2s}
+.pl-step:hover{transform:translateY(-3px);border-color:var(--violet)}
+.pl-step+.pl-step{margin-left:22px}
+.pl-step+.pl-step:before{content:"\2192";position:absolute;left:-19px;top:50%;
+  transform:translateY(-50%);color:var(--txt-3);font-size:16px}
+.pl-n{font-size:10px;letter-spacing:1px;color:var(--violet);font-weight:700;margin-bottom:4px}
+.pl-ico{font-size:19px;display:block;margin-bottom:5px}
+.pl-step h5{font-size:13px;margin-bottom:3px;color:var(--txt)}
+.pl-step p{font-size:11.8px;color:var(--txt-3);line-height:1.55}
+@media(max-width:760px){
+  .pl-step+.pl-step{margin-left:0;margin-top:20px}
+  .pl-step+.pl-step:before{content:"\2193";left:50%;top:-19px;transform:translateX(-50%)}
+}
+
+/* ---------- pros / cons table ---------- */
+.procon{width:100%;border-collapse:separate;border-spacing:0;font-size:12.8px;
+  border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:18px}
+.procon th{background:rgba(255,255,255,.05);text-align:left;padding:10px 13px;
+  font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--txt-3);
+  border-bottom:1px solid var(--line)}
+.procon td{padding:11px 13px;vertical-align:top;color:var(--txt-2);line-height:1.6;
+  border-bottom:1px solid var(--line)}
+.procon tr:last-child td{border-bottom:none}
+.procon tbody tr:hover td{background:rgba(255,255,255,.028)}
+.procon td:first-child,.procon th:first-child{color:var(--txt);font-weight:600}
+.procon .pro{color:#86efac}
+.procon .con{color:#fca5a5}
+.procon th.pro{color:var(--green)}
+.procon th.con{color:var(--red)}
+.procon-wrap{overflow-x:auto;margin-bottom:18px}
+.procon-wrap .procon{margin-bottom:0;min-width:560px}
+
+/* ---------- checklist box ---------- */
+.checkbox-list{background:rgba(0,0,0,.24);border:1px solid var(--line);border-left:3px solid var(--green);
+  border-radius:13px;padding:15px 17px;margin-bottom:18px}
+.checkbox-list h4{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--green);margin-bottom:9px}
+.checkbox-list ul{list-style:none;display:flex;flex-direction:column;gap:7px}
+.checkbox-list li{font-size:13px;color:var(--txt-2);line-height:1.6;padding-left:24px;position:relative}
+.checkbox-list li:before{content:"\2611";position:absolute;left:0;top:-1px;color:var(--green);font-size:14px}
+.checkbox-list.warn{border-left-color:var(--amber)}
+.checkbox-list.warn h4{color:var(--amber)}
+.checkbox-list.warn li:before{content:"\26A0";color:var(--amber);font-size:12px}
+
+/* ---------- tools & frameworks strip ---------- */
+.ts-head{display:flex;align-items:baseline;gap:10px;margin-bottom:4px}
+.ts-head h3{font-size:16px}
+.ts-head span{font-size:11px;color:var(--txt-3)}
+.ts-sub{font-size:13px;color:var(--txt-2);line-height:1.6;margin-bottom:14px}
+.ts-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:11px}
+.ts-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 15px;
+  display:flex;flex-direction:column;gap:9px;
+  transition:transform .18s var(--ease),border-color .18s}
+.ts-card:hover{transform:translateY(-3px);border-color:var(--c,var(--violet))}
+.ts-top{display:flex;gap:10px;align-items:center}
+.ts-mark{width:34px;height:34px;flex:none;border-radius:10px;display:grid;place-items:center;
+  font-size:17px;font-weight:700;background:var(--c,rgba(124,92,255,.2));
+  color:#fff;letter-spacing:-.5px}
+.ts-mark.txt{font-size:12.5px;font-family:var(--mono)}
+.ts-name{flex:1;min-width:0}
+.ts-name b{display:block;font-size:14px;line-height:1.25}
+.ts-name span{font-size:10.5px;color:var(--txt-3)}
+.ts-what{font-size:12.6px;color:var(--txt-2);line-height:1.6}
+.ts-pc{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:auto}
+@media(max-width:420px){.ts-pc{grid-template-columns:1fr}}
+.ts-pc ul{list-style:none;display:flex;flex-direction:column;gap:4px}
+.ts-pc li{font-size:11.6px;line-height:1.5;color:var(--txt-2);padding-left:15px;position:relative}
+.ts-pro h6,.ts-con h6{font-size:9.5px;letter-spacing:.9px;text-transform:uppercase;margin-bottom:5px}
+.ts-pro h6{color:var(--green)}
+.ts-con h6{color:var(--red)}
+.ts-pro li:before{content:"\002B";position:absolute;left:2px;color:var(--green);font-weight:800}
+.ts-con li:before{content:"\2212";position:absolute;left:2px;color:var(--red);font-weight:800}
+.ts-verdict{font-size:11.8px;color:var(--txt-3);line-height:1.55;border-top:1px solid var(--line);
+  padding-top:9px}
+.ts-verdict b{color:var(--txt-2)}
+
+/* ---------- real-world domains ---------- */
+.domains{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px}
+.dm{background:rgba(0,0,0,.24);border:1px solid var(--line);border-radius:13px;padding:13px 14px;
+  transition:border-color .18s,transform .18s var(--ease)}
+.dm:hover{border-color:var(--violet);transform:translateY(-2px)}
+.dm-ico{font-size:19px;display:block;margin-bottom:6px}
+.dm b{font-size:12.8px;display:block;margin-bottom:3px}
+.dm p{font-size:11.6px;color:var(--txt-3);line-height:1.55}

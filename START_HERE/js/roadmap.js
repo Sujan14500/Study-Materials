@@ -15,8 +15,8 @@ window.COURSES = {
   dl:         { n: 'DL Fundamentals',          i: '🕸️', href: '../dl_fundamentals/index.html',           ch: 12, hrs: '8-10 h',
     d: 'The neuron, activations, XOR, forward pass, backpropagation, training, regularisation, vanishing gradients, convolution, sequences.',
     why: 'Makes the transformer chapter something you understand rather than something you memorised.' },
-  genai:      { n: 'GenAI Flow',               i: '🧠', href: '../genai_flow/index.html',                ch: 24, hrs: '14-18 h',
-    d: 'Tokens, embeddings, attention, generation, speed, training, prompting, context, RAG, advanced RAG, agents, evaluation, shipping — plus deep dives on one transformer block, decoding controls, chunking, the fine-tuning menu, LLM-as-judge and beyond-RAG.',
+  genai:      { n: 'GenAI Flow',               i: '🧠', href: '../genai_flow/index.html',                ch: 25, hrs: '14-18 h',
+    d: 'Tokens, embeddings, attention, generation, speed, training, prompting, context, RAG, advanced RAG, agents, evaluation, shipping — plus deep dives on one transformer block, decoding controls, chunking, the fine-tuning menu, LLM-as-judge, multimodal generative AI and beyond-RAG.',
     why: 'The core course. If you only do one thing on this page, do this one — most interview questions live inside it.' },
   langchain:  { n: 'LangChain',                i: '🔗', href: '../langchain/index.html',                 ch: 13, hrs: '6-8 h',
     d: 'Models and messages, prompt templates, LCEL, structured output, loaders and splitters, vectors, the RAG chain, memory, tools and agents.',
@@ -33,9 +33,12 @@ window.COURSES = {
   projects:   { n: 'Projects Walkthrough',     i: '🔬', href: '../projects_walkthrough/index.html',      ch: 18, hrs: '6-8 h',
     d: 'Two real systems taken apart: a refund agent with a policy boundary, idempotency, sagas and approvals; and a support platform with tenant isolation, generated SQL, a confidence gate, memory and an eval gate.',
     why: 'Interviewers ask "tell me about something you shipped". This is what a good answer sounds like, and what to build so you have one.' },
-  interview:  { n: 'AI Interview Prep',        i: '🎯', href: '../ai_interview_prep/index.html',         ch: 486, hrs: 'ongoing', unit: 'questions',
-    d: '486 questions with a plain-English and a technical answer each, 203 multiple-choice questions, flashcards with spaced repetition, a timed mock interview and seven study paths.',
+  interview:  { n: 'AI Interview Prep',        i: '🎯', href: '../ai_interview_prep/index.html',         ch: 518, hrs: 'ongoing', unit: 'questions',
+    d: '518 questions with a plain-English and a technical answer each, 221 multiple-choice questions, flashcards with spaced repetition, a timed mock interview and seven study paths.',
     why: 'Where you find out whether you can say it out loud in ninety seconds, which is the thing that actually gets tested.' },
+  tooling:    { n: 'AI Tooling Landscape',     i: '🧰', href: '../ai_tooling/index.html',                ch: 19, hrs: '5-7 h',
+    d: 'Twelve layers of the AI stack and 95 named tools — LLMs, agent frameworks, RAG, embeddings, MCP, guardrails, observability, memory, agent SDKs, automation, vector databases and the FastAPI/Streamlit serving layer — with two lines and five interview points on every one.',
+    why: 'The breadth gap. You can explain attention perfectly and still freeze when someone points at a logo on an architecture slide and asks what it is for.' },
   datanyx:    { n: 'Datanyx Field Guide',      i: '📓', href: '../datanyx2.0/DATANYX_FIELD_GUIDE.html',  ch: 1,  hrs: '2-3 h', unit: 'guide',
     d: 'A field guide and interview Q&A for the Datanyx project, including its architecture and the decisions behind it.',
     why: 'Project-specific. Read it if you will be asked about this system.' }
@@ -67,10 +70,10 @@ window.ROADMAP = [
     tag: 'so you have something to talk about',
     d: 'Read two production systems end to end, then build your own version of one. "Tell me about something you shipped" is the question you cannot revise for the night before.',
     items: ['projects', 'datanyx'] },
-  { n: 'Stage 6 — Interview drilling',
-    tag: 'out loud, on the clock',
-    d: 'Study mode to fill the gaps, flashcards to make it recall rather than recognition, the quiz to catch misconceptions, and the mock interview to find out whether you can actually say it in ninety seconds. Start this in parallel with Stage 1 — do not save it for the end.',
-    items: ['interview'] }
+  { n: 'Stage 6 — Breadth and drilling',
+    tag: 'names first, then out loud on the clock',
+    d: 'Do the AI Tooling Landscape first — it attaches names to everything you just learned, and it is the layer people freeze on. Then study mode to fill the gaps, flashcards to make it recall rather than recognition, the quiz to catch misconceptions, and the mock interview to find out whether you can actually say it in ninety seconds. Start this in parallel with Stage 1 — do not save it for the end.',
+    items: ['tooling', 'interview'] }
 ];
 
 /* Alternative orders for people who do not have twelve weeks. */

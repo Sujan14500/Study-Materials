@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/notes.css">
+<link rel="stylesheet" href="css/prod40.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📐</text></svg>">
 </head>
 <body>
@@ -576,6 +578,7 @@ ASOF JOIN user_features f
       </ul>
     </div>
   </div>
+  <div data-toolstrip="ragscale"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -698,6 +701,7 @@ ASOF JOIN user_features f
     with efSearch if you built HNSW, and always against exact search over a golden set, because "the results
     got worse" is not a number anyone can act on.</div>
   </div>
+  <div data-toolstrip="annindex"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -781,6 +785,7 @@ ASOF JOIN user_features f
       </ul>
     </div>
   </div>
+  <div data-toolstrip="llmserving"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -849,6 +854,12 @@ ASOF JOIN user_features f
     <div class="callout-ico">📉</div>
     <div><b>Plan for the second model, not just the first.</b> Almost everything painful about ML in production — skew, leakage, biased logs, an un-rollbackable deploy, an eval set that does not exist — is only painful because someone shipped v1 without the machinery to safely ship v2. Build the logging, the golden set and the rollback path before the first launch; they are far cheaper then.</div>
   </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🎤 The production interview</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Twenty-five questions an interviewer uses to find out whether you have actually run one of these, covering scale, latency, traffic control, queues, shedding, monitoring, failure handling and rollout. Open a card for what they are really testing, the mechanism, and the answer that lands.</p>
+    <div id="prod40" data-cats="scale,latency,traffic,async,shed,monitor,arch,rely,deploy"></div>
+  </div>
+  <div data-toolstrip="operate"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -1001,6 +1012,7 @@ ASOF JOIN user_features f
       <li><b>Never cache an answer from a degraded path.</b> A cached fallback answer is a permanent outage nobody can see.</li>
     </ul>
   </div>
+  <div data-toolstrip="caching"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -1125,6 +1137,7 @@ ASOF JOIN user_features f
       <li><b>Refresh interval is a real tuning knob.</b> 30 seconds during bulk load is several times faster.</li>
     </ul>
   </div>
+  <div data-toolstrip="lexical"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -1219,7 +1232,10 @@ ASOF JOIN user_features f
 <div class="toast" id="toast"></div>
 
 <script src="js/content.js"></script>
+<script src="js/tools.js"></script>
 <script src="js/demos.js"></script>
 <script src="js/app.js"></script>
+<script src="js/toolstrip.js"></script>
+<script src="js/prod40.js"></script>
 </body>
 </html>

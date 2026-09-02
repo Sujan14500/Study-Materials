@@ -78,7 +78,7 @@ window.PATHS = [
     { n: '5. Retrieval at scale', topics: ['vectors', 'rag'],
       d: 'ANN indexes, sharding, filtering, hybrid search, the memory arithmetic at a billion vectors.',
       course: ['AI System Design — Vector indexes', '../ai_system_design_concepts/index.html'] },
-    { n: '6. Reliability and observability', topics: ['production', 'safety'],
+    { n: '6. Reliability and observability', topics: ['production', 'prodops', 'safety'],
       d: 'Timeouts, rate limits, circuit breakers, fallbacks, tracing, alerts, incidents, tenant isolation.',
       course: ['Agentic AI Flow — Failure playbook', '../agentic_ai_flow/index.html'] },
     { n: '7. System design practice', topics: ['sysdesign'],
@@ -159,7 +159,7 @@ window.PATHS = [
     { n: '6. Capacity and cost', topics: ['production'],
       d: 'Sizing from traffic, peak-to-average, utilisation, provisioned versus on-demand, autoscaling signals, cold starts.',
       course: ['AI System Design — Capacity & scale', '../ai_system_design_concepts/index.html'] },
-    { n: '7. Operations', topics: ['production', 'data'],
+    { n: '7. Operations', topics: ['production', 'prodops', 'data'],
       d: 'Observability, SLOs, incidents, rollouts, drift, and the pipelines that feed it all.',
       course: ['AI System Design — Operate it', '../ai_system_design_concepts/index.html'] }
   ] },

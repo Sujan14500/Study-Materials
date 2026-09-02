@@ -1,0 +1,68 @@
+/* ============================================================
+   dlviz.css — the optimiser race and the normalisation chart.
+   Reuses the .mv-* vocabulary from notes.css where it fits.
+   ============================================================ */
+
+.dv-ctrl{margin-bottom:14px}
+.dv-ctrl label{display:block;font-size:13px;color:var(--txt-2);margin-bottom:6px}
+.dv-ctrl label b{color:var(--txt);font-family:var(--mono);font-size:13.5px}
+.dv-note{font-size:11px;color:var(--txt-3);font-weight:400}
+.dv-check{display:flex !important;align-items:center;gap:8px;cursor:pointer;font-size:13px}
+.dv-check input{width:16px;height:16px;accent-color:var(--violet);cursor:pointer}
+.dv-step{font-size:12px;color:var(--txt-3);align-self:center;margin-left:4px}
+.dv-step b{font-family:var(--mono);color:var(--txt-2)}
+
+.dv-two{display:grid;grid-template-columns:1.25fr 1fr;gap:18px;align-items:start;margin-bottom:14px}
+@media(max-width:840px){.dv-two{grid-template-columns:1fr}}
+.dv-two svg,#nv-svg{width:100%;height:auto;display:block}
+#nv-svg{margin-bottom:14px}
+.dv-side{display:flex;flex-direction:column;gap:9px}
+
+.dv-card{background:rgba(0,0,0,.26);border:1px solid var(--line);border-left:3px solid var(--c);
+  border-radius:12px;padding:11px 13px}
+.dv-h{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+.dv-h b{font-size:13.5px;flex:1}
+.dv-badge{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:99px;
+  border:1px solid var(--line-2);color:var(--txt-3)}
+.dv-badge.bad{color:var(--red);border-color:rgba(251,113,133,.4);background:rgba(251,113,133,.1)}
+.dv-card p{font-size:11.8px;color:var(--txt-3);line-height:1.55}
+
+/* ---------- svg ---------- */
+.dv-contour{fill:none;stroke:rgba(255,255,255,.11);stroke-width:1}
+.dv-min{fill:none;stroke:#34d399;stroke-width:1.6}
+.dv-start{fill:none;stroke:var(--txt-3);stroke-width:1.4;stroke-dasharray:2 2}
+.dv-lbl2{fill:var(--txt-3);font-size:10px;font-family:var(--sans)}
+.dv-grid{stroke:rgba(255,255,255,.055);stroke-width:1}
+.dv-healthy{stroke:#34d399;stroke-width:1.2;stroke-dasharray:5 5;opacity:.55}
+.dv-tick{fill:var(--txt-3);font-size:9px;font-family:var(--mono);text-anchor:end}
+
+/* ---------- shared vocabulary, same as ml_fundamentals ---------- */
+.mv-verdict{font-size:12.8px;line-height:1.65;color:var(--txt-2);background:rgba(0,0,0,.28);
+  border:1px solid var(--line);border-left:3px solid var(--line-2);border-radius:12px;
+  padding:12px 14px;animation:chapterIn .3s var(--ease)}
+.mv-verdict b{color:var(--txt)}
+.mv-verdict.good{border-left-color:var(--green)}
+.mv-verdict.warn{border-left-color:var(--amber)}
+.mv-verdict.bad{border-left-color:var(--red)}
+
+.mv-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
+.mv-st{background:rgba(0,0,0,.26);border:1px solid var(--line);border-radius:11px;padding:9px 11px}
+.mv-st span{display:block;font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:var(--txt-3)}
+.mv-st b{font-family:var(--mono);font-size:16px;color:var(--txt)}
+.mv-st.hot b{color:var(--violet)}
+
+/* ---------- svg vocabulary ---------- */
+.mv-plot{fill:rgba(255,255,255,.022);stroke:var(--line);stroke-width:1}
+.mv-axis{stroke:var(--line-2);stroke-width:1}
+.mv-thin{fill:none;stroke:#94a3b8}
+.mv-true{fill:none;stroke:#34d399;stroke-dasharray:7 5}
+.mv-mean{fill:none;stroke:#7c5cff}
+.mv-train{fill:none;stroke:#7c5cff}
+.mv-valline{fill:none;stroke:#fb7185}
+.mv-floor{stroke:#94a3b8;stroke-width:1.4;stroke-dasharray:4 5;opacity:.6}
+.mv-gap{stroke:#fbbf24;stroke-width:2.5;stroke-dasharray:3 3;opacity:.9}
+.mv-ax{fill:var(--txt-3);font-size:10.5px;font-family:var(--sans)}
+.mv-lbl{fill:var(--txt-3);font-size:10px;font-family:var(--sans);text-anchor:middle}
+.mv-val{fill:var(--txt);font-size:11px;font-family:var(--mono);text-anchor:middle}
+.mv-tot{fill:var(--txt-2);font-size:12px;font-family:var(--mono)}
+.mv-cell{fill:var(--txt);font-size:19px;font-weight:700;font-family:var(--mono);text-anchor:middle}

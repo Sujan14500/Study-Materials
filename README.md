@@ -16,11 +16,12 @@ time you have, and a button that opens whatever you should do next.
 | Folder | What it is | Size |
 |--------|-----------|------|
 | [`START_HERE`](START_HERE) | The roadmap and course launcher | 1 page |
-| [`ai_interview_prep`](ai_interview_prep) | 486 interview questions with plain-English *and* technical answers, 203 multiple-choice questions, flashcards, timed mock interview | 486 questions |
-| [`genai_flow`](genai_flow) | How LLMs actually work — tokens through to shipping, plus deep dives on one transformer block, decoding controls, chunking, the fine-tuning menu, LLM-as-judge and beyond-RAG | 24 chapters |
+| [`ai_interview_prep`](ai_interview_prep) | 558 interview questions with plain-English *and* technical answers, 236 multiple-choice questions, flashcards, timed mock interview | 558 questions |
+| [`genai_flow`](genai_flow) | How LLMs actually work — tokens through to shipping, plus deep dives on one transformer block, decoding controls, chunking, the fine-tuning menu, LLM-as-judge, multimodal and beyond-RAG | 25 chapters |
 | [`ai_system_design_concepts`](ai_system_design_concepts) | AI/ML system design — metrics, latency budgets, capacity, vector indexes, serving, plus caching layers, parallelism, Elasticsearch and big-files-small-RAM | 23 chapters |
 | [`agentic_ai_flow`](agentic_ai_flow) | Agent architecture — the loop, tools, planning, memory, multi-agent, MCP, plus harness engineering and an eight-failure playbook | 17 chapters |
 | [`projects_walkthrough`](projects_walkthrough) | Two real systems taken apart: a refund agent and a support platform | 18 chapters |
+| [`ai_tooling`](ai_tooling) | The tool ecosystem by layer: 95 named tools across LLMs, agent frameworks, RAG, embeddings, MCP, guardrails, observability, memory, agent SDKs, automation, vector databases and FastAPI/Streamlit serving, with two lines and five interview points on every one | 19 chapters |
 | [`langgraph`](langgraph) | State, graphs, checkpointing, interrupts, time travel | 15 chapters |
 | [`dsa_basics`](dsa_basics) | Big-O through dynamic programming, every algorithm animated | 15 chapters |
 | [`langchain`](langchain) | Models, LCEL, splitters, retrievers, the RAG chain, agents | 13 chapters |
@@ -35,6 +36,19 @@ time you have, and a button that opens whatever you should do next.
 Every course is the same four files: `index.html` for the markup, `css/styles.css` for
 one theme with no framework, `js/content.js` for all the course data, and `js/demos.js`
 for the interactive widgets. Editing a course means editing `content.js`.
+
+Two more files are shared across every course:
+
+- **`css/notes.css`** — layout primitives borrowed from good handwritten study notes:
+  `.keypoint`, `.goldrule`, `.pipeline`, `.procon` (a pros/cons table that colours the two
+  columns), `.checkbox-list` and `.domains`. Class-only, so they drop straight into HTML.
+- **`js/toolstrip.js` + `js/tools.js`** — after a chapter explains a topic, a **Tools &
+  frameworks** strip names what people actually use for it: a coloured mark, one line on
+  what it is, its advantages, its drawbacks, and when to reach for it. Add a tool by
+  editing `js/tools.js`; mount a strip with `<div data-toolstrip="KEY"></div>`.
+
+The marks are coloured monograms and emoji rather than logo images, deliberately: these
+courses have no build step, no network dependency and no third-party trademark to license.
 
 Every course also has a `test.js` that runs on plain Node with no dependencies:
 
@@ -52,7 +66,7 @@ false, the test says so.
 Run them all:
 
 ```bash
-for d in genai_flow ai_system_design_concepts agentic_ai_flow langchain langgraph \
+for d in genai_flow ai_system_design_concepts agentic_ai_flow ai_tooling langchain langgraph \
          ml_fundamentals dl_fundamentals python_basics dsa_basics \
          projects_walkthrough ai_interview_prep START_HERE; do
   printf '%-28s ' "$d"; (cd "$d" && node test.js | tail -1)
@@ -69,3 +83,5 @@ done
   slider that lets you break it.
 - **Honest about uncertainty.** Where a term is contested or a number is illustrative,
   the page says so rather than sounding confident.
+- **Every tool gets both columns.** A tool card without drawbacks is marketing. `test.js`
+  refuses a strip where any tool has fewer than two advantages *and* two drawbacks.

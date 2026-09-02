@@ -218,9 +218,82 @@ function dropoutMask(n, rate, seed) {
   return Array.from({ length: n }, () => (rand() < rate ? 0 : 1));
 }
 
+/* ---------- optimisers on a ravine ----------
+   A stretched quadratic: steep across the valley, almost flat along
+   it. This is the shape that makes plain SGD zig-zag, and it is why
+   momentum and Adam exist. The surface is deliberately simple so the
+   optimiser behaviour, not the landscape, is what you are watching. */
+function ravine(x, y, a) { const A = a || 12; return 0.5 * (A * x * x + y * y); }
+function ravineGrad(x, y, a) { const A = a || 12; return [A * x, y]; }
+
+/* One step of each optimiser. State is passed in and returned, so the
+   page and the test step them identically. */
+function optStep(kind, p, st, lr, a) {
+  const g = ravineGrad(p[0], p[1], a);
+  const s = st || { v: [0, 0], m: [0, 0], vv: [0, 0], t: 0 };
+  let step;
+  if (kind === 'sgd') {
+    step = [lr * g[0], lr * g[1]];
+  } else if (kind === 'momentum') {
+    const b = 0.9;
+    s.v = [b * s.v[0] + g[0], b * s.v[1] + g[1]];
+    step = [lr * s.v[0], lr * s.v[1]];
+  } else {                                        // adam
+    const b1 = 0.9, b2 = 0.999, eps = 1e-8;
+    s.t += 1;
+    s.m = [b1 * s.m[0] + (1 - b1) * g[0], b1 * s.m[1] + (1 - b1) * g[1]];
+    s.vv = [b2 * s.vv[0] + (1 - b2) * g[0] * g[0], b2 * s.vv[1] + (1 - b2) * g[1] * g[1]];
+    const mh = [s.m[0] / (1 - Math.pow(b1, s.t)), s.m[1] / (1 - Math.pow(b1, s.t))];
+    const vh = [s.vv[0] / (1 - Math.pow(b2, s.t)), s.vv[1] / (1 - Math.pow(b2, s.t))];
+    step = [lr * mh[0] / (Math.sqrt(vh[0]) + eps), lr * mh[1] / (Math.sqrt(vh[1]) + eps)];
+  }
+  return { p: [p[0] - step[0], p[1] - step[1]], st: s };
+}
+
+/* Run one optimiser and return the whole path, so the widget can draw
+   it and the test can measure where it got to. */
+function optPath(kind, start, lr, steps, a) {
+  let p = start.slice(), st = null;
+  const path = [p.slice()];
+  for (let i = 0; i < (steps || 60); i++) {
+    const r = optStep(kind, p, st, lr, a);
+    p = r.p; st = r.st;
+    if (!isFinite(p[0]) || !isFinite(p[1])) break;
+    path.push(p.slice());
+  }
+  return { kind, path, final: p, loss: ravine(p[0], p[1], a) };
+}
+
+/* ---------- what normalisation actually does ----------
+   Push a batch of activations through `depth` layers. Without
+   normalisation the scale compounds: gain < 1 collapses towards zero,
+   gain > 1 explodes. Normalising after each layer resets the scale to
+   1 every time, which is the entire mechanism.                      */
+function activationScale(depth, gain, normalise, seed) {
+  const rand = rng(seed || 7);
+  let batch = [];
+  for (let i = 0; i < 256; i++) batch.push(gaussian(rand));
+  const out = [];
+  for (let l = 0; l < depth; l++) {
+    batch = batch.map(v => v * gain * (1 + 0.04 * gaussian(rand)));
+    batch = batch.map(v => (v > 0 ? v : 0));          // ReLU
+    if (normalise) {
+      const m = batch.reduce((a, b) => a + b, 0) / batch.length;
+      const sd = Math.sqrt(batch.reduce((a, b) => a + (b - m) ** 2, 0) / batch.length) || 1e-8;
+      batch = batch.map(v => (v - m) / sd);
+    }
+    const m = batch.reduce((a, b) => a + b, 0) / batch.length;
+    const sd = Math.sqrt(batch.reduce((a, b) => a + (b - m) ** 2, 0) / batch.length);
+    const dead = batch.filter(v => Math.abs(v) < 1e-6).length / batch.length;
+    out.push({ layer: l + 1, mean: m, sd, dead });
+  }
+  return out;
+}
+
 const MK = { rng, gaussian, ACT, gelu, makeNet, forward, predict, bce, netLoss,
              backprop, trainStep, accuracy, gradientFlow, convolve, maxPool, relu2d,
-             denseParams, convParams, dropoutMask };
+             denseParams, convParams, dropoutMask,
+             ravine, ravineGrad, optStep, optPath, activationScale };
 
 root.MK = MK;
 if (typeof module !== 'undefined' && module.exports) module.exports = MK;

@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/notes.css">
+<link rel="stylesheet" href="css/dlviz.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
 </head>
 <body>
@@ -396,6 +398,7 @@ z₁ depends on w₁
       <li>The repeated multiplication over depth is the source of both vanishing and exploding gradients.</li>
     </ul>
   </div>
+  <div data-toolstrip="backprop"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -467,6 +470,26 @@ z₁ depends on w₁
       <li>A healthy loss curve drops steeply then flattens. Bouncing means the steps are too big.</li>
       <li>Plot training and validation loss together, from the first run.</li>
     </ul>
+  </div>
+  <div data-toolstrip="training"></div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127937; The optimiser race on a stretched valley</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The surface is a bowl squashed forty times harder in one direction than the other &mdash;
+      the shape almost every real loss landscape has locally. Run all three optimisers from the same start at the
+      same learning rate and watch the <em>shape</em> of each path, not who arrives first. Then push the learning
+      rate past 0.050 and watch plain SGD come apart.</p>
+    <div id="opt"></div>
+  </div>
+
+  <div class="keypoint">
+    <div class="kp-ico">&#11088;</div>
+    <div><h4>Key point</h4>
+      <p><b>On a quadratic, plain gradient descent is stable only while the learning rate stays below 2 divided by
+      the largest curvature.</b> The steepest direction therefore caps the learning rate for every direction, so the
+      flat direction &mdash; the one you actually need to travel &mdash; crawls. Momentum cancels the oscillation;
+      Adam rescales each coordinate so curvature stops setting the step size. That is the entire argument for
+      adaptive optimisers in one sentence.</p></div>
   </div>
 </section>
 
@@ -564,6 +587,22 @@ z₁ depends on w₁
       <li>ReLU, good initialisation, normalisation and residual connections all exist to keep it near 1.</li>
       <li>Never initialise to zero — every unit in a layer would stay identical forever.</li>
     </ul>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128200; What normalisation actually does</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Push a batch of activations through ten layers. Each layer multiplies the signal by a gain,
+      so the effect <b>compounds</b>: slightly below one and the signal disappears, slightly above and it explodes.
+      Then tick the box and watch the same slider stop mattering at all.</p>
+    <div id="normviz"></div>
+  </div>
+
+  <div class="goldrule">
+    <div class="kp-ico">&#128161;</div>
+    <div><h4>Golden rule</h4>
+      <p>Vanishing and exploding gradients are the same phenomenon with the gain on either side of one, and both
+      are multiplicative in depth. Careful initialisation puts you on the knife edge; normalisation keeps you there
+      while the weights move. Gradient clipping only treats the explosion, and only after it has started.</p></div>
   </div>
 </section>
 
@@ -731,6 +770,7 @@ output  = weights @ V</pre>
       <li>Pretrained and fine-tuned beats from-scratch for nearly every real problem.</li>
     </ul>
   </div>
+  <div data-toolstrip="practice"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -767,7 +807,10 @@ output  = weights @ V</pre>
 
 <script src="js/mathkit.js"></script>
 <script src="js/content.js"></script>
+<script src="js/tools.js"></script>
 <script src="js/demos.js"></script>
 <script src="js/app.js"></script>
+<script src="js/toolstrip.js"></script>
+<script src="js/dlviz.js"></script>
 </body>
 </html>

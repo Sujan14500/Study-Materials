@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/notes.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦜</text></svg>">
 </head>
 <body>
@@ -184,6 +185,7 @@ model.invoke([
       <div class="glossary" id="model-knobs"></div>
     </div>
   </div>
+  <div data-toolstrip="models"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -368,6 +370,7 @@ chunks = splitter.split_documents(docs)   # Documents in, Documents out
     <div class="panel-head"><h3>📌 Four things worth internalising</h3></div>
     <div class="glossary" id="split-lessons"></div>
   </div>
+  <div data-toolstrip="splitters"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -419,6 +422,7 @@ retriever.invoke("Can I deploy on a Friday?")
       </div>
     </div>
   </div>
+  <div data-toolstrip="vectors"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -482,6 +486,7 @@ out["answer"]                       # the text
       <p class="panel-sub" style="margin-top:12px"><span class="mono">.assign()</span> adds a key while keeping everything already in the dict — which is how the documents survive alongside the answer.</p>
     </div>
   </div>
+  <div data-toolstrip="rag"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -603,6 +608,7 @@ tools = [get_p95, list_deploys, open_ticket]</pre>
       </div>
     </div>
   </div>
+  <div data-toolstrip="agents"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -711,6 +717,7 @@ export LANGSMITH_PROJECT=northwind-support</pre>
     <div class="panel-head"><h3>✅ Pre-launch checklist</h3><span class="panel-tag">saves</span></div>
     <div class="checklist" id="checklist"></div>
   </div>
+  <div data-toolstrip="ship"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -746,7 +753,9 @@ export LANGSMITH_PROJECT=northwind-support</pre>
 <div class="toast" id="toast"></div>
 
 <script src="js/content.js"></script>
+<script src="js/tools.js"></script>
 <script src="js/demos.js"></script>
 <script src="js/app.js"></script>
+<script src="js/toolstrip.js"></script>
 </body>
 </html>

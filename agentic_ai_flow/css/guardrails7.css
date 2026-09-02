@@ -1,0 +1,76 @@
+/* ============================================================
+   guardrails7.css — the seven-layer guardrail map.
+   Six layers surround the agent, output sits underneath it,
+   because output is the last thing a request passes through.
+   ============================================================ */
+
+.g7-wrap{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+@media(max-width:980px){.g7-wrap{grid-template-columns:1fr}}
+
+.g7-board{position:relative;display:grid;
+  grid-template-columns:1fr 132px 1fr;
+  grid-template-rows:repeat(3,auto) auto;
+  gap:12px 18px;align-items:center;padding:6px 0}
+
+.g7-node{font-family:var(--sans);text-align:left;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--c);
+  border-radius:13px;padding:12px 14px;color:var(--txt-2);
+  display:flex;align-items:center;gap:10px;
+  transition:transform .22s var(--ease),border-color .22s,background .22s}
+.g7-node:hover{transform:translateY(-2px);background:var(--panel-2);color:var(--txt)}
+.g7-node.on{background:color-mix(in srgb, var(--c) 16%, transparent);
+  border-color:var(--c);color:#fff;box-shadow:0 0 0 1px var(--c) inset}
+.g7-ico{font-size:19px;flex:none}
+.g7-node b{font-size:14px;flex:1}
+.g7-cnt{font-family:var(--mono);font-size:10px;color:var(--txt-3);white-space:nowrap}
+.g7-node.on .g7-cnt{color:rgba(255,255,255,.7)}
+
+/* place them around the core */
+.g7-node[data-side="l"]{grid-column:1}
+.g7-node[data-side="r"]{grid-column:3}
+.g7-node[data-row="0"]{grid-row:1}
+.g7-node[data-row="1"]{grid-row:2}
+.g7-node[data-row="2"]{grid-row:3}
+.g7-node[data-side="b"]{grid-column:2;grid-row:4;justify-self:stretch;
+  flex-direction:column;text-align:center;gap:3px}
+.g7-node[data-side="b"] b{flex:none}
+
+.g7-core{grid-column:2;grid-row:1 / span 3;justify-self:center;align-self:center;
+  width:118px;height:118px;border-radius:50%;display:grid;place-items:center;
+  background:radial-gradient(circle,rgba(124,92,255,.22),rgba(124,92,255,.04));
+  border:1.5px dashed rgba(124,92,255,.45);position:relative}
+.g7-core span{font-size:34px;line-height:1}
+.g7-core b{font-size:10.5px;letter-spacing:.7px;color:var(--txt-2);text-transform:uppercase}
+.g7-core:before{content:"";position:absolute;inset:-14px;border-radius:50%;
+  border:1px solid rgba(124,92,255,.16);animation:g7pulse 3.2s ease-out infinite}
+@keyframes g7pulse{
+  0%{transform:scale(.86);opacity:.9}
+  100%{transform:scale(1.22);opacity:0}
+}
+@media(max-width:980px){
+  .g7-board{grid-template-columns:1fr}
+  .g7-node,.g7-node[data-side="b"]{grid-column:1 !important;grid-row:auto !important;
+    flex-direction:row;text-align:left}
+  .g7-core{grid-column:1;grid-row:auto;margin:6px auto}
+}
+
+/* ---------- detail panel ---------- */
+.g7-detail{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--c);
+  border-radius:15px;padding:18px}
+.g7-detail.in{animation:chapterIn .32s var(--ease)}
+.g7-d-h{display:flex;gap:11px;align-items:flex-start;padding-bottom:12px;margin-bottom:12px;
+  border-bottom:1px solid var(--line)}
+.g7-d-ico{font-size:24px;line-height:1.1}
+.g7-d-h b{display:block;font-size:16px;margin-bottom:2px}
+.g7-d-h span{font-size:12.2px;color:var(--txt-3);line-height:1.5}
+.g7-why{font-size:13px;color:var(--txt-2);line-height:1.65;margin-bottom:12px}
+.g7-why b{color:var(--txt)}
+.g7-gone{font-size:12.5px;color:var(--txt-2);line-height:1.6;background:rgba(251,113,133,.08);
+  border:1px solid rgba(251,113,133,.25);border-radius:11px;padding:11px 13px;margin-bottom:14px}
+.g7-gone b{display:block;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--red);margin-bottom:4px}
+.g7-checks{display:flex;flex-direction:column;gap:8px}
+.g7-check{font-size:12.4px;line-height:1.55;padding-left:16px;position:relative;color:var(--txt-3)}
+.g7-check:before{content:"";position:absolute;left:2px;top:6px;width:6px;height:6px;
+  border-radius:2px;background:var(--c)}
+.g7-check b{color:var(--txt);display:block;font-size:12.8px}

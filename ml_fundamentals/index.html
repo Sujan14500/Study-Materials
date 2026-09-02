@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/notes.css">
+<link rel="stylesheet" href="css/mlviz.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
 </head>
 <body>
@@ -411,6 +413,15 @@ p = 1 / (1 + e^−z)          # sigmoid → 0..1
       <li>AUC judges the ranking, independent of threshold. Use it to compare models; use precision/recall to ship one.</li>
     </ul>
   </div>
+  <div data-toolstrip="evaluation"></div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127919; The accuracy paradox</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Drag the positive-class rate down towards something realistic &mdash; fraud, churn,
+      disease, defects &mdash; and watch a genuinely useful model score <em>worse on accuracy</em> than a
+      function that returns "no" every time.</p>
+    <div id="imb"></div>
+  </div>
 </section>
 
 <!-- ============================================================= -->
@@ -479,6 +490,31 @@ p = 1 / (1 + e^−z)          # sigmoid → 0..1
       <li>The best model is the one where held-out error bottoms out, not where training error does.</li>
     </ul>
   </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9878;&#65039; Bias and variance, actually measured</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Twelve training sets are drawn from the same true curve and a model of the degree you
+      choose is fitted to each one. <b>Bias</b> is how far the average fit sits from the truth. <b>Variance</b> is
+      how far the fits sit from each other. Nothing here is asserted &mdash; both are computed from the fits you
+      can see.</p>
+    <div id="bv"></div>
+  </div>
+
+  <div class="keypoint">
+    <div class="kp-ico">&#11088;</div>
+    <div><h4>Key point</h4>
+      <p><b>The two failures look identical from a single accuracy number and opposite from a picture.</b>
+      High bias: every model agrees, and every one of them is wrong. High variance: every model is nearly
+      right on its own data and they all disagree with each other. The fix for one makes the other worse,
+      which is why you must know which you have before you act.</p></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128207; L1 vs L2 &mdash; shrinking against selecting</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Both penalties fight overfitting by pulling coefficients towards zero. Only one of them
+      ever arrives. Drag &lambda; and watch what happens to the small features.</p>
+    <div id="regpath"></div>
+  </div>
 </section>
 
 <!-- ============================================================= -->
@@ -514,6 +550,22 @@ p = 1 / (1 + e^−z)          # sigmoid → 0..1
       <li>The fold structure must respect the data's structure: stratify on class, group on entity, order on time.</li>
       <li>Everything you fit goes inside the fold — scalers included, or you have leaked again.</li>
     </ul>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128200; Learning curves &mdash; would more data help?</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">The single most useful diagnostic in applied ML, and the one people skip. Two curves,
+      one question: is the problem the <b>gap</b> between them, or the <b>height</b> of both? The answer decides
+      whether you go and collect data or go and change the model.</p>
+    <div id="lc"></div>
+  </div>
+
+  <div class="goldrule">
+    <div class="kp-ico">&#128161;</div>
+    <div><h4>Golden rule</h4>
+      <p>A wide gap means variance &mdash; more data will close it. Both curves flat and high means bias &mdash;
+      more data changes nothing at all, and buying it is a month wasted. Read the curves before you write
+      the data request.</p></div>
   </div>
 </section>
 
@@ -573,6 +625,7 @@ gain = Gini(parent) − weighted average Gini(children)</pre>
       <li>Trees need no scaling and handle mixed feature types without ceremony.</li>
     </ul>
   </div>
+  <div data-toolstrip="trees"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -693,6 +746,7 @@ pipe.score(X_test, y_test)     # transforms test correctly</pre>
       <li>Ratios, dates broken into components, and a missing-value flag are the cheapest wins available.</li>
     </ul>
   </div>
+  <div data-toolstrip="features"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -746,6 +800,7 @@ recommendation:  most popular item</pre>
       <li>Every stage has a way to fool yourself. Knowing which one is most of the skill.</li>
     </ul>
   </div>
+  <div data-toolstrip="workflow"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -782,7 +837,10 @@ recommendation:  most popular item</pre>
 
 <script src="js/mathkit.js"></script>
 <script src="js/content.js"></script>
+<script src="js/tools.js"></script>
 <script src="js/demos.js"></script>
 <script src="js/app.js"></script>
+<script src="js/toolstrip.js"></script>
+<script src="js/mlviz.js"></script>
 </body>
 </html>

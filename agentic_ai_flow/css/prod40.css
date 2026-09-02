@@ -1,0 +1,177 @@
+/* ============================================================
+   prod40.css — the production question deck.
+
+   One accordion of cards. Only the open card animates, so the
+   diagram replays every time you open it and never runs forty
+   loops at once in the background.
+   ============================================================ */
+
+/* ---------- filter chips ---------- */
+.p40-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px}
+.p40-chip{font-family:var(--sans);font-size:12px;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);color:var(--txt-2);
+  border-radius:99px;padding:6px 13px;transition:all .18s var(--ease)}
+.p40-chip:hover{background:var(--panel-2);color:var(--txt)}
+.p40-chip.on{background:color-mix(in srgb, var(--c, var(--violet)) 18%, transparent);
+  border-color:var(--c, var(--violet));color:#fff}
+
+/* ---------- cards ---------- */
+.p40-cards{display:flex;flex-direction:column;gap:8px}
+.p40-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  overflow:hidden;transition:border-color .2s var(--ease),background .2s}
+.p40-card:hover{border-color:var(--line-2)}
+.p40-card.open{border-color:var(--c);background:var(--panel-2)}
+
+.p40-head{width:100%;display:flex;align-items:flex-start;gap:13px;text-align:left;
+  background:none;border:0;cursor:pointer;padding:14px 16px;color:var(--txt);font-family:var(--sans)}
+.p40-num{font-family:var(--mono);font-size:12px;color:var(--c);flex:none;
+  padding-top:2px;min-width:22px;letter-spacing:.5px}
+.p40-qt{flex:1;font-size:15px;font-weight:600;line-height:1.4}
+.p40-cat{display:block;font-size:10.5px;font-weight:500;letter-spacing:.4px;
+  text-transform:uppercase;color:var(--txt-3);margin-bottom:4px}
+.p40-caret{flex:none;color:var(--txt-3);font-size:19px;line-height:1;
+  transition:transform .25s var(--ease)}
+.p40-card.open .p40-caret{transform:rotate(90deg);color:var(--c)}
+
+/* ---------- open body ---------- */
+.p40-body{padding:2px 16px 18px 51px;animation:p40in .35s var(--ease)}
+@keyframes p40in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@media(max-width:640px){.p40-body{padding-left:16px}}
+
+.p40-expects{font-size:12.5px;color:var(--txt-2);line-height:1.55;
+  border-left:2px solid var(--c);padding:8px 0 8px 12px;margin-bottom:13px}
+.p40-expects b{display:block;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--c);margin-bottom:3px}
+.p40-why{font-size:13.5px;line-height:1.68;color:var(--txt-2);margin:0 0 15px}
+
+.p40-tip{display:flex;gap:10px;align-items:flex-start;margin-top:15px;
+  background:rgba(255,255,255,.04);border-radius:11px;padding:11px 13px}
+.p40-tip span{color:var(--c);font-size:13px;line-height:1.5;flex:none}
+.p40-tip p{margin:0;font-size:12.5px;line-height:1.6;color:var(--txt-2)}
+
+/* ============================================================
+   diagrams
+   ============================================================ */
+.p40-viz{padding:4px 0}
+
+/* nodes shared by flow and branch */
+.p40-node{background:rgba(255,255,255,.05);border:1px solid var(--line);
+  border-radius:10px;padding:9px 12px;min-width:0;
+  animation:p40pop .4s var(--ease) both;animation-delay:var(--d)}
+.p40-node b{display:block;font-size:12.5px;font-weight:600;color:var(--txt);line-height:1.35}
+.p40-node span{display:block;font-size:10.5px;color:var(--txt-3);margin-top:2px;line-height:1.4}
+.p40-node.p40-hi{background:color-mix(in srgb, var(--c) 20%, transparent);border-color:var(--c)}
+.p40-node.p40-hi b{color:#fff}
+.p40-node.p40-ok{background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.5)}
+.p40-node.p40-bad{background:rgba(251,113,133,.15);border-color:rgba(251,113,133,.5)}
+.p40-node.p40-warn{background:rgba(251,191,36,.13);border-color:rgba(251,191,36,.45)}
+@keyframes p40pop{from{opacity:0;transform:translateY(7px) scale(.96)}to{opacity:1;transform:none}}
+
+.p40-arrow{flex:none;height:2px;min-width:26px;background:var(--line-2);position:relative;
+  align-self:center;animation:p40grow .3s var(--ease) both;animation-delay:var(--d)}
+@keyframes p40grow{from{transform:scaleX(0);opacity:0}to{transform:none;opacity:1}}
+.p40-arrow i{position:absolute;top:-2px;left:0;width:6px;height:6px;border-radius:50%;
+  background:var(--c);animation:p40travel 2.4s var(--ease) infinite;animation-delay:var(--d)}
+@keyframes p40travel{0%{left:0;opacity:0}15%{opacity:1}85%{opacity:1}100%{left:100%;opacity:0}}
+
+.p40-flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;
+  row-gap:8px;overflow-x:auto;padding-bottom:2px}
+.p40-flow .p40-node{flex:1 1 130px}
+
+/* branch: one source, a fan of targets, an optional join */
+.p40-branch{display:flex;align-items:center;gap:0;flex-wrap:wrap;row-gap:8px}
+.p40-bcol{display:flex;flex-direction:column;gap:7px;flex:1 1 130px;min-width:0}
+.p40-bfan{flex:1.2 1 150px}
+
+/* circuit-breaker style state machine */
+.p40-cycle{display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:relative;
+  padding-bottom:26px}
+.p40-state{flex:1 1 130px;border-radius:10px;padding:9px 12px;border:1px solid var(--line);
+  background:rgba(255,255,255,.05);animation:p40pulse 4.2s var(--ease) infinite;animation-delay:var(--d)}
+.p40-state b{display:block;font-family:var(--mono);font-size:12px;letter-spacing:.5px;color:var(--txt)}
+.p40-state span{display:block;font-size:10.5px;color:var(--txt-3);margin-top:2px}
+.p40-state.p40-ok{border-color:rgba(52,211,153,.5)}
+.p40-state.p40-bad{border-color:rgba(251,113,133,.5)}
+.p40-state.p40-hi{border-color:var(--c)}
+@keyframes p40pulse{0%,100%{background:rgba(255,255,255,.05);transform:none}
+  12%{background:rgba(255,255,255,.13);transform:translateY(-3px)}
+  30%{background:rgba(255,255,255,.05);transform:none}}
+.p40-carrow{color:var(--txt-3);font-size:14px;flex:none}
+.p40-cloop{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:10.5px;
+  color:var(--txt-3);border-top:1px dashed var(--line-2);padding-top:5px}
+
+/* latency span */
+.p40-span{padding:2px 0 22px;position:relative}
+.p40-spantop{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);margin-bottom:6px}
+.p40-bar{display:flex;height:34px;border-radius:9px;overflow:hidden;background:rgba(255,255,255,.05)}
+.p40-seg{width:var(--w);display:grid;place-items:center;overflow:hidden;white-space:nowrap;
+  background:rgba(255,255,255,.09);border-right:1px solid rgba(0,0,0,.35);
+  animation:p40wipe .5s var(--ease) both;animation-delay:var(--d);transform-origin:left}
+.p40-seg span{font-size:10.5px;color:var(--txt-2);padding:0 6px;
+  overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.p40-seg.p40-bad{background:rgba(251,113,133,.3)}
+.p40-seg.p40-ok{background:rgba(52,211,153,.3)}
+@keyframes p40wipe{from{transform:scaleX(0)}to{transform:none}}
+.p40-mark{position:absolute;bottom:0;left:var(--x);font-size:10.5px;color:var(--c);
+  white-space:nowrap;animation:p40in .5s var(--ease) .7s both}
+@media(max-width:640px){.p40-mark{left:0!important}}
+
+/* backoff bars */
+.p40-bars{display:flex;flex-direction:column;gap:7px}
+.p40-brow{display:flex;align-items:center;gap:10px;animation:p40in .4s var(--ease) both;animation-delay:var(--d)}
+.p40-blab{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);min-width:66px;flex:none}
+.p40-btrack{flex:1;height:16px;border-radius:6px;background:rgba(255,255,255,.05);overflow:hidden}
+.p40-btrack i{display:block;height:100%;width:var(--w);border-radius:6px;
+  background:linear-gradient(90deg,var(--c),color-mix(in srgb,var(--c) 25%,transparent));
+  background-size:220% 100%;animation:p40wipe .55s var(--ease) both, p40jit 2.6s linear infinite;
+  animation-delay:var(--d), var(--d);transform-origin:left}
+@keyframes p40jit{to{background-position:220% 0}}
+.p40-bval{font-family:var(--mono);font-size:10.5px;color:var(--txt-2);min-width:92px;flex:none;text-align:right}
+.p40-note{font-size:10.5px;color:var(--txt-3);margin:8px 0 0}
+
+/* small comparison table */
+.p40-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.p40-table th,.p40-table td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line)}
+.p40-table thead th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt-3);font-weight:600}
+.p40-table tbody th{color:var(--txt);font-weight:600}
+.p40-table tbody td{color:var(--txt-2);font-family:var(--mono);font-size:11.5px}
+.p40-table tbody tr{animation:p40in .4s var(--ease) both;animation-delay:var(--d)}
+
+/* code block */
+.p40-code{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:rgba(0,0,0,.28);
+  animation:p40in .4s var(--ease) both}
+.p40-codetag{font-family:var(--mono);font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--txt-3);padding:7px 12px;border-bottom:1px solid var(--line)}
+.p40-code pre{margin:0;padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.65;
+  color:var(--txt-2);white-space:pre;overflow-x:auto}
+
+/* icon list */
+.p40-list{display:flex;flex-direction:column;gap:7px}
+.p40-lrow{display:grid;grid-template-columns:20px minmax(88px,auto) 1fr;gap:4px 10px;align-items:baseline;
+  animation:p40in .35s var(--ease) both;animation-delay:var(--d)}
+@media(max-width:640px){.p40-lrow{grid-template-columns:20px 1fr}
+  .p40-lrow .p40-ltxt{grid-column:2}}
+.p40-lico{font-size:12px;line-height:1.5}
+.p40-lrow b{font-size:12.5px;color:var(--txt)}
+.p40-ltxt{font-size:12.5px;color:var(--txt-2);line-height:1.6}
+.p40-lrow.p40-ok .p40-lico{color:#34d399}
+.p40-lrow.p40-bad .p40-lico{color:#fb7185}
+.p40-lrow.p40-warn .p40-lico{color:#fbbf24}
+.p40-lrow.p40-go .p40-lico{color:var(--c)}
+
+/* ---------- cheat sheet ---------- */
+.p40-sheet{margin-top:20px;border:1px solid var(--line);border-radius:14px;padding:16px;
+  background:rgba(255,255,255,.03)}
+.p40-sheet h4{margin:0 0 12px;font-size:13px;letter-spacing:.4px;color:var(--txt)}
+.p40-sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:9px}
+.p40-scell{font-size:12px;line-height:1.6;color:var(--txt-2);background:var(--panel);
+  border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  animation:p40in .35s var(--ease) both;animation-delay:var(--d)}
+.p40-scell b{color:var(--txt);display:block;margin-bottom:2px;font-size:12.5px}
+.p40-sfoot{margin:13px 0 0;font-size:12px;color:var(--txt-3);line-height:1.6}
+
+/* ---------- people who asked for less movement get less movement ---------- */
+@media(prefers-reduced-motion:reduce){
+  .p40-card *,.p40-card *::before,.p40-card *::after{animation:none!important;transition:none!important}
+  .p40-arrow i{display:none}
+}

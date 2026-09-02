@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/notes.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐍</text></svg>">
 </head>
 <body>
@@ -640,6 +641,7 @@ if __name__ == "__main__":
       <li>Use <span class="mono">csv</span> and <span class="mono">json</span> instead of parsing by hand. They handle the edge cases you have not thought of.</li>
     </ul>
   </div>
+  <div data-toolstrip="projects"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -685,6 +687,7 @@ if __name__ == "__main__":
       <li>pandas methods return new frames. Assign the result; <span class="mono">inplace=True</span> saves nothing and hides bugs.</li>
     </ul>
   </div>
+  <div data-toolstrip="datastack"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -1091,6 +1094,7 @@ items = [i for i in items if not bad(i)]</pre>
       <li><span class="mono">id(x)</span> tells you which object you actually have when arrows get confusing.</li>
     </ul>
   </div>
+  <div data-toolstrip="gotchas"></div>
 </section>
 
 <!-- ============================================================= -->
@@ -1126,8 +1130,10 @@ items = [i for i in items if not bad(i)]</pre>
 <div class="toast" id="toast"></div>
 
 <script src="js/content.js"></script>
+<script src="js/tools.js"></script>
 <script src="js/demos.js"></script>
 <script src="js/packages.js"></script>
 <script src="js/app.js"></script>
+<script src="js/toolstrip.js"></script>
 </body>
 </html>

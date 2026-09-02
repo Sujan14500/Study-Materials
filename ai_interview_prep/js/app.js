@@ -27,8 +27,10 @@ const TOPICS = [
   { id: 'eval',        n: 'Evaluation',         i: '⚖️', c: '#4ade80' },
   { id: 'safety',      n: 'Safety & guardrails',i: '🛡️', c: '#fb7185' },
   { id: 'production',  n: 'Production & cost',  i: '🚀', c: '#38bdf8' },
+  { id: 'prodops',     n: 'Production drills',  i: '🧯', c: '#f97316' },
   { id: 'data',        n: 'Data engineering',   i: '🗄️', c: '#c084fc' },
   { id: 'sysdesign',   n: 'System design',      i: '🏗️', c: '#facc15' },
+  { id: 'tooling',     n: 'Tooling & ecosystem',i: '🧰', c: '#2dd4bf' },
   { id: 'behavioural', n: 'Behavioural',        i: '💬', c: '#94a3b8' }
 ];
 const TMAP = {};

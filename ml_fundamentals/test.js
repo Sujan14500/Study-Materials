@@ -315,5 +315,75 @@ assert.strictEqual(new Set(chapterIds).size, chapterIds.length, 'two chapters sh
 for (const m of demos.matchAll(/e\.detail === '([a-z-]+)'/g))
   assert(chapterIds.includes(m[1]), `demos.js redraws on chapter "${m[1]}", which does not exist`);
 
+/* ---- tools & frameworks strips ---- */
+/* Every strip mounted in the page must have data, every strip with data must be
+   mounted, and every tool must carry both advantages and drawbacks — a one-sided
+   tool card is marketing, not a study note. */
+{
+  const tsHtml = fs.readFileSync('index.html', 'utf8');
+  vm.runInContext(fs.readFileSync('js/tools.js', 'utf8'), ctx);
+  const TS = ctx.window.C.toolstrips || {};
+  const mounted = [...tsHtml.matchAll(/data-toolstrip="([a-z0-9-]+)"/g)].map(m => m[1]);
+  mounted.forEach(k => assert(TS[k], `index.html mounts a tools strip "${k}" with no data in js/tools.js`));
+  Object.keys(TS).forEach(k => {
+    assert(mounted.includes(k), `js/tools.js defines strip "${k}" that the page never renders`);
+    const s = TS[k];
+    assert(s.tools.length >= 3, `tools strip "${k}" has fewer than three tools`);
+    s.tools.forEach(t => {
+      ['n', 'by', 'mark', 'what', 'use'].forEach(f =>
+        assert(t[f] && String(t[f]).trim(), `tools strip "${k}": ${t.n || '?'} is missing ${f}`));
+      assert(t.pro && t.pro.length >= 2, `tools strip "${k}": ${t.n} needs at least two advantages`);
+      assert(t.con && t.con.length >= 2, `tools strip "${k}": ${t.n} needs at least two drawbacks`);
+    });
+  });
+  if (mounted.length) console.log(`  ${mounted.length} tools strips, ` +
+    `${Object.values(TS).reduce((a, s) => a + s.tools.length, 0)} tools with advantages and drawbacks`);
+}
+
+/* ---- the four diagnostic widgets ---- */
+/* Each of these asserts the claim the widget makes on screen, using the
+   same mathkit function the widget calls. If the maths stops behaving,
+   the chapter is teaching something false and this fails. */
+{
+  const page = fs.readFileSync('index.html', 'utf8');
+  ['bv', 'lc', 'regpath', 'imb'].forEach(id =>
+    assert(page.includes('id="' + id + '"'), 'index.html is missing #' + id));
+  assert(page.includes('js/mlviz.js') && page.includes('css/mlviz.css'), 'mlviz assets are not linked');
+
+  // bias falls and variance rises as the model gets more complex
+  const bv = [1, 2, 3, 4, 5, 6, 7].map(d => MK.biasVariance(d));
+  assert(bv[0].bias2 > bv[4].bias2 * 10, 'bias should collapse as degree rises');
+  assert(bv[6].variance > bv[0].variance * 5, 'variance should grow as degree rises');
+  // and the total is U-shaped: the best degree is neither the simplest nor the most complex
+  const best = bv.reduce((a, b) => (b.total < a.total ? b : a));
+  assert(best.deg > 1 && best.deg < 7, `the bias-variance minimum landed at degree ${best.deg}, not in the middle`);
+
+  // L1 selects (drives coefficients to exactly zero); L2 only shrinks
+  const co = [0.92, -0.71, 0.48, -0.34, 0.19, 0.11, -0.06, 0.03];
+  const l1 = MK.regPath(co, 0.2, 'l1'), l2 = MK.regPath(co, 0.2, 'l2');
+  assert(l1.filter(c => c === 0).length >= 3, 'L1 must zero the small coefficients');
+  assert(l2.every(c => c !== 0), 'L2 must never reach exactly zero');
+  assert(l2.every((c, i) => Math.abs(c) < Math.abs(co[i])), 'L2 must shrink every coefficient');
+
+  // more data closes the gap; that is the whole point of the learning-curve chapter
+  const g10 = MK.learningCurve(10, 0.2, 0.06).gap;
+  const g200 = MK.learningCurve(200, 0.2, 0.06).gap;
+  assert(g200 < g10 / 5, 'the train/validation gap must close as data grows');
+  // ...but it cannot go below the model's own ceiling
+  assert(MK.learningCurve(1e6, 0.6, 0.06).val > 0.6, 'a high-bias model must not converge to zero error');
+
+  // the accuracy paradox the widget claims: a useful model scores worse than a constant
+  const rare = MK.imbalance(0.02, 0.60, 0.02, 10000);
+  assert(rare.accuracy < rare.majorityAccuracy,
+    'at a 2% positive rate, always-say-no must beat the model on accuracy — that is the paradox');
+  assert(rare.recall > 0.5 && rare.precision < 0.5,
+    'the model must be genuinely useful (recall) and look bad on precision, or the lesson is lost');
+  const even = MK.imbalance(0.45, 0.60, 0.02, 10000);
+  assert(even.accuracy > even.majorityAccuracy, 'on balanced data the model must beat the constant');
+
+  console.log('  bias-variance U verified (best degree ' + best.deg + '), L1 selects and L2 shrinks, ' +
+              'accuracy paradox reproduced at 2%');
+}
+
 console.log(`ok — ${chapters.length} chapters, best poly degree ${bestDeg}, AUC ${A.toFixed(3)}, ` +
             `best tree split at ${split.thr}, OLS slope ${best.w.toFixed(2)}`);

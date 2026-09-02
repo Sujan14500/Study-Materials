@@ -33,7 +33,7 @@ open index.html           # macOS
 | 12 | Prompt vs RAG vs fine-tune | Three questions, one reasoned recommendation |
 | 13 | Agents & tools | Step through think → act → observe loops |
 | 14 | Evaluation & risk | Spot the hallucination |
-| 15 | Ship it | Cost/latency calculator and a production checklist that saves |
+| 15 | Ship it | Cost/latency calculator, a production checklist that saves, and 40 production interview questions with animated diagrams |
 | 16 | Mem0: agent memory | Step a conversation through extract → reconcile and watch ADD/UPDATE/DELETE/NOOP fire, then search the store |
 | 17 | Data Formulator | Fill in encoding shelves, ask for a field the data doesn't have, read the pandas/SQL it generates |
 | 18 | One transformer block | A real 4-dim, 1-head model computed live: step all ten operations, then switch the feed-forward off and watch the prediction flip from "cat" to "mat" |
