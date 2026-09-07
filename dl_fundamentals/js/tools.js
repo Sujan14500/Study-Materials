@@ -97,3 +97,41 @@ C.toolstrips.practice = {
       use: 'Adapting a large pretrained model without the compute to retrain it.' }
   ]
 };
+
+/* ---------- Ch: PyTorch ---------- */
+C.toolstrips.pytorch = {
+  title: 'Tools & frameworks — the ring around PyTorch',
+  sub: 'PyTorch itself is one library. What people mean by "the PyTorch stack" is this ring of things that remove the boilerplate around it — and each one takes some control away in exchange.',
+  tools: [
+    { n: 'PyTorch Lightning', by: 'Lightning AI', mark: '⚡', c: '#792ee5',
+      what: 'Takes the training loop, the device handling and the multi-GPU plumbing, and leaves you the model and the step.',
+      pro: ['The loop, checkpointing, logging and distributed training stop being your code', 'Same PyTorch underneath, so you can drop back down anywhere', 'Makes multi-GPU a flag rather than a rewrite'],
+      con: ['One more abstraction to debug through when something is wrong', 'The hooks and their order are their own thing to learn'],
+      use: 'Any project past the notebook stage where you would otherwise copy the same loop for the fourth time.' },
+    { n: 'Hugging Face Transformers', by: 'Hugging Face', mark: '🤗', c: '#ffd21e',
+      what: 'Pretrained models and tokenizers with a common API, plus a Trainer that owns the loop.',
+      pro: ['A pretrained model beats training from scratch on almost every real task', 'One API across thousands of architectures', 'Accelerate handles devices and distribution without a rewrite'],
+      con: ['Very large surface area — the Trainer has dozens of arguments that change training silently', 'Easy to fine-tune something you do not understand'],
+      use: 'Anything involving text, and increasingly vision and audio. Start here before you build a model.' },
+    { n: 'torch.compile', by: 'PyTorch', mark: '⚙️', c: '#ee4c2c',
+      what: 'One line that traces your model and compiles fused kernels for it, often for a substantial speedup.',
+      pro: ['Frequently a large speedup for a single line of code', 'No change to how you write the model', 'Works with the rest of the ecosystem'],
+      con: ['Compilation itself takes time, and recompiles when shapes change', 'Graph breaks on dynamic Python silently give you back the slow path'],
+      use: 'Once training works and is correct. Never as a fix for a model that does not learn.' },
+    { n: 'TensorBoard / Weights & Biases', by: 'Google / W&B', mark: '📈', c: '#fbbf24',
+      what: 'Experiment tracking: loss curves, hyperparameters, gradients and artefacts, per run.',
+      pro: ['A loss curve you can compare across runs is the single best debugging tool here', 'Records the hyperparameters you will otherwise forget', 'Gradient and weight histograms make chapter 9 visible on your own model'],
+      con: ['W&B is a hosted service — check where the data goes before enterprise use', 'Easy to log so much that nothing is readable'],
+      use: 'From the second experiment onwards. The first one you can watch in the terminal.' },
+    { n: 'torchvision / torchaudio / datasets', by: 'PyTorch / Hugging Face', mark: '📦', c: '#34d399',
+      what: 'Datasets, standard transforms and pretrained backbones, so data loading is not written from scratch.',
+      pro: ['Standard augmentations that are already correct', 'Pretrained backbones one line away', 'DataLoader gives you batching, shuffling and worker parallelism free'],
+      con: ['num_workers and pinned memory need tuning per machine, and the defaults are rarely right', 'Transform pipelines are a common silent source of train/test skew'],
+      use: 'Any vision or audio task, and as the reference for how a Dataset should be shaped.' },
+    { n: 'ONNX / TorchScript / ExecuTorch', by: 'PyTorch / ONNX', mark: '🚚', c: '#60a5fa',
+      what: 'Export formats that take a trained model out of Python and into a serving runtime or a device.',
+      pro: ['Runs without Python, which most production and mobile targets require', 'ONNX Runtime is often faster than eager PyTorch for inference', 'Export forces you to pin the shapes and the preprocessing'],
+      con: ['Dynamic control flow in forward() frequently does not export cleanly', 'Numerical differences after export are real and need a comparison test'],
+      use: 'At deployment. Always diff the exported model against the original on a fixed batch before trusting it.' }
+  ]
+};

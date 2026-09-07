@@ -452,5 +452,110 @@ for (const m of demos.matchAll(/e\.detail === '([a-z-]+)'/g))
               'normalisation holds spread at 1.000 for every gain');
 }
 
+/* ---- chapter 12: PyTorch ---- */
+/* The chapter prints gradients, broadcast shapes and an accumulation table and
+   claims they are computed rather than typed. This block is that claim: the
+   autograd engine is checked against numerical differentiation, exactly as the
+   hand-written one in mathkit.js is, and the two "silent bug" cases the page
+   warns about are re-derived from the broadcasting rule itself. */
+{
+  const ptCtx = { window: {} };
+  ptCtx.window.window = ptCtx.window;
+  vm.createContext(ptCtx);
+  vm.runInContext(fs.readFileSync('js/pytorch.js', 'utf8'), ptCtx, { filename: 'pytorch.js' });
+  const P = ptCtx.window.PYTORCH;
+  assert(P, 'pytorch.js did not publish its data');
+
+  /* --- the page is wired up at all --- */
+  assert(html.includes('data-id="pytorch"'), 'the PyTorch chapter is missing from the page');
+  assert(html.includes('css/pytorch.css'), 'pytorch.css is not linked');
+  assert(html.includes('js/pytorch.js'), 'pytorch.js is not loaded');
+  ['pt-tensor', 'pt-autograd', 'pt-map', 'pt-loop', 'pt-bugs', 'pt-module',
+   'pt-code-model', 'pt-code-loop', 'pt-code-autograd'].forEach(id =>
+    assert(html.includes('id="' + id + '"'), `pytorch.js fills #${id}, which the page never creates`));
+
+  /* --- autograd, against numerical differentiation --- */
+  const g = P.neuron();
+  P.backward(g.o);
+  const f = q => Math.tanh(q.x1.data * q.w1.data + q.x2.data * q.w2.data + q.b.data);
+  const numeric = (name, h = 1e-6) => {
+    const up = P.neuron(), dn = P.neuron();
+    up[name].data += h; dn[name].data -= h;
+    return (f(up) - f(dn)) / (2 * h);
+  };
+  ['x1', 'w1', 'x2', 'w2', 'b'].forEach(k => {
+    const err = Math.abs(g[k].grad - numeric(k));
+    assert(err < 1e-6,
+      `autograd d(o)/d(${k}) = ${g[k].grad} but numerical differentiation says ${numeric(k)}`);
+  });
+  /* two claims the chapter makes out loud about this exact graph */
+  assert(g.w2.grad === 0,
+    'the chapter says a weight on a zero input cannot learn — w2.grad is not zero');
+  assert(g.x1.grad < 0,
+    'the chapter says x1.grad is negative; if the numbers changed, so must the prose');
+  assert(Math.abs(g.n.grad - (1 - g.o.data * g.o.data)) < 1e-12,
+    'the tanh caption claims n.grad is exactly 1 - o^2');
+
+  /* --- the animation replays the same gradients it would compute in one go --- */
+  const { frames } = P.backwardFrames();
+  assert(frames.length >= 6, `the backward animation has only ${frames.length} steps`);
+  frames.forEach((fr, i) => assert(fr.say && fr.say.length > 80,
+    `backward step ${i + 1} has no real explanation`));
+  const last = frames[frames.length - 1].snap;
+  ['x1', 'w1', 'x2', 'w2', 'b'].forEach(k => assert(Math.abs(last[k].grad - g[k].grad) < 1e-12,
+    `the animation ends with ${k}.grad = ${last[k].grad}, but a straight backward() gives ${g[k].grad}`));
+
+  /* --- broadcasting, by the rule rather than by memory --- */
+  const bc = (a, b) => P.broadcast(a, b);
+  /* joined, not deep-equal: these arrays come from another vm realm */
+  const shape = (a, b) => bc(a, b).shape.join(",");
+  assert.strictEqual(shape([32, 128], [128]), '32,128', 'bias broadcast is wrong');
+  assert.strictEqual(shape([8, 3, 64, 64], [3, 1, 1]), '8,3,64,64', 'per-channel broadcast is wrong');
+  assert.strictEqual(shape([512, 1], [1, 256]), '512,256', 'outer-product broadcast is wrong');
+  /* the failure the chapter calls "the good one" */
+  const bad = bc([32, 3], [32, 4]);
+  assert(!bad.ok && bad.dim === 1 && /non-singleton dimension 1/.test(bad.error),
+    'the incompatible case must fail at dimension 1 with the message PyTorch prints');
+  /* and the one it calls dangerous: (64,1) against (64,) really does explode */
+  const silent = bc([64, 1], [64]);
+  assert(silent.ok && silent.shape[0] === 64 && silent.shape[1] === 64,
+    'the chapter warns that (64,1) with (64,) broadcasts to (64,64); it no longer does');
+  P.SHAPES.forEach(s => assert(Array.isArray(s.a) && Array.isArray(s.b) && s.n,
+    'a broadcasting example is malformed'));
+
+  /* --- the forgotten zero_grad(), as printed in the table --- */
+  const acc = P.accumulation(3);
+  assert(acc.length === 3, 'the accumulation table needs three passes to make its point');
+  assert(Math.abs(acc[1].w1 - 2 * acc[0].w1) < 1e-12 &&
+         Math.abs(acc[2].w1 - 3 * acc[0].w1) < 1e-12,
+    'the table claims the gradient doubles and triples without zero_grad(); it does not');
+  assert(Math.abs(acc[0].w1 - g.w1.grad) < 1e-12,
+    'the first pass must equal the correct gradient, or the whole comparison is meaningless');
+
+  /* --- the written content that carries the chapter --- */
+  assert(P.MAP.length >= 6, 'the by-hand/PyTorch map is too short to cover a training step');
+  P.MAP.forEach(m => {
+    assert(m.hand && m.torch && m.note, 'a map row is missing a column');
+    assert(m.note.length > 80, `the note for "${m.torch}" says nothing worth clicking for`);
+  });
+  assert(P.MAP.some(m => /backward\(\)/.test(m.torch) && /dW2|dz2/.test(m.hand)),
+    'the map must show the hand-derived backward pass collapsing into loss.backward()');
+  assert(P.LOOP.length === 5, 'the training loop is five lines; the widget shows ' + P.LOOP.length);
+  P.LOOP.forEach(l => ['does', 'skip', 'why'].forEach(k =>
+    assert(l[k] && l[k].length > 60, `loop step "${l.n}" is thin on ${k}`)));
+  assert(P.BUGS.length >= 8, 'the error gallery promises eight');
+  P.BUGS.forEach(b => {
+    ['n', 'msg', 'cause', 'fix'].forEach(k => assert(b[k], `bug "${b.id}" is missing ${k}`));
+    assert(b.fix.length > 100, `bug "${b.id}" needs a fix someone could act on`);
+  });
+  /* the two silent ones are the point of the gallery */
+  assert(P.BUGS.filter(b => /no error/i.test(b.msg)).length === 2,
+    'the chapter says two of the eight raise nothing at all');
+  Object.keys(P.CODE).forEach(k => assert(P.CODE[k].length > 200, `code sample "${k}" is a stub`));
+
+  console.log('  chapter 12: autograd matches numerical differentiation on all five leaves, ' +
+              'broadcasting re-derived, gradient accumulation 1x/2x/3x');
+}
+
 console.log(`ok — ${chapters.length} chapters, gradients verified against numerical differentiation, ` +
   `sigmoid vanishes ${Math.round(shrink('sigmoid')).toLocaleString()}× over 8 layers vs ReLU's ${shrink('relu').toFixed(1)}×`);

@@ -27,7 +27,7 @@ time you have, and a button that opens whatever you should do next.
 | [`langchain`](langchain) | Models, LCEL, splitters, retrievers, the RAG chain, agents | 13 chapters |
 | [`ml_fundamentals`](ml_fundamentals) | Splits, gradient descent, evaluation, overfitting, trees | 13 chapters |
 | [`python_basics`](python_basics) | Values through to files, projects and the gotchas | 13 chapters |
-| [`dl_fundamentals`](dl_fundamentals) | Neurons, backpropagation, vanishing gradients, convolution | 12 chapters |
+| [`dl_fundamentals`](dl_fundamentals) | Neurons, backpropagation, vanishing gradients, convolution — then PyTorch, with a real autograd graph animated forward and backward | 14 chapters |
 | [`datanyx2.0`](datanyx2.0) | Field guide and interview Q&A for the Datanyx project | 1 guide |
 | [`refund-agent`](refund-agent), [`support-platform`](support-platform) | The runnable source for the two systems in `projects_walkthrough` | code |
 

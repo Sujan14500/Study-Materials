@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="css/styles.css">
 <link rel="stylesheet" href="css/notes.css">
 <link rel="stylesheet" href="css/dlviz.css">
+<link rel="stylesheet" href="css/pytorch.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
 </head>
 <body>
@@ -60,7 +61,7 @@
     <div class="hero-tag">interactive course · real networks · no server</div>
     <h1 class="hero-title">How <span class="grad">deep learning</span><br>actually works</h1>
     <p class="hero-sub">
-      Thirteen chapters. Train a real network on XOR and watch it fail without a hidden layer.
+      Fourteen chapters. Train a real network on XOR and watch it fail without a hidden layer.
       Step through a forward pass and a backward pass <b>number by number</b>. Slide a kernel
       across an image. Every network here is built, initialised and trained
       <b>live in your browser</b> — no framework, no recording, about 200 lines of maths.
@@ -776,11 +777,122 @@ output  = weights @ V</pre>
 <!-- ============================================================= -->
 <!-- 12. QUIZ                                                      -->
 <!-- ============================================================= -->
+<!-- 12. PYTORCH                                                   -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="pytorch" data-title="PyTorch" data-icon="12" data-group="The framework">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 12 · The framework</div>
+    <h2>Now let something else <span class="grad">do the calculus</span></h2>
+    <p class="lead">
+      Eleven chapters of doing it by hand were not a detour — they are the reason this chapter is short.
+      A framework does exactly four things for you: it stores <b>tensors</b>, it records what you did to
+      them, it <b>differentiates</b> that recording, and it holds the parameters while an optimiser
+      updates them. You have written all four. What follows is the translation, plus the handful of
+      places where PyTorch will bite you precisely <i>because</i> it is doing the work silently.
+    </p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧱 A tensor is an array that remembers</h3></div>
+    <p class="panel-sub">
+      <span class="mono">torch.Tensor</span> is an n-dimensional array with three extra facts attached: a
+      <b>dtype</b>, a <b>device</b>, and — if you asked for it — <b>a record of how it was produced</b>.
+      That third one is the whole framework. Before any of it matters, though, you have to survive
+      <b>broadcasting</b>: the rule that lets a bias of shape <span class="mono">(128,)</span> be added to
+      a batch of shape <span class="mono">(32, 128)</span>, and the rule behind more silent bugs than
+      anything else in the library.
+    </p>
+    <div id="pt-tensor"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔗 Autograd, watched</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">
+      This is chapter 5 with the arithmetic done for you. Every node holds a value <i>and</i> a note of
+      the operation that produced it; <span class="mono">backward()</span> walks that record in reverse
+      and applies the chain rule at each step. The graph below is real — the gradients are computed by a
+      forty-line autograd engine in <span class="mono">js/pytorch.js</span>, and
+      <span class="mono">test.js</span> checks them against numerical differentiation before this page is
+      allowed to claim them.
+    </p>
+    <div id="pt-autograd"></div>
+    <p class="panel-sub" style="margin-top:16px">The same graph, in PyTorch:</p>
+    <pre class="code" id="pt-code-autograd"></pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔁 The same network, twice</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">
+      Left: what you built in chapters 4 to 6, written in Python. Right: the same thing in PyTorch. Click
+      any row for what the swap actually buys — and for the two rows where the left-hand column is still
+      the thing worth understanding.
+    </p>
+    <div id="pt-map"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🧩 nn.Module, in five parts</h3></div>
+    <p class="panel-sub">
+      A module is a container that knows which tensors are parameters, which are state, and how to run
+      them forward. Everything else — saving, moving to a GPU, freezing layers, counting parameters — is
+      built on it knowing that.
+    </p>
+    <div id="pt-module"></div>
+    <pre class="code" id="pt-code-model" style="margin-top:16px"></pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>👣 The five lines, and what each one costs</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">
+      Every training script you will ever read is this cycle. Click a step for what it does, what breaks
+      if you skip it, and the part people miss. Underneath, the most common bug in the list — a forgotten
+      <span class="mono">zero_grad()</span> — reproduced on the graph from earlier so you can read the
+      gradients doubling.
+    </p>
+    <div id="pt-loop"></div>
+    <pre class="code" id="pt-code-loop" style="margin-top:16px"></pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🐛 Eight errors you will actually see</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">
+      With the message PyTorch prints, because recognising the message is most of the fix. Two of the
+      eight raise nothing at all, which is what makes them the expensive ones.
+    </p>
+    <div id="pt-bugs"></div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-ico">🖥️</div>
+    <div><b>Devices and dtypes, in one paragraph.</b> Pick the device once
+    (<span class="mono">"cuda" if torch.cuda.is_available() else "mps" if … else "cpu"</span>), move the
+    model once, and move each batch as it arrives. Keep inputs in <span class="mono">float32</span> and
+    class targets in <span class="mono">int64</span>. Mixed precision
+    (<span class="mono">torch.autocast</span> plus a <span class="mono">GradScaler</span>) is a later
+    optimisation that roughly halves memory and often speeds up training — it is not something to add
+    while a model still does not learn.</div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Take away</h4>
+    <ul>
+      <li>A framework stores tensors, records operations, differentiates the recording and holds parameters. That is the entire job.</li>
+      <li><span class="mono">loss.backward()</span> is the seven lines you derived by hand, applied to whatever graph you happened to build this time.</li>
+      <li>Gradients <b>accumulate</b>. That is a feature for large effective batches and a silent bug everywhere else.</li>
+      <li><span class="mono">model.eval()</span> is about dropout and batch norm; <span class="mono">torch.no_grad()</span> is about memory. Different mistakes, both easy.</li>
+      <li>Broadcasting failures that raise are the kind ones. <span class="mono">(64,1)</span> against <span class="mono">(64,)</span> is the kind that costs an afternoon.</li>
+      <li>Save the <span class="mono">state_dict</span>, never the pickled model.</li>
+    </ul>
+  </div>
+  <div data-toolstrip="pytorch"></div>
+</section>
+
+<!-- ============================================================= -->
 <section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Finish line">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 12 · Finish line</div>
+    <div class="ch-kicker">Chapter 13 · Finish line</div>
     <h2>Prove it to <span class="grad">yourself</span></h2>
-    <p class="lead">Fifteen questions covering everything above. No time limit, instant explanations, and you can retake it.</p>
+    <p class="lead">Nineteen questions covering everything above. No time limit, instant explanations, and you can retake it.</p>
   </header>
 
   <div class="panel">
@@ -812,5 +924,6 @@ output  = weights @ V</pre>
 <script src="js/app.js"></script>
 <script src="js/toolstrip.js"></script>
 <script src="js/dlviz.js"></script>
+<script src="js/pytorch.js"></script>
 </body>
 </html>

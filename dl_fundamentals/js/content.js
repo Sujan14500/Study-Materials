@@ -302,3 +302,49 @@ C.glossary = [
   ['Autograd', 'The framework machinery that records operations and runs backprop for you.'],
   ['Fine-tuning', 'Continue training a pretrained model on your own smaller dataset.']
 ];
+
+
+/* ---------- chapter 12: PyTorch ---------- */
+C.quiz = C.quiz.concat([
+  { q: "In PyTorch, what does loss.backward() actually do?",
+    o: ["Walks the recorded graph in reverse and fills in .grad on every tensor that needs it",
+        "Updates the parameters using the learning rate",
+        "Clears the gradients from the previous step",
+        "Recomputes the forward pass in reverse"],
+    a: 0,
+    e: "It only computes gradients. Updating parameters is opt.step(), and clearing them is opt.zero_grad() - three separate lines because they are three separate jobs." },
+
+  { q: "You forget opt.zero_grad() in your training loop. What happens?",
+    o: ["Gradients accumulate across iterations, so the effective step keeps growing - and nothing raises an error",
+        "PyTorch raises RuntimeError on the second backward pass",
+        "The gradients stay zero and nothing learns",
+        "Only the first batch contributes to training"],
+    a: 0,
+    e: "Accumulation is deliberate - it is how you simulate a batch larger than your GPU. That is exactly why forgetting to zero is silent, and why it is usually misdiagnosed as an unstable learning rate." },
+
+  { q: "y has shape (64,) and pred has shape (64, 1). You compute pred - y. What do you get?",
+    o: ["A (64, 64) tensor, silently - broadcasting aligns from the right",
+        "A RuntimeError about mismatched shapes",
+        "A (64,) tensor, as intended",
+        "A (64, 1) tensor, as intended"],
+    a: 0,
+    e: "Aligned from the right, (64,1) and (1,64) both broadcast to (64,64) - 4,096 elements where you wanted 64. No error, a loss that is the mean of the wrong thing. Fix it at the source with y.view(-1, 1)." },
+
+  { q: "What is the difference between model.eval() and torch.no_grad()?",
+    o: ["eval() switches dropout and batch norm to inference behaviour; no_grad() stops the graph being recorded",
+        "They do the same thing, and using both is redundant",
+        "eval() saves memory; no_grad() improves accuracy",
+        "eval() freezes the weights; no_grad() freezes the gradients"],
+    a: 0,
+    e: "Different mistakes. Forgetting eval() makes validation results wrong; forgetting no_grad() makes validation slow and memory-hungry. Neither one freezes anything." }
+]);
+
+C.glossary = C.glossary.concat([
+  ["Tensor", "An n-dimensional array with a dtype, a device and - if requires_grad is set - a record of how it was produced."],
+  ["Autograd", "Reverse-mode differentiation over that record. One backward pass gives every parameter its gradient, however many there are."],
+  ["Broadcasting", "Shapes aligned from the right; each pair must be equal or one of them must be 1. The stretched dimension is read with stride zero, so it costs no memory."],
+  ["Leaf tensor", "A tensor you created rather than computed - a parameter. Only leaves keep .grad after a backward pass; intermediate nodes do not, and the autograd graph is freed as it is traversed."],
+  ["nn.Module", "A container that knows which of its tensors are parameters, which are buffers, and how to run them forward."],
+  ["state_dict", "An ordered map of names to tensors. Save this, not the pickled model object."],
+  ["Gradient accumulation", "Calling backward() several times before step(), on purpose, to simulate a batch bigger than your memory. The same mechanism that makes a forgotten zero_grad() silent."]
+]);

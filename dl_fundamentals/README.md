@@ -1,6 +1,6 @@
 # DL Fundamentals
 
-An interactive, animated course on deep learning fundamentals. Thirteen chapters, every
+An interactive, animated course on deep learning fundamentals. Fourteen chapters, every
 concept attached to something you can drag, step through or watch train.
 
 The angle: **there is no framework here**. Roughly 200 lines in `js/mathkit.js` implement
@@ -8,6 +8,13 @@ initialisation, the forward pass, binary cross-entropy, backpropagation, gradien
 2D convolution. Every network on the page is built and trained live in your browser, and the
 test suite verifies the gradients against numerical differentiation — so the arithmetic the
 course shows you is the arithmetic it actually does.
+
+Chapter 12 is the deliberate exception. Once you have written backpropagation by hand there is
+a reason to see PyTorch, and it arrives in that order on purpose: `loss.backward()` only means
+something once you have derived the seven lines it replaces. That chapter still runs its own
+autograd — about forty lines in `js/pytorch.js` — and `test.js` checks its gradients against
+numerical differentiation the same way, so the graph the page animates is a graph it really
+differentiated.
 
 ## Run it
 
@@ -35,7 +42,8 @@ open index.html           # macOS
 | 9 | Convolution | **Animated**: slide a 3×3 kernel over a hand-drawn 7, with the arithmetic for each window |
 | 10 | Sequences | Feed-forward → RNN → LSTM → transformer, each fixing the previous one's limit |
 | 11 | In practice | A symptom → first-suspect debugging table, and the PyTorch equivalent of everything built here |
-| 12 | Final quiz | 15 questions with explanations, plus a 33-term glossary |
+| 12 | PyTorch | **Animated**: a real autograd graph run forward, then backward one node at a time, with the gradients checked against numerical differentiation. Plus a broadcasting explorer, the same network by hand and in PyTorch line by line, the five-line training loop with what each line costs, and eight errors with the message PyTorch prints |
+| 13 | Final quiz | 19 questions with explanations, plus a 40-term glossary |
 
 Progress, XP and answers persist in `localStorage`.
 
@@ -47,6 +55,7 @@ css/styles.css    one theme, no framework
 js/mathkit.js     the neural network — init, forward, backprop, training, convolution
 js/content.js     every dataset and piece of course content
 js/demos.js       the interactive widgets (drawing only; it imports the maths)
+js/pytorch.js     chapter 12 — a 40-line autograd engine, broadcasting, and its widgets
 js/app.js         navigation, progress, XP
 test.js           node test.js — fails if the data or the maths goes wrong
 ```
