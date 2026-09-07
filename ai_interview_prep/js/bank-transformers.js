@@ -340,6 +340,16 @@ print(serving_memory_gb(70.6e9, 80, 8, 128, 8192, 32, 4))  # ~82 GB at int4`,
   tech: 'Attention would still perform token mixing, so copying, positional patterns and induction-style in-context completion would partially survive. What disappears is stored knowledge: the FFN sublayers are where factual associations live, and they hold roughly two thirds of the parameters. Empirically, models with the FFN ablated collapse to something close to a weighted-average-of-context predictor. You can demonstrate this on a toy model: with the FFN off, a prompt like "the cat sat" predicts another animate noun (it echoes what it attended to); with the FFN on, a neuron detecting "animate + action" fires and pushes probability toward a location word.',
   trap: 'This is a comprehension check dressed as a hypothetical. The right answer names the division of labour — routing versus knowledge — and gives one concrete consequence.',
   tags: ['ffn', 'interpretability'], orig: 3,
-  xref: [['See the feed-forward switched off, live', '../genai_flow/index.html']] }
+  xref: [['See the feed-forward switched off, live', '../genai_flow/index.html']] },
+
+{ id: 'tr37', topic: 'transformers', level: 1,
+  q: 'How does a token id become a vector before self-attention runs?',
+  lay: 'The id is just a row number. The model holds one big table with a row of numbers for every entry in its vocabulary, and looking up the id hands you that row — that is the token\'s vector. Then it adds information about the position, because the table alone has no idea which word came first.',
+  tech: 'Three steps, and the third has a subtlety interviewers listen for.<ol><li><b>Tokenise</b> — subword tokenizer turns text into integer ids, shape [batch, seq].</li><li><b>Embedding lookup</b> — a learned matrix E of shape [vocab, d_model]; the lookup is mathematically a one-hot vector times E, implemented as a gather. Output shape [batch, seq, d_model]. These vectors are learned parameters, trained with everything else, and in many models the same matrix is reused transposed as the output head (weight tying).</li><li><b>Position</b> — and this is where models differ. Learned absolute position embeddings (GPT-2, BERT) are a second table indexed by position, <i>added</i> to the token vector once at the input. Sinusoidal encodings do the same with fixed values. <b>RoPE, which most modern models use, adds nothing at the input at all</b> — it rotates the query and key vectors inside every attention layer instead.</li></ol>Some architectures scale the embeddings by √d_model before the first block, and most apply a normalisation before attention. What enters layer 0 is the initial state of the residual stream.',
+  dgm: { nodes: ['"refund policy"', { t: 'tokenizer', s: 'ids [8271, 4419]' }, { t: 'embedding matrix', s: '[vocab × d]' }, { t: 'token vectors', s: '[B, T, d]', k: 'alt' }, { t: 'position', s: 'added, or RoPE inside attention', k: 'alt' }, { t: 'block 0', k: 'ok' }],
+    cap: 'The lookup is order-blind: without step 5, "dog bites man" and "man bites dog" are the same set of vectors.' },
+  trap: 'The distinction that separates a read-about-it answer from a built-it one: "we add positional encoding to the embeddings" is wrong for any RoPE model. Say which family the model belongs to, and where the position information is actually applied.',
+  tags: ['embeddings', 'positional'],
+  xref: [['Step through one transformer block', '../genai_flow/index.html']] }
 
 ]);

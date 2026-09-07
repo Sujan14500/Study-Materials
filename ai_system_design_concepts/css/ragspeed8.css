@@ -1,0 +1,87 @@
+/* ============================================================
+   ragspeed8.css — the latency waterfall and the eight fixes.
+   Bars animate by transitioning width, so switching a fix on
+   shows the segment shrinking rather than jumping.
+   ============================================================ */
+
+.r8-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.r8-chip{font-family:var(--sans);font-size:12.2px;padding:7px 12px;border-radius:99px;
+  background:var(--panel);border:1px solid var(--line);color:var(--txt-2);cursor:pointer;
+  transition:all .18s var(--ease)}
+.r8-chip:hover{border-color:var(--line-2);color:var(--txt)}
+.r8-chip.on{background:rgba(52,211,153,.14);border-color:#34d399;color:#a7f3d0}
+.r8-chip.all{margin-left:auto;border-style:dashed}
+
+/* ---------- the three numbers ---------- */
+.r8-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+@media(max-width:760px){.r8-stats{grid-template-columns:1fr}}
+.r8-stat{background:rgba(0,0,0,.3);border:1px solid var(--line);border-left:3px solid var(--line-2);
+  border-radius:13px;padding:12px 14px}
+.r8-stat b{display:block;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--txt-3);margin-bottom:5px}
+.r8-stat strong{display:block;font-family:var(--mono);font-size:24px;color:var(--txt);
+  line-height:1.1;margin-bottom:5px;transition:color .25s}
+.r8-stat span{display:block;font-size:11.6px;color:var(--txt-3);line-height:1.5}
+.r8-stat.ok{border-left-color:#34d399}    .r8-stat.ok strong{color:#6ee7b7}
+.r8-stat.mid{border-left-color:#fbbf24}   .r8-stat.mid strong{color:#fcd34d}
+.r8-stat.bad{border-left-color:#fb7185}   .r8-stat.bad strong{color:#fda4af}
+.r8-stat.off strong{color:var(--txt-3)}
+
+/* ---------- the waterfall ---------- */
+.r8-bar{position:relative;display:flex;height:34px;border-radius:9px;overflow:visible;
+  background:rgba(0,0,0,.34);border:1px solid var(--line);margin-bottom:6px}
+.r8-seg{width:var(--w);background:var(--c);opacity:.85;
+  border-right:1px solid rgba(0,0,0,.35);
+  transition:width .45s var(--ease);animation:r8seg .4s var(--ease) both;animation-delay:var(--d)}
+.r8-seg:first-child{border-radius:8px 0 0 8px}
+.r8-ghost{width:var(--w);background:repeating-linear-gradient(45deg,
+  rgba(255,255,255,.05) 0 6px,transparent 6px 12px);transition:width .45s var(--ease)}
+@keyframes r8seg{from{opacity:0}to{opacity:.85}}
+.r8-mark{position:absolute;left:var(--x);top:-6px;bottom:-6px;transition:left .45s var(--ease)}
+.r8-mark i{position:absolute;top:0;bottom:0;width:2px;background:#fff;border-radius:2px}
+.r8-mark b{position:absolute;top:-17px;left:5px;font-size:10px;color:#fff;white-space:nowrap;
+  font-family:var(--mono)}
+
+/* ---------- per-span rows ---------- */
+.r8-rows{margin:14px 0 18px}
+.r8-row{display:grid;grid-template-columns:1fr 180px 66px;gap:12px;align-items:center;
+  padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+@media(max-width:760px){.r8-row{grid-template-columns:1fr 70px}.r8-rb{display:none}}
+.r8-rn{font-size:12.6px;color:var(--txt)}
+.r8-rn i{display:block;font-style:normal;font-size:11.2px;color:var(--txt-3);margin-top:2px}
+.r8-rb{height:7px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden}
+.r8-rb span{display:block;height:100%;background:var(--c);border-radius:4px;
+  transition:width .45s var(--ease)}
+.r8-rms{font-family:var(--mono);font-size:12px;color:var(--txt-2);text-align:right}
+
+/* ---------- the eight cards ---------- */
+.r8-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(max-width:860px){.r8-cards{grid-template-columns:1fr}}
+.r8-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;overflow:hidden;
+  transition:border-color .2s,background .2s}
+.r8-card.on{border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.05)}
+.r8-card.open{grid-column:1 / -1}
+.r8-ch{width:100%;display:flex;gap:11px;align-items:center;text-align:left;cursor:pointer;
+  background:none;border:0;padding:12px 13px;font-family:var(--sans)}
+.r8-ico{font-size:17px;flex:none}
+.r8-cn{flex:1;min-width:0}
+.r8-cn b{display:block;font-size:13.4px;color:var(--txt)}
+.r8-cn i{display:block;font-style:normal;font-size:11.4px;color:var(--txt-3);margin-top:2px}
+.r8-tag{flex:none;font-family:var(--mono);font-size:9.5px;padding:2px 7px;border-radius:99px;
+  border:1px solid rgba(52,211,153,.4);color:#6ee7b7}
+.r8-tag.pay{border-color:rgba(251,191,36,.45);color:#fcd34d}
+.r8-body{padding:0 13px 13px;animation:r8in .28s var(--ease)}
+@keyframes r8in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.r8-body p{margin:0 0 9px;font-size:12.6px;color:var(--txt-2);line-height:1.68}
+.r8-not{padding:9px 11px;border-radius:10px;background:rgba(0,0,0,.3);
+  border-left:2px solid var(--amber)}
+.r8-not b{color:var(--txt)}
+
+.r8-verdict{margin-top:16px;padding:14px 16px;border-radius:13px;font-size:13px;
+  color:var(--txt-2);line-height:1.72;background:rgba(0,0,0,.26);
+  border:1px solid var(--line);border-left:3px solid var(--cyan)}
+.r8-verdict b{color:var(--txt)}
+
+@media (prefers-reduced-motion: reduce){
+  .r8-seg,.r8-ghost,.r8-rb span,.r8-mark,.r8-body{animation:none;transition:none}
+}

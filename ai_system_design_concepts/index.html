@@ -11,6 +11,8 @@
 <link rel="stylesheet" href="css/styles.css">
 <link rel="stylesheet" href="css/notes.css">
 <link rel="stylesheet" href="css/prod40.css">
+<link rel="stylesheet" href="css/vsearch9.css">
+<link rel="stylesheet" href="css/ragspeed8.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📐</text></svg>">
 </head>
 <body>
@@ -400,6 +402,12 @@ ASOF JOIN user_features f
     <div class="glossary" id="latency-lessons"></div>
   </div>
 
+  <div class="panel">
+    <div class="panel-head"><h3>🐌 Eight fixes for a slow RAG pipeline</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Same data, same model, same answers — only engineering. Toggle a fix and the waterfall re-draws. Watch two things: how much of the budget is spent <i>around</i> the model rather than in it, and what refuses to move when all eight are on.</p>
+    <div id="ragspeed8"></div>
+  </div>
+
   <div class="callout">
     <div class="callout-ico">✂️</div>
     <div><b>When you are over budget, in order of what to try:</b> move work offline (precompute), cut the work per request (smaller candidate set, smaller model), parallelise what is independent, cache aggressively, and only then optimise code. The first two usually win by an order of magnitude; the last one wins by 20% after a fortnight.</div>
@@ -701,6 +709,13 @@ ASOF JOIN user_features f
     with efSearch if you built HNSW, and always against exact search over a golden set, because "the results
     got worse" is not a number anyone can act on.</div>
   </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>🔎 The nine ways to search a vector index</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">Everything above was one family at a time. This is the whole shelf, drawn — and they are not nine competing products, they are nine answers to one question: <b>which vectors am I allowed to skip, and what does skipping them cost?</b> Open a card for the mechanism, the recall it gives back and the line that lands it in an interview.</p>
+    <div id="vsearch9"></div>
+  </div>
+
   <div data-toolstrip="annindex"></div>
 </section>
 
@@ -1236,6 +1251,8 @@ ASOF JOIN user_features f
 <script src="js/demos.js"></script>
 <script src="js/app.js"></script>
 <script src="js/toolstrip.js"></script>
+<script src="js/vsearch9.js"></script>
+<script src="js/ragspeed8.js"></script>
 <script src="js/prod40.js"></script>
 </body>
 </html>

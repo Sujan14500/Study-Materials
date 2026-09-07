@@ -266,6 +266,38 @@ print(f"{raw:.0f} GB raw, {sq:.0f} GB int8, {pq:.0f} GB PQ")
   lay: 'Put both kinds of thing into the same space, so a picture of a dog and the word "dog" land near each other. Or describe the picture in words first and search the words.',
   tech: 'Two approaches: <ul><li><b>Joint embedding</b> — a model like CLIP trained with a contrastive objective across modalities places images and text in one space, so text queries retrieve images directly. Best for visual similarity; weaker on fine-grained text inside images.</li><li><b>Caption-then-embed</b> — a vision model describes the image at index time, and you embed and search the caption. Cheap, searchable with your existing text stack, works well for documents and screenshots, and loses purely visual detail.</li></ul>Most production systems do both and fuse the rankings, because they fail differently.',
   trap: 'For document images and screenshots, an OCR pass feeding text retrieval usually beats a joint embedding, because the information is text that happens to be rendered as pixels. Choose based on whether the signal is visual or textual.',
-  tags: ['multimodal', 'retrieval'] }
+  tags: ['multimodal', 'retrieval'] },
+
+{ id: 've33', topic: 'vectors', level: 3,
+  q: 'What is binary quantisation, and when is Hamming search good enough?',
+  lay: 'Throw away everything about each number except whether it was positive. A 768-number vector becomes 768 bits — thirty-two times smaller — and comparing two of them is one bitwise operation the processor does almost for free. You lose precision, so you use it to pick a shortlist fast and then score that shortlist properly.',
+  tech: 'Each dimension collapses to one bit, usually by sign: <code>bit = x &gt; 0</code>. A 768-d float32 vector goes from 3072 bytes to 96 bytes — 32× — and the distance becomes Hamming distance, <code>popcount(a XOR b)</code>, which modern CPUs do 64 dimensions at a time. That is the whole trick: the memory cut is what lets a billion vectors sit in RAM instead of on disk, and the memory cut is usually worth more than the arithmetic speedup.<br><br>Used alone it loses recall. Used correctly it is the first stage of a funnel: <b>oversample and rescore</b> — retrieve 10–20× the k you want using binary codes, then re-score just those candidates with the full-precision vectors (kept on disk, or in a second store) and return the true top-k. Recall lands within a point or two of exact search at a fraction of the memory.<br><br>It works best on high-dimensional embeddings (1024-d and up) from models trained or normalised with it in mind; on 384-d vectors there is not enough redundancy left and recall falls off a cliff.',
+  compare: { cols: ['float32', 'int8', 'Binary', 'PQ'],
+    rows: [
+      ['Bytes per 768-d vector', '3072', '768', '96', '~96 at m=96, tunable'],
+      ['Distance', 'dot / cosine', 'dot on integers', 'Hamming popcount', 'lookup in codebook tables'],
+      ['Recall alone', 'exact', 'near-exact', 'poor to fair', 'fair to good'],
+      ['Recall with rescoring', 'n/a', 'exact-ish', 'within ~1-2 points', 'within ~1-2 points'],
+      ['Build cost', 'none', 'calibration only', 'none — no training', 'k-means codebooks per subspace'],
+      ['Reach for it when', 'the corpus fits and you want no argument', 'an easy 4x with almost no thought', 'RAM is the binding constraint and dimensions are high', 'you need compression with better recall per byte and can train']
+    ] },
+  trap: 'The mistake is shipping binary search with no rescoring stage and then blaming the embedding model when quality drops. Binary codes are a filter, not a ranker — say "oversample then rescore with full vectors" in the same breath as "binary" and the question is answered.',
+  tags: ['ann', 'quantisation'],
+  xref: [['Watch product quantisation compress a vector', '../ai_system_design_concepts/index.html']] },
+
+{ id: 've34', topic: 'vectors', level: 1,
+  q: 'We already have SQL and NoSQL. Why did AI need a new database category at all?',
+  lay: 'The databases we had answer "find the row where this equals that". AI asks "find the things that mean roughly this" — and there is no equals to look up. Every item is a long list of numbers, the answer is the nearest few out of millions, and the usual indexes cannot help because closeness in hundreds of dimensions has no natural sort order.',
+  tech: 'A B-tree indexes a total order, and a hash index indexes equality. Similarity in 768 dimensions has neither: you cannot sort vectors so that near ones sit next to each other, which is why <code>ORDER BY distance LIMIT 10</code> without a vector index is a full scan of the table. What a vector store adds is a different index family — HNSW graphs, IVF cells, quantised codes — that answers <i>approximate</i> nearest neighbour in logarithmic-ish time, plus the operational machinery around it: distance metrics, metadata filters fused into the search rather than applied after it, compression to fit vectors in RAM, hybrid fusion with a lexical index, and sharding by vector count rather than by key range.<br><br>The other real difference is the definition of correct. A SQL query returns <i>the</i> answer; an ANN query returns an answer with a recall number attached, and that recall is a dial you tune against latency. Databases that have never had to explain "you got 94% of the right rows" are not shaped for that conversation.',
+  compare: { cols: ['Relational', 'Document NoSQL', 'Vector'],
+    rows: [
+      ['Query it answers', 'equality, range, join, aggregate', 'key lookup, partial-document match', 'nearest neighbours of a point'],
+      ['Index', 'B-tree, hash', 'B-tree, inverted', 'HNSW / IVF / PQ'],
+      ['Correctness', 'exact', 'exact', 'approximate — recall@k is a tuning dial'],
+      ['Scales by', 'rows and joins', 'partition key', 'vectors and dimensions, RAM-bound'],
+      ['Fails by', 'slow query plans', 'hot partitions', 'silently returning the wrong neighbours']
+    ] },
+  trap: 'The senior half of this answer is that the category is collapsing again: pgvector, Elasticsearch, Redis, MongoDB and SQLite all ship vector indexes now. So the honest position is "AI needed a new <i>index</i>, and a wave of new databases shipped it first". Unless you are past roughly a hundred million vectors or need per-index tuning, keeping the vectors next to the rest of your data is usually the better engineering call.',
+  tags: ['vectordb', 'basics'] }
 
 ]);

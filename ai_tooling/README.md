@@ -48,7 +48,7 @@ Learn the twelve questions and you can place a tool that did not exist when this
   the MCP, RAG and Agentic AI chapters and are defined in `C.arch` in `js/content.js`.
 - **Choosing** — the build-vs-buy ladder (add one rung at a time, and the triggers that
   justify each), and a 14-scenario "pick the right tool" drill.
-- **Drilling** — a searchable catalogue of all 95 tools, 20 rapid-fire comparisons, and a
+- **Drilling** — a searchable catalogue of all 96 tools, 20 rapid-fire comparisons, and a
   14-question quiz where every wrong answer sounds impressive.
 
 ## Files
@@ -86,7 +86,7 @@ something it does not deliver, the test says so.
 Current output:
 
 ```
-ok — 12 layers, 95 tools, 535 talking points, 14 quiz questions, 14 scenarios, 20 rapid-fire pairs
+ok — 12 layers, 96 tools, 540 talking points, 14 quiz questions, 14 scenarios, 20 rapid-fire pairs
 ```
 
 ## Where this sits

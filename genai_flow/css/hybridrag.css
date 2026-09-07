@@ -1,0 +1,122 @@
+/* ============================================================
+   hybridrag.css — the two-lane pipeline and the fusion bench.
+   The active stage is lit by a data attribute on the wrapper, so
+   the whole picture stays one SVG with no per-node bookkeeping.
+   ============================================================ */
+
+/* ---------- stage tabs ---------- */
+.hr-stagebar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.hr-tab{flex:1;min-width:132px;display:flex;flex-direction:column;gap:1px;text-align:left;
+  font-family:var(--sans);cursor:pointer;padding:9px 12px;border-radius:12px;
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line-2);
+  transition:all .2s var(--ease)}
+.hr-tab:hover{background:var(--panel-2)}
+.hr-tab.on{border-left-color:var(--c);background:color-mix(in srgb, var(--c) 12%, transparent)}
+.hr-tab span{font-size:15px}
+.hr-tab b{font-size:12.8px;color:var(--txt)}
+.hr-tab i{font-style:normal;font-size:10.6px;color:var(--txt-3);font-family:var(--mono)}
+.hr-play{align-self:stretch;font-family:var(--sans);font-size:12px;padding:0 14px;
+  border-radius:12px;background:var(--panel);border:1px solid var(--line);
+  color:var(--txt-2);cursor:pointer}
+.hr-play:hover{color:var(--txt);border-color:var(--line-2)}
+
+/* ---------- the picture ---------- */
+.hr-figure{background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:14px;
+  padding:12px;overflow-x:auto}
+.hr-svg{width:100%;min-width:660px;height:auto;display:block}
+
+.hr-box rect{fill:rgba(255,255,255,.05);stroke:var(--line-2);stroke-width:1;
+  transition:fill .3s,stroke .3s}
+.hr-box.alt rect{fill:rgba(124,92,255,.08)}
+.hr-bt{fill:var(--txt-2);font-family:var(--sans);font-size:10.5px;text-anchor:middle;
+  transition:fill .3s}
+.hr-bs{fill:var(--txt-3);font-family:var(--mono);font-size:8px;text-anchor:middle}
+.hr-wire{fill:none;stroke:rgba(255,255,255,.16);stroke-width:1.4;transition:stroke .3s,opacity .3s}
+.hr-wire.thin{stroke-width:1;stroke-dasharray:3 4}
+.hr-cap{fill:var(--txt-3);font-family:var(--mono);font-size:8.5px}
+
+/* everything dims except the live stage */
+.hr-stage{opacity:.26;transition:opacity .4s var(--ease)}
+.hr-figure[data-on="0"] .hr-stage[data-s="0"],
+.hr-figure[data-on="1"] .hr-stage[data-s="1"],
+.hr-figure[data-on="2"] .hr-stage[data-s="2"],
+.hr-figure[data-on="3"] .hr-stage[data-s="3"]{opacity:1}
+
+/* the live stage's boxes pick up colour, and its wires animate */
+.hr-figure[data-on="0"] .hr-stage[data-s="0"] .hr-box rect,
+.hr-figure[data-on="1"] .hr-stage[data-s="1"] .hr-box rect,
+.hr-figure[data-on="2"] .hr-stage[data-s="2"] .hr-box rect,
+.hr-figure[data-on="3"] .hr-stage[data-s="3"] .hr-box rect{
+  fill:rgba(255,255,255,.08);stroke:rgba(255,255,255,.34)}
+.hr-figure[data-on="0"] .hr-stage[data-s="0"] .hr-bt,
+.hr-figure[data-on="1"] .hr-stage[data-s="1"] .hr-bt,
+.hr-figure[data-on="2"] .hr-stage[data-s="2"] .hr-bt,
+.hr-figure[data-on="3"] .hr-stage[data-s="3"] .hr-bt{fill:var(--txt)}
+
+.hr-box.a rect{stroke:#60a5fa}
+.hr-box.b rect{stroke:#34d399}
+.hr-box.hi rect{fill:rgba(34,211,238,.14);stroke:#22d3ee}
+.hr-box.ok rect{fill:rgba(52,211,153,.14);stroke:#34d399}
+.hr-wire.a{stroke:rgba(96,165,250,.7)}
+.hr-wire.b{stroke:rgba(52,211,153,.7)}
+
+.hr-figure[data-on="1"] .hr-wire.a,
+.hr-figure[data-on="1"] .hr-wire.b{stroke-dasharray:6 6;animation:hrflow 1s linear infinite}
+@keyframes hrflow{to{stroke-dashoffset:-12}}
+
+/* ---------- the stage detail ---------- */
+.hr-detail{margin-top:14px;padding:15px 16px;border-radius:14px;background:var(--panel);
+  border:1px solid var(--line);border-left:3px solid var(--c);animation:hrin .3s var(--ease)}
+@keyframes hrin{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.hr-lead{margin:0 0 11px;font-size:13.4px;color:var(--txt-2);line-height:1.65}
+.hr-lead b{color:var(--txt)}
+.hr-steps{margin:0;padding-left:20px}
+.hr-steps li{font-size:12.6px;color:var(--txt-2);line-height:1.66;margin-bottom:7px}
+.hr-steps b{display:block;color:var(--txt);font-size:13px;margin-bottom:1px}
+.hr-why{display:flex;gap:10px;margin-top:12px;padding:11px 13px;border-radius:11px;
+  background:rgba(0,0,0,.3);border:1px solid var(--line)}
+.hr-why span{color:var(--c)}
+.hr-why p{margin:0;font-size:12.6px;color:var(--txt-2);line-height:1.65}
+
+/* ---------- the fusion bench ---------- */
+.hr-bench{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.hr-bench h4{margin:0 0 4px;font-size:15px;color:var(--txt)}
+.hr-bsub{margin:0 0 12px;font-size:12.6px;color:var(--txt-3);line-height:1.6}
+.hr-qs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:13px}
+.hr-q{font-family:var(--mono);font-size:11.5px;padding:7px 11px;border-radius:9px;
+  background:var(--panel);border:1px solid var(--line);color:var(--txt-2);cursor:pointer;
+  transition:all .18s var(--ease)}
+.hr-q:hover{color:var(--txt);border-color:var(--line-2)}
+.hr-q.on{background:rgba(34,211,238,.13);border-color:#22d3ee;color:#a5f3fc}
+
+.hr-lanes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:900px){.hr-lanes{grid-template-columns:1fr}}
+.hr-lane{background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:12px;padding:12px}
+.hr-lane.a{border-top:2px solid #60a5fa}
+.hr-lane.b{border-top:2px solid #34d399}
+.hr-lane.f{border-top:2px solid #22d3ee;background:rgba(34,211,238,.05)}
+.hr-lane h5{margin:0 0 9px;font-size:12.4px;color:var(--txt);display:flex;
+  justify-content:space-between;align-items:baseline;gap:8px}
+.hr-lane h5 span{font-family:var(--mono);font-size:9.5px;color:var(--txt-3);font-weight:400}
+.hr-lane ol{margin:0;padding-left:19px}
+.hr-lane li{font-size:11.8px;color:var(--txt-3);line-height:1.5;margin-bottom:6px}
+.hr-lane li b{display:inline-block;font-family:var(--mono);font-size:10px;color:var(--txt-2);
+  margin-right:6px;padding:0 4px;border-radius:4px;background:rgba(255,255,255,.07)}
+.hr-lane li i{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;
+  color:var(--txt-3);opacity:.8}
+.hr-lane li.win{color:var(--txt)}
+.hr-lane li.win:after{content:" ★";color:var(--amber)}
+
+.hr-math{margin-top:12px;padding:10px 13px;border-radius:11px;background:rgba(0,0,0,.3);
+  border:1px solid var(--line);font-size:12.4px;color:var(--txt-2);line-height:1.65}
+.hr-math code{font-family:var(--mono);font-size:11.6px;color:#a5f3fc}
+.hr-math b{color:var(--txt);font-family:var(--mono);font-size:11.6px}
+.hr-verdict{margin-top:10px;padding:12px 14px;border-radius:11px;font-size:12.8px;
+  color:var(--txt-2);line-height:1.68;background:rgba(0,0,0,.26);
+  border:1px solid var(--line);border-left:3px solid var(--amber)}
+.hr-verdict b{color:var(--txt)}
+
+@media (prefers-reduced-motion: reduce){
+  .hr-detail,.hr-figure .hr-wire{animation:none}
+  .hr-stage{opacity:1}
+}

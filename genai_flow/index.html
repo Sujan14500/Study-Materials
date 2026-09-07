@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="css/styles.css">
 <link rel="stylesheet" href="css/notes.css">
 <link rel="stylesheet" href="css/prod40.css">
+<link rel="stylesheet" href="css/hybridrag.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
 <style id="mm-css">
 .mf-panel{background:rgba(0,0,0,.26);border:1px solid var(--line);border-top:3px solid var(--c);
@@ -653,6 +654,12 @@ sim("dog", "database")  -> 0.07</pre>
     <div class="callout-ico">🎯</div>
     <div><b>Retrieval quality is the product.</b> If the right chunk isn't retrieved, no model and no prompt can save the answer. Debug retrieval before you blame the LLM.</div>
   </div>
+  <div class="panel">
+    <div class="panel-head"><h3>🔀 Hybrid RAG, end to end</h3><span class="panel-tag">animated</span></div>
+    <p class="panel-sub">The whole shape in one picture: index once into <b>two</b> stores, query both at the same time, fuse the two rankings, then augment and generate. Play it, or click a stage. Underneath, the step every diagram draws as a funnel and never explains — reciprocal rank fusion — computed live on three queries where a different lane wins each time.</p>
+    <div id="hybridrag"></div>
+  </div>
+
   <div data-toolstrip="rag"></div>
 </section>
 
@@ -1930,6 +1937,7 @@ SUMX(Sales,
 <script src="js/demos.js"></script>
 <script src="js/app.js"></script>
 <script src="js/multimodal.js"></script>
+<script src="js/hybridrag.js"></script>
 <script src="js/toolstrip.js"></script>
 <script src="js/prod40.js"></script>
 </body>

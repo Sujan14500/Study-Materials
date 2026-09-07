@@ -744,4 +744,66 @@ ids.forEach(id => assert(html.includes('id="' + id + '"') || demos.includes('id=
   console.log(`  ${P.Q.length} production questions across ${P.CATS.length} categories, every diagram renders`);
 }
 
+/* ---- hybrid RAG: the fusion bench must not lie about its own arithmetic ---- */
+/* The widget prints a rank per lane and a rank after fusion, and a verdict
+   written in prose next to them. RRF is re-run here so that editing a list
+   without editing the verdict fails the build instead of teaching fiction. */
+{
+  const page = fs.readFileSync('index.html', 'utf8');
+  const hCtx = { window: {} }; hCtx.window.window = hCtx.window;
+  vm.createContext(hCtx);
+  vm.runInContext(fs.readFileSync('js/hybridrag.js', 'utf8'), hCtx);
+  const H = hCtx.window.HYBRIDRAG;
+
+  assert(H, 'hybridrag.js did not publish its data');
+  assert(page.includes('id="hybridrag"'), 'the hybrid RAG widget is never mounted');
+  assert(page.includes('css/hybridrag.css'), 'hybridrag.css is not linked');
+  assert(page.includes('js/hybridrag.js'), 'hybridrag.js is not loaded');
+  assert(H.STAGES.length === 4, 'hybrid RAG is drawn in four stages: index, retrieve, augment, generate');
+  H.STAGES.forEach(s => {
+    assert(s.steps.length >= 4 && s.lead && s.why, `stage "${s.id}" is thin`);
+    s.steps.forEach(t => assert(t[1].length > 60, `stage "${s.id}" has a step with no explanation`));
+  });
+
+  /* RRF, re-derived: rank-only fusion, k = 60 */
+  const ref = (lists, k = 60) => {
+    const sc = {};
+    lists.forEach(l => l.forEach((id, i) => sc[id] = (sc[id] || 0) + 1 / (k + i + 1)));
+    return Object.keys(sc).sort((a, b) => {
+      const d = sc[b] - sc[a];
+      return Math.abs(d) > 1e-12 ? d : a.localeCompare(b);   /* ties must not depend on float order */
+    });
+  };
+
+  H.QUERIES.forEach(q => {
+    [...q.dense, ...q.bm25].forEach(id => assert(H.DOCS[id], `query "${q.q}" ranks unknown doc ${id}`));
+    assert(H.DOCS[q.answer], `query "${q.q}" names an answering doc that is not in the corpus`);
+    const mine = ref([q.dense, q.bm25]);
+    const theirs = H.rrf([q.dense, q.bm25]).map(f => f.id);
+    /* joined, not deep-equal: the widget's arrays come from another vm realm */
+    assert.strictEqual(theirs.join(","), mine.join(","),
+      `rrf() disagrees with the reference on "${q.q}"`);
+
+    /* and the prose must match the numbers it sits next to */
+    const fusedRank = mine.indexOf(q.answer) + 1;
+    const denseRank = q.dense.indexOf(q.answer) + 1;
+    const bm25Rank = q.bm25.indexOf(q.answer) + 1;
+    if (/fusion does/.test(q.verdict))
+      assert(fusedRank === 1 && denseRank > 1 && bm25Rank > 1,
+        `"${q.q}" claims fusion promotes the answer, but the ranks say ${denseRank}/${bm25Rank}/${fusedRank}`);
+    if (/still ranks it second/.test(q.verdict))
+      assert(fusedRank === 2, `"${q.q}" claims fusion ranks it second; it ranks it ${fusedRank}`);
+  });
+
+  /* the fusion has to be doing something: at least one query must be a case
+     neither lane gets right on its own, or the widget argues for nothing */
+  const promoted = H.QUERIES.filter(q => {
+    const f = ref([q.dense, q.bm25]).indexOf(q.answer);
+    return f === 0 && q.dense.indexOf(q.answer) > 0 && q.bm25.indexOf(q.answer) > 0;
+  });
+  assert(promoted.length >= 1, 'no query demonstrates fusion beating both lanes — the bench proves nothing');
+
+  console.log(`  hybrid RAG: 4 stages, ${H.QUERIES.length} fusion queries, RRF re-derived`);
+}
+
 console.log('ok — content data is consistent');

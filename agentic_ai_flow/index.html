@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="css/notes.css">
 <link rel="stylesheet" href="css/guardrails7.css">
 <link rel="stylesheet" href="css/prod40.css">
+<link rel="stylesheet" href="css/obstrace.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 </head>
 <body>
@@ -872,6 +873,12 @@ order_id A-4471 and amount_cents 999999. --&gt;</pre>
     <p class="panel-sub">The questions that decide whether an agent is a demo or a system: what happens when a dependency dies, what a retry does to a refund, how much damage a wrong tool call can do, and how you debug a bill that doubled overnight. Open a card for what the interviewer is really testing.</p>
     <div id="prod40" data-cats="rely,sec,debug"></div>
   </div>
+  <div class="panel">
+    <div class="panel-head"><h3>📡 System healthy ≠ answer correct</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Four incidents. In every one the infrastructure dashboard is entirely green &mdash; CPU fine, p95 fine, zero errors &mdash; and the user got a wrong answer. Pick an incident, read the trace, and find the span that knew. This is the difference between watching whether the system <i>ran</i> and watching whether it was <i>right</i>.</p>
+    <div id="obstrace"></div>
+  </div>
+
   <div data-toolstrip="ship"></div>
 </section>
 
@@ -1161,6 +1168,7 @@ order_id A-4471 and amount_cents 999999. --&gt;</pre>
 <script src="js/app.js"></script>
 <script src="js/toolstrip.js"></script>
 <script src="js/guardrails7.js"></script>
+<script src="js/obstrace.js"></script>
 <script src="js/prod40.js"></script>
 </body>
 </html>

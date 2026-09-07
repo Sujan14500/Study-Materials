@@ -742,4 +742,95 @@ C.annFamilies.forEach(f => {
   console.log(`  ${shown.length} of ${P.Q.length} production questions mounted here`);
 }
 
+/* ---- the nine vector search techniques ---- */
+{
+  const page = fs.readFileSync('index.html', 'utf8');
+  const src = fs.readFileSync('js/vsearch9.js', 'utf8');
+  vm.runInContext(src, ctx);
+  const T = ctx.window.VSEARCH9;
+  assert(T && T.length === 9, 'vsearch9.js does not publish nine techniques');
+  assert(page.includes('id="vsearch9"'), 'vsearch9 is never mounted on the page');
+  assert(page.includes('css/vsearch9.css'), 'vsearch9.css is not linked');
+  assert(page.includes('js/vsearch9.js'), 'vsearch9.js is not loaded');
+
+  /* a card whose drawing has no function renders an empty box and says nothing,
+     so the names are checked against the VIZ table rather than trusted */
+  const drawn = new Set((src.split('const VIZ = {')[1].split('\n};')[0]
+    .match(/^ {2}([a-z]+):/gm) || []).map(s => s.trim().replace(':', '')));
+  assert(drawn.size >= 9, 'could not read the VIZ drawing table out of vsearch9.js');
+
+  const ids = new Set();
+  T.forEach(x => {
+    assert(!ids.has(x.id), 'duplicate technique id ' + x.id);
+    ids.add(x.id);
+    ['name', 'ico', 'c', 'viz', 'one', 'how', 'cost', 'recall', 'use', 'line'].forEach(k =>
+      assert(x[k] && String(x[k]).trim(), 'technique ' + x.id + ' is missing ' + k));
+    assert(drawn.has(x.viz), 'technique ' + x.id + ' asks for a "' + x.viz + '" drawing VIZ does not define');
+    assert(x.bullets.length === 3, 'technique ' + x.id + ' needs exactly three bullets to fit the card');
+    assert(x.how.length > 300, 'technique ' + x.id + ' explains itself in ' + x.how.length +
+      ' characters; that is a caption, not an answer');
+  });
+  /* the spread is the point of the widget — the easy three cannot be all of it */
+  ['flat', 'ann', 'hnsw', 'ivf', 'ivfpq', 'pq', 'binary', 'hybrid', 'filtered'].forEach(id =>
+    assert(ids.has(id), 'the nine techniques no longer include ' + id));
+  console.log('  9 vector search techniques, each with a drawing and an interview line');
+}
+
+/* ---- the eight RAG latency fixes ---- */
+/* The widget makes arithmetic claims on screen. They are re-derived here, so
+   that editing a number in one place and not the other fails the build rather
+   than teaching someone a wrong latency budget. */
+{
+  const page = fs.readFileSync('index.html', 'utf8');
+  vm.runInContext(fs.readFileSync('js/ragspeed8.js', 'utf8'), ctx);
+  const R = ctx.window.RAGSPEED8;
+  assert(R && R.FIXES.length === 8, 'ragspeed8.js does not publish eight fixes');
+  assert(page.includes('id="ragspeed8"'), 'ragspeed8 is never mounted on the page');
+  assert(page.includes('css/ragspeed8.css'), 'ragspeed8.css is not linked');
+  assert(page.includes('js/ragspeed8.js'), 'ragspeed8.js is not loaded');
+  R.FIXES.forEach(f => {
+    ['n', 'ico', 'does', 'not', 'effect'].forEach(k =>
+      assert(f[k] && String(f[k]).trim(), 'fix ' + f.id + ' is missing ' + k));
+    assert(f.not.length > 80, 'fix ' + f.id + ' does not say what it fails to fix');
+  });
+
+  const none = R.pipeline({});
+  const all = {}; R.FIXES.forEach(f => all[f.id] = true);
+  const every = R.pipeline(all);
+
+  /* the baseline is meant to read as "a pipeline nobody profiled" */
+  assert(none.total > 4000 && none.total < 6000,
+    `baseline is ${none.total} ms, which no longer reads as a slow pipeline`);
+
+  /* every fix must move something, or it is on the list for decoration */
+  R.FIXES.forEach(f => {
+    const one = R.pipeline({ [f.id]: true });
+    const moved = one.total < none.total || one.ttft < none.ttft || one.hit !== null;
+    assert(moved, `fix "${f.id}" changes none of the three numbers`);
+  });
+
+  /* streaming is the honest one: it must move time to first token and nothing else */
+  const streamed = R.pipeline({ stream: true });
+  assert(streamed.total === none.total, 'streaming changed the total, which is not what streaming does');
+  assert(streamed.ttft < none.ttft * 0.5, 'streaming did not move time to first token');
+
+  /* the lesson of the widget: eight pipeline fixes cannot shorten generation */
+  const decodeNone = none.rows.find(r => r.id === 'decode').ms;
+  const decodeAll = every.rows.find(r => r.id === 'decode').ms;
+  assert(decodeNone === decodeAll, 'decode moved — no pipeline fix in this list can do that');
+  assert(every.total > decodeAll, 'the whole request is somehow shorter than its own decode');
+  assert(every.total < none.total * 0.85, 'all eight fixes barely move the total');
+  assert(decodeAll / every.total > 0.8,
+    'with everything on, generation should dominate what is left; it does not');
+
+  /* parallelising must cost the slowest lane, never the sum */
+  const seq = R.pipeline({}), par = R.pipeline({ parallel: true });
+  const sum = ['guard', 'dense', 'bm25'].reduce((a, id) => a + seq.rows.find(r => r.id === id).ms, 0);
+  const group = par.rows.find(r => r.id === 'group');
+  assert(group && group.ms < sum, 'the concurrent group is not cheaper than running the lanes in order');
+
+  console.log(`  8 latency fixes: ${none.total} ms baseline → ${every.total} ms, ` +
+              `${Math.round(decodeAll / every.total * 100)}% of it generation`);
+}
+
 console.log('ok — content data and widget arithmetic are consistent');

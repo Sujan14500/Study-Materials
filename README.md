@@ -15,13 +15,13 @@ time you have, and a button that opens whatever you should do next.
 
 | Folder | What it is | Size |
 |--------|-----------|------|
-| [`START_HERE`](START_HERE) | The roadmap and course launcher | 1 page |
-| [`ai_interview_prep`](ai_interview_prep) | 558 interview questions with plain-English *and* technical answers, 236 multiple-choice questions, flashcards, timed mock interview | 558 questions |
+| [`START_HERE`](START_HERE) | The roadmap, a skills tree that maps every skill to the course teaching it, and the course launcher | 1 page |
+| [`ai_interview_prep`](ai_interview_prep) | 569 interview questions with plain-English *and* technical answers, 236 multiple-choice questions, flashcards, timed mock interview | 569 questions |
 | [`genai_flow`](genai_flow) | How LLMs actually work — tokens through to shipping, plus deep dives on one transformer block, decoding controls, chunking, the fine-tuning menu, LLM-as-judge, multimodal and beyond-RAG | 25 chapters |
-| [`ai_system_design_concepts`](ai_system_design_concepts) | AI/ML system design — metrics, latency budgets, capacity, vector indexes, serving, plus caching layers, parallelism, Elasticsearch and big-files-small-RAM | 23 chapters |
+| [`ai_system_design_concepts`](ai_system_design_concepts) | AI/ML system design — metrics, latency budgets, capacity, vector indexes, serving, plus caching layers, parallelism, Elasticsearch and big-files-small-RAM, the nine vector search techniques drawn, and eight latency fixes on a live waterfall | 23 chapters |
 | [`agentic_ai_flow`](agentic_ai_flow) | Agent architecture — the loop, tools, planning, memory, multi-agent, MCP, plus harness engineering and an eight-failure playbook | 17 chapters |
 | [`projects_walkthrough`](projects_walkthrough) | Two real systems taken apart: a refund agent and a support platform | 18 chapters |
-| [`ai_tooling`](ai_tooling) | The tool ecosystem by layer: 95 named tools across LLMs, agent frameworks, RAG, embeddings, MCP, guardrails, observability, memory, agent SDKs, automation, vector databases and FastAPI/Streamlit serving, with two lines and five interview points on every one | 19 chapters |
+| [`ai_tooling`](ai_tooling) | The tool ecosystem by layer: 96 named tools across LLMs, agent frameworks, RAG, embeddings, MCP, guardrails, observability, memory, agent SDKs, automation, vector databases and FastAPI/Streamlit serving, with two lines and five interview points on every one | 19 chapters |
 | [`langgraph`](langgraph) | State, graphs, checkpointing, interrupts, time travel | 15 chapters |
 | [`dsa_basics`](dsa_basics) | Big-O through dynamic programming, every algorithm animated | 15 chapters |
 | [`langchain`](langchain) | Models, LCEL, splitters, retrievers, the RAG chain, agents | 13 chapters |

@@ -1852,5 +1852,11 @@ C.glossary = C.glossary.concat([
   ['Agentic RAG', 'The model decides whether, what and how many times to search, then critiques its own results.'],
   ['GraphRAG', 'Build an entity graph over the corpus and traverse relationships instead of measuring vector distance.'],
   ['CAG', 'Cache-augmented generation - preload a small stable corpus into a precomputed KV cache, no retrieval hop.'],
-  ['Knowledge fabric (OKF)', 'A governed semantic layer over enterprise sources - ontology, lineage, access policy. Governance, not retrieval.']
+['Knowledge fabric (OKF)', 'A governed semantic layer over enterprise sources - ontology, lineage, access policy. Governance, not retrieval.'],
+  ['Neural network', 'Layers of weighted sums and non-linearities, fitted by gradient descent. Everything on this page is one of these underneath.'],
+  ['Tokenization', 'Splitting text into subword units the model has embeddings for. Rare words become several tokens; that is why they cost more.'],
+  ['Transfer learning', 'Reusing what a model learned on a large general task for a smaller specific one. Prompting, adapters and fine-tuning are three rungs of it.'],
+  ['Fine-tuning', 'Updating weights on your own examples to change behaviour - format, tone, tool discipline. Not the way to add facts; retrieve those.'],
+  ['Diffusion model', 'Generates by removing noise from a whole canvas over many steps, guided by a prompt. Latency is steps x one model pass, not output length.'],
+  ['Prompt engineering', 'Writing the instruction, the examples and the output contract so the model does the task reliably rather than occasionally.']
 ]);

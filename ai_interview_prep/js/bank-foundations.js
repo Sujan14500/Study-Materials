@@ -283,6 +283,28 @@ margin = abs(top.get("yes", -99) - top.get("no", -99))   # route to a human if t
   dgm: { nodes: [{ t: 'one call', s: 'fixed' }, { t: 'chain', s: 'you choose steps' }, { t: 'router', s: 'model picks a branch' }, { t: 'agent loop', s: 'model picks everything', k: 'warn' }],
     cap: 'Left to right: more capability, less predictability, harder evaluation.' },
   trap: '"When would you refuse to build an agent?" When the task has a known sequence, when cost variance is unacceptable, or when every action is irreversible. Saying that out loud signals experience.',
-  tags: ['agents', 'design'], orig: 46 }
+  tags: ['agents', 'design'], orig: 46 },
+
+{ id: 'fo33', topic: 'foundations', level: 1,
+  q: 'What is transfer learning, and how does it relate to fine-tuning?',
+  lay: 'Learn something general once, at enormous cost, then reuse it for a specific job at tiny cost. Every large model you use is somebody else\'s expensive general training that you are borrowing. Fine-tuning is one way of borrowing it; there are cheaper ones.',
+  tech: 'Transfer learning is the umbrella: take representations learned on a large general task and reuse them on a smaller, related one, because the early layers of a trained network encode features that are not task-specific. The forms, cheapest first:<ul><li><b>In-context learning</b> — no weights change at all; examples in the prompt steer behaviour. The characteristic transfer mechanism of the LLM era, and the one to try first.</li><li><b>Feature extraction</b> — freeze the model, use its output vectors as inputs to a small classifier or a retrieval index. This is what every embedding pipeline is doing.</li><li><b>Parameter-efficient fine-tuning</b> — train a small number of new parameters (LoRA adapters) and leave the base frozen. Most of the benefit, a fraction of the compute, and swappable per customer.</li><li><b>Full fine-tuning</b> — update all the weights on your data. Highest cost, highest risk of degrading general capability.</li><li><b>Continued pretraining</b> — more of the original objective on domain text, when the domain\'s vocabulary itself is unfamiliar.</li></ul>',
+  trap: 'The interview trap is treating fine-tuning as the default form of transfer. State the ladder — prompt, then retrieve, then adapters, then full fine-tune — and say that most teams reach for the fourth rung to solve a problem the second one owns.',
+  tags: ['training', 'basics'] },
+
+{ id: 'fo34', topic: 'foundations', level: 1,
+  q: 'What is a diffusion model, and how is it different from an LLM?',
+  lay: 'Take a picture and add noise to it, again and again, until it is static. Now train a model to undo one step of that. Start from pure static and run the undo step fifty times, and a picture appears — steered towards your prompt. It sculpts the whole canvas at once, where a language model writes one word after another and never goes back.',
+  tech: 'Forward process: add Gaussian noise to the data over T steps until it is indistinguishable from noise. The model — a U-Net or a diffusion transformer — is trained to predict the noise that was added at a given step. Sampling runs the process backwards from noise, denoising step by step, with the text prompt injected by cross-attention and its influence amplified by classifier-free guidance. Latent diffusion, which is what Stable Diffusion and most production image models are, runs all of that inside a compressed latent space and decodes once at the end, which is what made it affordable.<br><br>Engineering consequences that matter more than the maths: latency is <b>steps × one model pass</b>, so the scheduler and the step count are your latency dial in a way an LLM has no equivalent of; quality and speed trade against each other continuously; and generation is not left-to-right, so inpainting, editing and structural conditioning (ControlNet) are natural rather than bolted on.',
+  compare: { cols: ['Diffusion', 'LLM'],
+    rows: [
+      ['Generates', 'the whole output, refined over steps', 'one token at a time, left to right'],
+      ['Latency driver', 'number of denoising steps', 'number of output tokens'],
+      ['Conditioning', 'cross-attention plus guidance scale', 'the prompt itself'],
+      ['Can revise its own output', 'yes, that is the mechanism', 'no, only by generating again'],
+      ['Typical failure', 'prompt ignored, artefacts, wrong counts', 'confident fabrication']
+    ] },
+  trap: 'Worth knowing that the boundary is blurring: diffusion language models generate text by denoising a whole sequence in parallel, and transformers now replace the U-Net inside image models. The useful distinction is not architecture, it is whether generation is iterative refinement of the whole output or sequential extension of it.',
+  tags: ['diffusion', 'multimodal'] }
 
 ]);

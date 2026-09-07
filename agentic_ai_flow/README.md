@@ -37,7 +37,7 @@ open index.html           # macOS
 | 10 | Guardrails & HITL | Gate drill: run it, ask a human, or block in code — seven actions, real answers |
 | 11 | Reliability maths | Sliders for per-step accuracy and step count; watch 95% become 36% |
 | 12 | Evaluating agents | Four runs graded on outcome *and* trajectory — two pass an outcome-only eval and shouldn't |
-| 13 | Ship it | Cost calculator showing quadratic growth, architecture, a checklist that saves, and 17 production interview questions on reliability, security and debugging |
+| 13 | Ship it | Cost calculator showing quadratic growth, architecture, a checklist that saves, 17 production interview questions on reliability, security and debugging, and four incidents where every infrastructure metric is green and the answer is still wrong |
 | 14 | MCP | Step a whole JSON-RPC session frame by frame, and watch the N×M wiring grid collapse |
 | 15 | Harness engineering | The six layers between the model and the world, then two agents with the same model and tools whose only differences are code - revealed one row at a time |
 | 16 | Failure playbook | Eight production failures with a detection, one cheap recovery, an honest degradation and a metric each; plus why an agent forgets everything at turn 50, and the context budget that prevents it |
@@ -52,6 +52,7 @@ index.html        all chapter markup
 css/styles.css    one theme, no framework (shared base + this course's accents at the end)
 js/content.js     every piece of course content — edit here to change the course
 js/demos.js       the interactive widgets
+js/obstrace.js    four green-dashboard incidents and the trace span that knew
 js/app.js         navigation, progress, XP
 test.js           node test.js — checks the course data is self-consistent
 ```

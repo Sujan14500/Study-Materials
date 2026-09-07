@@ -338,6 +338,18 @@ C.cats.push(
       pick:'Any RAG system whose inputs are real-world documents rather than clean markdown.',
       watch:'hi_res is slow and CPU-hungry. Choose the strategy per document type, not globally.' },
 
+    { id:'firecrawl', n:'Firecrawl', by:'Firecrawl (Mendable)', kind:'ingestion',
+      two:'Turns a URL — or a whole site — into clean Markdown an LLM can read, handling JavaScript rendering, crawling and rate limits so your pipeline does not have to.',
+      pts:[
+        'The problem it solves is unglamorous and constant: a modern page is a JavaScript application, so <code>requests.get</code> returns a shell and your chunker indexes navigation menus.',
+        'Four modes worth naming: <b>scrape</b> one page, <b>crawl</b> a site by following links, <b>map</b> a site to its URLs, and <b>extract</b> structured fields against a schema.',
+        'Output is Markdown with the boilerplate stripped, which matters more than it sounds — headers and footers repeated on every page poison both the embeddings and the BM25 statistics.',
+        'It completes the third leg of the common agent stack: memory (Mem0), tools (MCP), and web data. An agent without a way to read the live web is limited to what you indexed.',
+        'Open source with a hosted API. The honest caveat is that scraping is a legal and etiquette question as well as a technical one — robots.txt, terms of service and rate limits are your responsibility, not the library\'s.'
+      ],
+      pick:'Any RAG or agent system whose sources include public web pages, docs sites or competitor content.',
+      watch:'Crawl breadth is a cost and a politeness setting. Cap depth and page count before the first run, not after the bill.' },
+
     { id:'embedchain', n:'EmbedChain', by:'Mem0', kind:'wrapper',
       two:'A deliberately tiny RAG wrapper — add a source, ask a question, three lines total. Now folded into the Mem0 project.',
       pts:[

@@ -381,4 +381,40 @@ ids.forEach(id => assert(html.includes('id="' + id + '"') || demos.includes('id=
   console.log(`  ${shown.length} of ${P.Q.length} production questions mounted here`);
 }
 
+/* ---- observability: healthy is not correct ---- */
+/* The whole claim of the widget is that infrastructure metrics stay green while
+   the answer is wrong. If a case ever ships with a red health check or an
+   unflagged trace, it stops making that argument and nobody would notice. */
+{
+  const page = fs.readFileSync('index.html', 'utf8');
+  const oCtx = { window: {} }; oCtx.window.window = oCtx.window;
+  vm.createContext(oCtx);
+  vm.runInContext(fs.readFileSync('js/obstrace.js', 'utf8'), oCtx);
+  const O = oCtx.window.OBSTRACE;
+
+  assert(O, 'obstrace.js did not publish its data');
+  assert(page.includes('id="obstrace"'), 'the observability widget is never mounted');
+  assert(page.includes('css/obstrace.css'), 'obstrace.css is not linked');
+  assert(page.includes('js/obstrace.js'), 'obstrace.js is not loaded');
+
+  assert(O.HEALTH.every(h => h.ok),
+    'a health check is red — the point of the widget is that they are all green');
+  assert(O.CASES.length >= 4, 'four incidents is the floor; there are four distinct failure classes');
+
+  O.CASES.forEach(c => {
+    assert(c.ask && c.ask.length > 20, `case "${c.id}" has no question a user would ask`);
+    ['said', 'truth', 'tell', 'metric', 'fix'].forEach(k =>
+      assert(c[k] && c[k].length > 40, `case "${c.id}" is missing or thin on ${k}`));
+    assert(c.spans.length >= 3, `case "${c.id}" has too short a trace to read`);
+    assert(c.spans.every(s => s.ok),
+      `case "${c.id}" has a span marked failed — every span must succeed, or the dashboard would have caught it`);
+    const flagged = c.spans.filter(s => s.flag);
+    assert(flagged.length === 1,
+      `case "${c.id}" flags ${flagged.length} spans; exactly one span should be the tell`);
+    assert(c.fix.length > 120, `case "${c.id}" needs a fix someone could actually implement`);
+  });
+
+  console.log(`  observability: ${O.CASES.length} green-dashboard incidents, one tell each`);
+}
+
 console.log('ok — content data is consistent');

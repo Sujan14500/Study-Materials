@@ -1,6 +1,6 @@
 # AI Interview Prep
 
-558 GenAI and AI-engineer interview questions, each answered twice — once in plain
+569 GenAI and AI-engineer interview questions, each answered twice — once in plain
 English so it sticks, once at interview depth so it survives the follow-up — plus
 236 multiple-choice questions, flashcards with spaced repetition, and a timed mock
 interview that makes you answer out loud.
@@ -21,7 +21,7 @@ open index.html           # macOS
 
 | Mode | What it is for |
 |------|----------------|
-| **Study** | Browse and search all 558 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
+| **Study** | Browse and search all 569 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
 | **Flashcards** | Recall, not recognition. Say the answer out loud, flip, then rate yourself. Cards you rate badly come back sooner — the schedule is SM-2-lite and lives in `localStorage`. |
 | **Quiz** | Multiple choice with an explanation after every question, optionally timed. Every wrong option is a real misconception, and the explanation says why the tempting answer is wrong. |
 | **Mock interview** | A timed round for a chosen role and level. Questions arrive one at a time with a clock and a target answer length. Reveal, self-rate, and get a report with your weakest topic and how often you ran long. |

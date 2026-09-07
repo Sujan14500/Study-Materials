@@ -86,4 +86,34 @@ assert(absent.length === 0, `app.js targets ids nothing creates: ${absent.join('
   console.log('  app boots against a stub DOM without throwing');
 }
 
+/* ---- the skills tree ---- */
+/* Every leaf promises "this course teaches it", so a leaf pointing at a course
+   that no longer exists is a broken promise on the front page. */
+{
+  vm.runInContext(fs.readFileSync('js/skilltree.js', 'utf8'), ctx);
+  const TREE = ctx.window.SKILLTREE;
+  assert(TREE && TREE.length >= 6, 'skilltree.js does not publish a tree');
+  assert(html.includes('id="skilltree"'), 'the skills tree is never mounted');
+  assert(html.includes('css/skilltree.css'), 'skilltree.css is not linked');
+  assert(html.includes('js/skilltree.js'), 'skilltree.js is not loaded');
+
+  const used = new Set();
+  let leaves = 0;
+  TREE.forEach(b => {
+    ['id', 'n', 'ico', 'c', 'why'].forEach(k => assert(b[k], `branch "${b.id || '?'}" is missing ${k}`));
+    assert(b.why.length > 60, `branch "${b.n}" needs a real reason for existing`);
+    assert(b.leaves.length >= 3, `branch "${b.n}" has too few skills to be a branch`);
+    b.leaves.forEach(l => {
+      leaves++;
+      assert(l.n && l.ico, `a leaf of "${b.n}" is missing its name or icon`);
+      assert(l.what.length > 80, `leaf "${l.n}" says nothing useful about what it means`);
+      assert(C[l.course], `leaf "${l.n}" points at unknown course "${l.course}"`);
+      used.add(l.course);
+    });
+  });
+  /* a tree that only ever sends you to one course is a menu, not a map */
+  assert(used.size >= 7, `the tree only routes to ${used.size} courses`);
+  console.log(`  skills tree: ${TREE.length} branches, ${leaves} skills, routing to ${used.size} courses`);
+}
+
 console.log('ok — roadmap is consistent');

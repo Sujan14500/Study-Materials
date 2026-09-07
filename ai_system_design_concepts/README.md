@@ -45,12 +45,12 @@ open index.html           # macOS
 | 5 | Features & skew | Eight features: safe, skewed, or leaking? Two are genuinely nasty |
 | 6 | The model ladder | Pick a task, watch the right rung move from "a few if-statements" to "LLM" on the same ladder |
 | 7 | Retrieval funnel | Tune the stage sizes; watch the first stage cap everything downstream |
-| 8 | Latency budgets | Toggle components against a time budget; turn on the LLM and watch 200ms become impossible |
+| 8 | Latency budgets | Toggle components against a time budget; turn on the LLM and watch 200ms become impossible. Then eight engineering fixes for a slow RAG pipeline applied to a live waterfall — and the thing that refuses to move when all eight are on |
 | 9 | Capacity & scale | Server sizing from users and requests; find out the cache is the biggest lever |
 | 10 | Offline → online | A/B sample-size calculator, plus a peeking slider that wrecks your false-positive rate |
 | 11 | Feedback loops | 60 items, 10 slots, 25 rounds — watch the catalogue collapse to 10, then add exploration |
 | 12 | RAG at scale | Chunk size, k, hybrid, rerank, cache → how often the right document is found, and what it costs |
-| 13 | Vector indexes | Watch k-means carve a corpus into cells, then drag the query around: how many vectors the search skipped, and which true neighbours it lost by skipping them. Then the nprobe sweep, the four index families, product quantization and a walk down an HNSW graph |
+| 13 | Vector indexes | Watch k-means carve a corpus into cells, then drag the query around: how many vectors the search skipped, and which true neighbours it lost by skipping them. Then the nprobe sweep, the four index families, product quantization and a walk down an HNSW graph. Then all nine search techniques on one shelf — brute force, ANN, HNSW, IVF, IVF-PQ, PQ, binary, hybrid and filtered — each with its own drawing |
 | 14 | LLM serving & cost | Model-cascade simulator; a KV-cache ceiling calculator that turns context length into a concurrency limit; and prefill/decode levers — streaming, prompt caching, speculative decoding — that each move one number and stubbornly not the others |
 | 15 | Canonical designs | Feed, search, fraud, support assistant — stage by stage, with the gotcha on each |
 | 16 | Operate it | Rollout ladder, failure modes and fallbacks, a checklist that saves, and 25 production interview questions with animated diagrams |
@@ -74,6 +74,8 @@ index.html        all chapter markup
 css/styles.css    one theme, no framework (shared base + this course's accents at the end)
 js/content.js     every piece of course content — edit here to change the course
 js/demos.js       the interactive widgets, including all the arithmetic
+js/vsearch9.js    the nine vector search techniques, data and drawings
+js/ragspeed8.js   the eight latency fixes and the waterfall model behind them
 js/app.js         navigation, progress, XP
 test.js           node test.js — checks the content AND the widget maths
 ```

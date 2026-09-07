@@ -1,0 +1,136 @@
+/* ============================================================
+   vsearch9.css — nine vector search techniques, nine pictures.
+
+   The drawings are static SVG animated with CSS only: no timers,
+   no canvas, and everything stops for prefers-reduced-motion.
+   ============================================================ */
+
+.v9-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+@media(max-width:1100px){.v9-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.v9-grid{grid-template-columns:1fr}}
+
+.v9-card{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--c);
+  border-radius:15px;overflow:hidden;transition:border-color .22s,transform .22s var(--ease)}
+.v9-card:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.v9-card.open{grid-column:1 / -1;transform:none;border-color:var(--c)}
+
+.v9-head{width:100%;display:flex;gap:11px;align-items:flex-start;text-align:left;
+  background:none;border:0;cursor:pointer;padding:14px 15px 10px;font-family:var(--sans)}
+.v9-num{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--mono);font-size:11.5px;color:#fff;
+  background:color-mix(in srgb, var(--c) 55%, transparent)}
+.v9-title{flex:1;min-width:0}
+.v9-title b{display:block;font-size:14.5px;color:var(--txt);margin-bottom:3px;line-height:1.35}
+.v9-title span{display:block;font-size:12.2px;color:var(--txt-3);line-height:1.55}
+.v9-caret{flex:none;color:var(--txt-3);font-size:19px;line-height:1;
+  transition:transform .22s var(--ease)}
+.v9-card.open .v9-caret{transform:rotate(90deg);color:var(--c)}
+
+.v9-viz{padding:2px 15px 0}
+.v9-svg{width:100%;height:auto;display:block;overflow:visible}
+
+.v9-bul{list-style:none;margin:8px 0 0;padding:0 15px 14px}
+.v9-bul li{position:relative;padding-left:14px;font-size:12.2px;color:var(--txt-2);
+  line-height:1.6;margin-bottom:2px}
+.v9-bul li:before{content:"";position:absolute;left:2px;top:8px;width:5px;height:5px;
+  border-radius:50%;background:var(--c);opacity:.75}
+
+/* ---------- the opened half ---------- */
+.v9-detail{border-top:1px solid var(--line);padding:15px;animation:v9in .3s var(--ease)}
+@keyframes v9in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.v9-how{font-size:13.2px;color:var(--txt-2);line-height:1.72;margin:0 0 13px}
+.v9-how b{color:var(--txt)}
+.v9-how code{font-family:var(--mono);font-size:11.6px;padding:1px 5px;border-radius:5px;
+  background:rgba(255,255,255,.06);color:#c9d2f0}
+
+.v9-facts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:760px){.v9-facts{grid-template-columns:1fr}}
+.v9-facts>div{background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:11px;
+  padding:10px 12px;font-size:12.2px;color:var(--txt-2);line-height:1.6}
+.v9-facts b{display:block;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--txt-3);margin-bottom:4px}
+
+.v9-line{display:flex;gap:10px;margin-top:13px;padding:11px 13px;border-radius:11px;
+  background:color-mix(in srgb, var(--c) 9%, transparent);
+  border:1px solid color-mix(in srgb, var(--c) 26%, transparent)}
+.v9-line span{color:var(--c);font-size:13px;line-height:1.6}
+.v9-line p{margin:0;font-size:12.8px;color:var(--txt);line-height:1.62}
+
+.v9-foot{margin-top:16px;padding:14px 16px;border-radius:13px;font-size:13px;
+  color:var(--txt-2);line-height:1.7;background:rgba(0,0,0,.26);
+  border:1px solid var(--line);border-left:3px solid var(--violet)}
+.v9-foot b{color:var(--txt)}
+
+/* ============================================================
+   the drawings
+   ============================================================ */
+.v9-dot{fill:rgba(255,255,255,.34)}
+.v9-q{fill:#f472b6;stroke:rgba(244,114,182,.35);stroke-width:5}
+.v9-lbl{fill:var(--txt-3);font-family:var(--mono);font-size:7.5px}
+.v9-lt{fill:var(--txt-2);font-family:var(--sans);font-size:9px;text-anchor:middle}
+.v9-lt.sm{font-size:7.6px}
+
+/* 1 · brute force — every vector lights, one after another */
+.v9-scan{animation:v9scan 3.6s linear infinite;animation-delay:calc(var(--i) * .12s)}
+@keyframes v9scan{
+  0%,88%{fill:rgba(255,255,255,.34);r:3.1}
+  4%{fill:#f472b6;r:4.4}
+  12%{fill:rgba(255,255,255,.34);r:3.1}
+}
+
+/* 2 · ANN — a neighbourhood, and only its members get compared */
+.v9-ball{fill:rgba(96,165,250,.08);stroke:#60a5fa;stroke-width:1.2;stroke-dasharray:4 4;
+  animation:v9pulse 2.6s var(--ease) infinite}
+@keyframes v9pulse{0%,100%{opacity:.55}50%{opacity:1}}
+.v9-hit{stroke:#60a5fa;stroke-width:1;opacity:0;
+  animation:v9hit 2.6s var(--ease) infinite;animation-delay:calc(var(--i) * .1s)}
+@keyframes v9hit{0%,70%,100%{opacity:0}20%,55%{opacity:.7}}
+
+/* 3 · HNSW — the hop path draws itself down the layers */
+.v9-lyr{stroke:rgba(255,255,255,.12);stroke-width:1;stroke-dasharray:3 5}
+.v9-hop{fill:none;stroke:#a78bfa;stroke-width:1.8;stroke-linecap:round;
+  stroke-dasharray:240;stroke-dashoffset:240;animation:v9draw 3.4s var(--ease) infinite}
+@keyframes v9draw{0%{stroke-dashoffset:240}55%,85%{stroke-dashoffset:0}100%{stroke-dashoffset:0;opacity:0}}
+
+/* 4 · IVF — one cell opens, the others stay shut */
+.v9-cell{fill:rgba(255,255,255,.03);stroke:rgba(255,255,255,.14);stroke-width:1;stroke-dasharray:3 4}
+.v9-cell.on{fill:rgba(34,211,238,.1);stroke:#22d3ee;stroke-dasharray:none;
+  animation:v9open 2.8s var(--ease) infinite}
+@keyframes v9open{0%,100%{opacity:.6}50%{opacity:1}}
+
+/* 5 · IVF-PQ — the opened cell hands over compressed codes */
+.v9-arrow{stroke:rgba(255,255,255,.4);stroke-width:1.4;marker-end:none;
+  stroke-dasharray:3 3;animation:v9march 1.2s linear infinite}
+@keyframes v9march{to{stroke-dashoffset:-12}}
+.v9-code{fill:rgba(45,212,191,.55);stroke:#2dd4bf;stroke-width:.8;
+  animation:v9code 2.4s var(--ease) infinite;animation-delay:calc(var(--i) * .16s)}
+@keyframes v9code{0%,100%{opacity:.4;transform:translateY(0)}50%{opacity:1;transform:translateY(-2px)}}
+
+/* 6 · PQ / 7 · binary — the float strip that shrinks */
+.v9-f{fill:rgba(255,255,255,.1);stroke:rgba(255,255,255,.22);stroke-width:.8}
+.v9-bit{fill:#fb923c;font-family:var(--mono);font-size:12px;text-anchor:middle;
+  animation:v9bit 2.6s var(--ease) infinite;animation-delay:calc(var(--i) * .1s)}
+@keyframes v9bit{0%,100%{opacity:.45}45%{opacity:1}}
+
+/* 8 · hybrid — two lanes flowing into one merge */
+.v9-lane{fill:rgba(255,255,255,.05);stroke-width:1}
+.v9-lane.a{stroke:#60a5fa}
+.v9-lane.b{stroke:#34d399}
+.v9-flow{fill:none;stroke-width:1.6;stroke-dasharray:5 6;animation:v9march 1s linear infinite}
+.v9-flow.a{stroke:#60a5fa}
+.v9-flow.b{stroke:#34d399}
+.v9-merge{fill:rgba(52,211,153,.14);stroke:#34d399;stroke-width:1.2;
+  animation:v9pulse 2.2s var(--ease) infinite}
+
+/* 9 · filtered — predicates on top, funnel below */
+.v9-chip{fill:rgba(124,92,255,.16);stroke:#7c5cff;stroke-width:.9;
+  animation:v9code 2.6s var(--ease) infinite;animation-delay:calc(var(--i, 0) * .2s)}
+.v9-funnel{fill:rgba(124,92,255,.06);stroke:rgba(124,92,255,.5);stroke-width:1.1;
+  stroke-dasharray:4 4;animation:v9march 1.4s linear infinite}
+
+@media (prefers-reduced-motion: reduce){
+  .v9-scan,.v9-ball,.v9-hit,.v9-hop,.v9-cell.on,.v9-arrow,.v9-code,.v9-bit,
+  .v9-flow,.v9-merge,.v9-chip,.v9-funnel{animation:none}
+  .v9-hop{stroke-dashoffset:0}
+  .v9-hit{opacity:.6}
+}

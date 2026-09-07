@@ -28,7 +28,7 @@ open index.html           # macOS
 | 7 | Training | Pretraining → SFT → preference tuning, click through each stage |
 | 8 | Prompt engineering | Prompt lab: toggle ingredients, watch answer quality move |
 | 9 | Context & memory | Fill a context window until it overflows and the model forgets your name |
-| 10 | RAG | The full pipeline animated, with real retrieval scoring over a tiny knowledge base |
+| 10 | RAG | The full pipeline animated, with real retrieval scoring over a tiny knowledge base. Then hybrid RAG end to end — two indexes, two lanes, one fused ranking — with reciprocal rank fusion computed live on three queries where a different lane wins each time |
 | 11 | Advanced RAG | Switch the dense / sparse / late-interaction lanes on and off over one knowledge base, fan one question into five and fuse them with RRF, then break a RAG system four different ways and watch which metric family collapses |
 | 12 | Prompt vs RAG vs fine-tune | Three questions, one reasoned recommendation |
 | 13 | Agents & tools | Step through think → act → observe loops |
@@ -53,6 +53,7 @@ index.html        all chapter markup
 css/styles.css    one theme, no framework
 js/content.js     every piece of course content — edit here to change the course
 js/demos.js       the interactive widgets
+js/hybridrag.js   hybrid RAG: the animated pipeline and the RRF fusion bench
 js/app.js         navigation, progress, XP
 test.js           node test.js — fails if the course data goes inconsistent
 ```
