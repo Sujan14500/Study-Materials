@@ -132,6 +132,18 @@ function observeReveals() {
   $$('.chapter.active .reveal:not(.in)').forEach(r => io.observe(r));
 }
 
+/* any widget that rebuilds .reveal cards after load must say so, or its
+   new cards are never observed. */
+window.observeReveals = observeReveals;
+
 goto(state.at, true);
 paint();
+
+/* This file runs at parse time, which is BEFORE demos.js builds its cards on
+   DOMContentLoaded. So the goto() above observed a chapter that was still
+   empty, and any JS-built .reveal inside it stayed at opacity 0 until you
+   navigated away and back — which is exactly what landing on a chapter whose
+   cards are built by demos.js looked like. This listener is
+   registered after demos.js's, so it runs after the cards exist. */
+document.addEventListener('DOMContentLoaded', observeReveals);
 })();

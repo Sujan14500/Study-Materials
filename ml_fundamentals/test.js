@@ -337,6 +337,21 @@ C.glossary.forEach(t => assert(t.length === 3 && t[0] && t[1] && t[2],
 }
 
 /* ---------------------------------------------------------------
+   Reveal-on-scroll must survive the boot order
+
+   app.js runs at parse time; demos.js builds its .reveal cards later on
+   DOMContentLoaded. Without a second observe pass those cards sit at
+   opacity 0 forever and the panel renders as a blank box — no error,
+   nothing in the console, just missing content.
+   --------------------------------------------------------------- */
+{
+  const app = fs.readFileSync('js/app.js', 'utf8');
+  assert(/DOMContentLoaded['"]?\s*,\s*observeReveals/.test(app),
+    'app.js never re-observes .reveal elements after demos.js builds them, ' +
+    'so anything it creates on the first chapter stays invisible');
+}
+
+/* ---------------------------------------------------------------
    Wiring — every id the demos reach for must exist somewhere
    --------------------------------------------------------------- */
 const ids = new Set();
