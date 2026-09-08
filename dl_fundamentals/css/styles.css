@@ -538,6 +538,10 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .gterm{background:rgba(0,0,0,.26);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
 .gterm b{font-size:13.5px;display:block;color:var(--cyan)}
 .gterm span{font-size:12.5px;color:var(--txt-2)}
+.gterm .gplain{display:block;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);
+  font-style:normal;font-size:12.5px;line-height:1.5;color:var(--txt-3)}
+.gterm .gplain::before{content:'In plain English  ';display:block;font-size:10px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--green);margin-bottom:3px}
 
 /* ---------- pager + toast ---------- */
 .pager{position:fixed;bottom:0;left:var(--sidebar-w);right:0;z-index:30;

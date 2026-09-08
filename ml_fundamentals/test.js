@@ -293,7 +293,8 @@ C.quiz.forEach((q, i) => {
   assert.strictEqual(new Set(q.o).size, q.o.length, `quiz ${i} has duplicate options`);
   assert(q.e, `quiz ${i} has no explanation`);
 });
-C.glossary.forEach(t => assert(t.length === 2 && t[0] && t[1], `glossary entry ${t[0]} is malformed`));
+C.glossary.forEach(t => assert(t.length === 3 && t[0] && t[1] && t[2],
+  `glossary entry "${t[0]}" is missing its plain-English line — every term needs one`));
 
 /* ---------------------------------------------------------------
    Wiring — every id the demos reach for must exist somewhere

@@ -909,8 +909,9 @@ function initQuiz() {
   function renderG(filter) {
     const f = (filter || '').toLowerCase();
     g.innerHTML = C.glossary
-      .filter(t => !f || t[0].toLowerCase().includes(f) || t[1].toLowerCase().includes(f))
-      .map(t => '<div class="gterm"><b>' + t[0] + '</b><span>' + t[1] + '</span></div>').join('')
+      .filter(t => !f || t.join(' ').toLowerCase().includes(f))
+      .map(t => '<div class="gterm"><b>' + t[0] + '</b><span>' + t[1] + '</span>'
+        + (t[2] ? '<em class="gplain">' + t[2] + '</em>' : '') + '</div>').join('')
       || '<p class="panel-sub">No match.</p>';
   }
   search.oninput = () => renderG(search.value);
