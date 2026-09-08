@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="css/prod40.css">
 <link rel="stylesheet" href="css/vsearch9.css">
 <link rel="stylesheet" href="css/ragspeed8.css">
+<link rel="stylesheet" href="css/fastapi.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📐</text></svg>">
 </head>
 <body>
@@ -1215,11 +1216,229 @@ ASOF JOIN user_features f
 </section>
 
 <!-- ============================================================= -->
+<!-- 23. FASTAPI                                                   -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="fastapi" data-title="FastAPI &amp; serving" data-icon="23" data-group="Putting it together">
+  <header class="ch-head">
+    <div class="ch-kicker">Chapter 23 &middot; Putting it together</div>
+    <h2>The door <span class="grad">into the system</span></h2>
+    <p class="lead">Every design in this course ends at an HTTP handler somebody wrote in Python. This chapter is that handler &mdash; what FastAPI actually gives you, the two-character mistake that costs a hundred and sixty times your throughput, and the six production habits an interviewer is listening for when they ask "and how is it served?"</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#128682;</div>
+    <div><b>The layman version.</b> A restaurant kitchen with one chef. Most of a dish is waiting &mdash; the oven, the stock, the delivery. A chef who stands and watches the oven cooks one dish at a time. A chef who starts the next dish while the oven runs cooks forty. Same chef, same oven, same recipes. FastAPI is the kitchen; whether your chef stands and watches is a single word in front of one function.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129513; Three things, and people call all of them "FastAPI"</h3></div>
+    <p class="panel-sub">The most common muddle in this layer. They are separate pieces and they fail separately, so name them separately.</p>
+    <div class="procon-wrap"><table class="procon">
+      <thead><tr><th>Piece</th><th>What it is</th><th class="pro">What it is responsible for</th><th class="con">What it is <i>not</i></th></tr></thead>
+      <tbody>
+        <tr><td>FastAPI</td><td>A framework. A Python library you import.</td>
+          <td>Routing, turning type hints into validation and docs, dependency injection.</td>
+          <td>It does not listen on a port. Nothing is served by FastAPI alone.</td></tr>
+        <tr><td>Starlette</td><td>The ASGI toolkit FastAPI is built on.</td>
+          <td>Requests, responses, middleware, background tasks, and the threadpool that runs your synchronous handlers.</td>
+          <td>Not something you usually import directly &mdash; but every concurrency surprise below happens here, not in FastAPI.</td></tr>
+        <tr><td>Uvicorn / Gunicorn</td><td>The server process, and the thing that supervises it.</td>
+          <td>Accepting connections, running the event loop, worker count, graceful restarts, shutdown.</td>
+          <td>Not a load balancer, and its default timeouts are shorter than a long generation.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="keypoint">
+      <div class="kp-ico">&#11088;</div>
+      <div><h4>Key point</h4>
+        <p><b>"FastAPI is fast" is a claim about the third box, not the first.</b> The framework overhead is a
+        fraction of a millisecond and it is never your problem. Everything that follows in this chapter is about
+        how your handler uses the event loop that Uvicorn runs &mdash; which is entirely within your control and
+        almost always where the throughput went.</p></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9889; Four ways to write the same handler</h3><span class="panel-tag">interactive</span></div>
+    <p class="panel-sub">Identical hardware, identical model, identical response. The only difference is the shape of the function. Pick a shape, then drag how long the model call takes &mdash; and watch what happens to the row that says <span class="mono">async def</span> but never awaits.</p>
+    <div id="fastapi-conc"></div>
+  </div>
+
+  <div class="goldrule">
+    <div class="kp-ico">&#128161;</div>
+    <div><h4>Golden rule</h4>
+      <p><b>Never put a blocking call in an <span class="mono">async def</span> handler.</b> If the library you
+      must call is synchronous, you have two honest options and one dishonest one. Honest: write the handler as
+      plain <span class="mono">def</span> and let Starlette give it a thread, or keep it async and wrap the one
+      blocking call in <span class="mono">run_in_threadpool</span>. Dishonest: leave it as it is, because it
+      "looks async" and nothing errors. That third option is the one in production right now at most companies,
+      and it is the answer to "why does this box fall over at forty users?"</p></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127903;&#65039; One type, three jobs &mdash; why Python won this layer</h3></div>
+    <p class="panel-sub">A Pydantic model is not a validation library you bolted on. In an AI service the same declaration does three separate jobs, and that is the whole argument for this stack.</p>
+    <pre class="code">from pydantic import BaseModel, Field
+
+class RefundRequest(BaseModel):
+    order_id: str = Field(pattern=r"^ORD-\d{6}$")
+    amount_cents: int = Field(gt=0, le=50_000)
+    reason: str = Field(min_length=10, max_length=500)
+
+# job 1 — the API contract. A malformed body never reaches your code;
+#          the caller gets a 422 naming the field, and the OpenAPI docs
+#          are generated from the same declaration.
+@app.post("/refund")
+async def refund(req: RefundRequest) -> RefundResponse: ...
+
+# job 2 — the tool schema handed to the model. Same class.
+tools = [{"type": "function", "function": {
+    "name": "issue_refund",
+    "parameters": RefundRequest.model_json_schema(),
+}}]
+
+# job 3 — validating what the model sent back. Same class again.
+try:
+    call = RefundRequest.model_validate_json(tool_call.arguments)
+except ValidationError as e:
+    # feed the structured error back as a repair instruction —
+    # far better than telling the model "that was wrong"
+    messages.append({"role": "tool", "content": e.json()})</pre>
+    <div class="keypoint">
+      <div class="kp-ico">&#128274;</div>
+      <div><h4>The security half of it</h4>
+        <p><b>A constraint in the type is a guarantee; the same constraint in the prompt is a suggestion.</b>
+        <span class="mono">le=50_000</span> means the model cannot issue a &pound;900 refund however it is
+        persuaded to try, because the refund never gets past validation. "Please do not exceed £500" in a system
+        prompt means it usually will not. When an interviewer asks how you stop an agent doing something
+        expensive, this is the answer they want &mdash; not a better prompt.</p></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128295; Depends: the four things it is actually for</h3></div>
+    <p class="panel-sub">Dependency injection sounds like enterprise ceremony until you notice it is how you get auth, tracing, rate limits and database sessions without a single line of them appearing in your handler.</p>
+    <pre class="code">async def caller(token: str = Header(...)) -> User:
+    user = await verify(token)                       # 1. auth, once, everywhere
+    if not user: raise HTTPException(401)
+    return user
+
+async def budget(user: User = Depends(caller)) -> None:
+    if await spend_today(user.id) > user.daily_cap:  # 2. per-user cost cap —
+        raise HTTPException(429, "daily budget spent")#    dependencies compose
+
+async def db() -> AsyncIterator[Session]:
+    async with Session() as s:                       # 3. lifecycle: the yield
+        yield s                                      #    guarantees cleanup even
+                                                     #    if the handler raises
+@app.post("/chat", dependencies=[Depends(budget)])
+async def chat(req: ChatRequest, user: User = Depends(caller),
+               s: Session = Depends(db)) -> ChatResponse: ...
+
+# 4. and the reason it beats a decorator: in a test you replace it.
+app.dependency_overrides[caller] = lambda: User(id="test", daily_cap=10**9)</pre>
+    <div class="checkbox-list">
+      <h4>Why this matters more in an AI service than a CRUD one</h4>
+      <ul>
+        <li><b>Every request costs real money</b>, so the budget check has to be somewhere it cannot be forgotten &mdash; not copied into fourteen handlers.</li>
+        <li><b>A dependency is where the request id is minted</b> and pushed into the logging context, which is what makes a trace across retrieval, model call and tool call reconstructable afterwards.</li>
+        <li><b>Overrides make the expensive things testable.</b> Swapping the model client for a stub in <span class="mono">dependency_overrides</span> is the difference between a test suite you run and one you skip.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9203; The endpoint takes too long. Three shapes, and picking the wrong one</h3></div>
+    <p class="panel-sub">There are only three answers, and the boundary between them is roughly "how long before something in the middle gives up on you".</p>
+    <div class="procon-wrap"><table class="procon">
+      <thead><tr><th>Shape</th><th>Range</th><th class="pro">How</th><th class="con">What bites</th></tr></thead>
+      <tbody>
+        <tr><td>Respond when done</td><td class="mono">&lt; 1 s</td>
+          <td>An ordinary handler. Do not complicate this.</td>
+          <td>Falls apart the moment a slow tail crosses a client timeout you do not control.</td></tr>
+        <tr><td>Stream it</td><td class="mono">1&ndash;30 s</td>
+          <td><span class="mono">StreamingResponse</span> or server-sent events. Yield tokens as the model produces them.</td>
+          <td>The total time does not change &mdash; you moved what the user <i>experiences</i>, not what the server does. And a proxy that buffers turns your stream back into one lump; check yours.</td></tr>
+        <tr><td>Hand back a job id</td><td class="mono">&gt; 30 s</td>
+          <td>Enqueue the work, return <span class="mono">202</span> and an id, let the client poll or subscribe.</td>
+          <td><span class="mono">BackgroundTasks</span> runs inside your web process: a deploy kills it and nothing retries. Past a few seconds of work that is a real queue, not a background task.</td></tr>
+      </tbody>
+    </table></div>
+    <pre class="code">@app.post("/chat")
+async def chat(req: ChatRequest) -> StreamingResponse:
+    async def gen():
+        async for chunk in llm.stream(req.message):
+            yield f"data: {json.dumps({'t': chunk})}\n\n"
+        yield "data: [DONE]\n\n"
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"X-Accel-Buffering": "no"})  # tell nginx not to buffer</pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9201;&#65039; Four timeouts, and the stingiest one wins</h3></div>
+    <p class="panel-sub">Every one of these exists whether or not you set it. The request dies at the smallest of them, and the error you get back is written by whichever layer that was &mdash; which is why the symptom so rarely names the cause.</p>
+    <div class="fa-timeouts">
+      <div class="fa-to"><b>Browser / client SDK</b><em>30 s</em>
+        <span>Frequently the default nobody set. A 45-second agent run dies here while your server logs cheerfully record a completed request.</span></div>
+      <div class="fa-to win"><b>Load balancer / ingress</b><em>60 s</em>
+        <span>ALB idle timeout, nginx <span class="mono">proxy_read_timeout</span>. Cuts the connection mid-stream, so the client sees a truncated answer rather than an error. The hardest of the four to diagnose from application logs.</span></div>
+      <div class="fa-to"><b>Uvicorn / Gunicorn worker</b><em>30 s</em>
+        <span>Gunicorn <span class="mono">--timeout</span> kills the whole worker, taking every other in-flight request on that process with it. The one that turns one slow request into a small outage.</span></div>
+      <div class="fa-to"><b>Model SDK / httpx</b><em>600 s</em>
+        <span>Usually the most generous and therefore usually irrelevant. Tuning this one carefully while ignoring the three above is the classic wasted afternoon.</span></div>
+    </div>
+    <div class="goldrule">
+      <div class="kp-ico">&#128736;&#65039;</div>
+      <div><h4>Golden rule</h4>
+        <p><b>Set them deliberately, in decreasing order outward-in, and write the numbers down somewhere.</b>
+        Client &gt; load balancer &gt; server &gt; model SDK, each with a margin. If your model call can take 45
+        seconds, every layer outside it must allow more than 45 seconds, and a streaming response must be
+        producing bytes often enough that no idle timer ever fires.</p></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129514; The test that catches most of it</h3></div>
+    <p class="panel-sub">FastAPI's testing story is the quiet reason to pick it: the app is an object, the dependencies are replaceable, and the whole thing runs in-process with no server and no network.</p>
+    <pre class="code">from fastapi.testclient import TestClient
+
+def test_refund_over_cap_is_rejected_before_the_model_sees_it():
+    app.dependency_overrides[llm] = lambda: StubLLM()   # no network, no bill
+    r = TestClient(app).post("/refund", json={
+        "order_id": "ORD-000123", "amount_cents": 90_000, "reason": "damaged in transit"})
+    assert r.status_code == 422                         # validation, not the prompt
+    assert "amount_cents" in r.text</pre>
+    <div class="checkbox-list warn">
+      <h4>The three tests worth having on any AI endpoint</h4>
+      <ul>
+        <li><b>A malformed body is rejected before anything expensive runs.</b> Cheap to write, and it is the test that proves your guardrail is in the type rather than the prompt.</li>
+        <li><b>The slow path is not the happy path.</b> Stub the model to hang, and assert your timeout fires and returns something a client can act on.</li>
+        <li><b>The blocking-call regression.</b> If you have ever been bitten by a synchronous client in an async handler, a test that fires N concurrent requests and asserts wall-clock time is far below N × latency will catch it coming back.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div data-toolstrip="fastapi"></div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>FastAPI, Starlette and Uvicorn are three things.</b> Name them separately, because they fail separately &mdash; and the timeout that killed your request almost certainly belongs to the third.</li>
+      <li><b>An <span class="mono">async def</span> handler with a blocking call inside is worse than a plain <span class="mono">def</span>.</b> The plain <span class="mono">def</span> at least gets the threadpool. This is the single highest-value thing in the chapter.</li>
+      <li><b>Async is a waiting feature, not a speed feature.</b> With no network call in the handler it buys exactly nothing &mdash; and an LLM endpoint is almost entirely waiting, which is why it buys so much here.</li>
+      <li><b>Raising the threadpool is not the fix for a threadpool ceiling.</b> It moves the wall. Awaiting properly removes it.</li>
+      <li><b>Put the money constraint in the Pydantic type, not the prompt.</b> One is a guarantee, the other is a request.</li>
+      <li><b>Under one second respond, under thirty stream, over thirty hand back a job id.</b> And <span class="mono">BackgroundTasks</span> is not a queue &mdash; a deploy kills it and nothing retries.</li>
+      <li><b>Timeouts are a stack and the smallest one wins.</b> Set all four deliberately, decreasing outward-in, with a margin over your slowest real generation.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
 <!-- 18. QUIZ                                                      -->
 <!-- ============================================================= -->
 <section class="chapter" data-id="quiz" data-title="Final quiz" data-icon="🏁" data-group="Putting it together">
   <header class="ch-head">
-    <div class="ch-kicker">Chapter 19 · Finish line</div>
+    <div class="ch-kicker">Chapter 24 · Finish line</div>
     <h2>Prove it to <span class="grad">yourself</span></h2>
     <p class="lead">Fourteen questions across everything above. No time limit, instant explanations, retake it as often as you like.</p>
   </header>
@@ -1254,5 +1473,6 @@ ASOF JOIN user_features f
 <script src="js/vsearch9.js"></script>
 <script src="js/ragspeed8.js"></script>
 <script src="js/prod40.js"></script>
+<script src="js/fastapi.js"></script>
 </body>
 </html>

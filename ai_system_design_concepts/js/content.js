@@ -1399,6 +1399,8 @@ C.plain.lexical = ['The oldest kind of search still beats the clever kind at sev
   'Matching by meaning is wonderful for "when do I get my money back". It is useless for an error code, because every error code means roughly the same thing to it. Matching by the actual words handles codes, names and brand-new jargon on day one, and it can show you exactly why it ranked something first.'];
 C.plain.bigdata = ['The file is bigger than the memory. Do not pick the file up.',
   'Read one line, add it to a running total, throw the line away, repeat. Then the interesting follow-up: what if the running total itself gets too big to hold? Then you split the work into buckets and do one bucket at a time, which is what every database has quietly always done.'];
+C.plain.fastapi = ['The front door: the few lines of Python that turn a model into something other software can call.',
+  'One word in front of one function decides whether a machine serves two people at once or two hundred. Not a faster model, not a bigger box \u2014 whether the code knows how to wait politely while the model thinks. This chapter is that choice, and the handful of production habits that go with it.'];
 
 /* ---------- quiz additions for chapters 19-22 ---------- */
 C.quiz = C.quiz.concat([

@@ -90,8 +90,8 @@ const TREE = [
   { id: 'ship', n: 'Shipping it', ico: '🚀', c: '#facc15',
     why: 'Where a prototype becomes a system somebody is paged about at three in the morning. Prototype thinking asks whether it works; this branch asks whether it keeps working when the provider does not.',
     leaves: [
-      { n: 'APIs & serving', ico: '🌐', course: 'tooling',
-        what: 'FastAPI, async endpoints, streaming responses, and why Streamlit is a demo rather than a product.' },
+      { n: 'APIs & serving', ico: '🌐', course: 'sysdesign',
+        what: 'FastAPI end to end: why an async handler with a blocking call inside is slower than a plain def, Pydantic as the guarantee a prompt cannot give, streaming versus a job id, and the four timeouts where the smallest one wins.' },
       { n: 'Docker & deployment', ico: '🐳', course: 'projects',
         what: 'Reproducible images, secrets that are not in the repo, and a rollback you have actually tested.' },
       { n: 'Latency & cost', ico: '⏱️', course: 'sysdesign',

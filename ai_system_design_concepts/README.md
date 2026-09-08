@@ -1,7 +1,7 @@
 # AI System Design Flow
 
 An interactive, animated course on AI/ML system design — the discipline, not the model zoo.
-Twenty-three chapters spanning classic ML systems (recommenders, search, fraud) and LLM-era ones
+Twenty-four chapters spanning classic ML systems (recommenders, search, fraud) and LLM-era ones
 (RAG at scale, model cascades), because real products contain both.
 
 **Written for someone with no prior experience.** Chapter 1 is nothing but vocabulary —
@@ -60,7 +60,8 @@ open index.html           # macOS
 | 20 | Sharding & parallelism | Weights + KV cache + activations computed live against a real GPU, six ways to split a model, and a PagedAttention toggle that shows the memory you were throwing away |
 | 21 | Elasticsearch & BM25 | An inverted index built in front of you, BM25 scored term by term with the real numbers, and the query that scores zero everywhere |
 | 22 | Big files, small RAM | The 5 GB file on a 2 GB machine, six approaches with computed peak memory, and the follow-up nobody prepares for: when the aggregate is what does not fit |
-| 23 | Final quiz | 29 questions with explanations, plus a 40-term glossary |
+| 23 | FastAPI & serving | Four ways to write the same handler, with the throughput of all four on screen at once — including the `async def` that never awaits and is 160x slower than the plain `def` it replaced |
+| 24 | Final quiz | 29 questions with explanations, plus a 40-term glossary |
 
 Every chapter opens with a jargon-free "in plain English" box, and the calculators
 each have a hand-worked example above them.
@@ -76,6 +77,7 @@ js/content.js     every piece of course content — edit here to change the cour
 js/demos.js       the interactive widgets, including all the arithmetic
 js/vsearch9.js    the nine vector search techniques, data and drawings
 js/ragspeed8.js   the eight latency fixes and the waterfall model behind them
+js/fastapi.js     the four handler shapes and the concurrency model behind them
 js/app.js         navigation, progress, XP
 test.js           node test.js — checks the content AND the widget maths
 ```

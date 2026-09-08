@@ -833,4 +833,89 @@ C.annFamilies.forEach(f => {
               `${Math.round(decodeAll / every.total * 100)}% of it generation`);
 }
 
+/* ---- FastAPI handler shapes ---- */
+/* The chapter's central claim is an arithmetic one: on an endpoint that mostly
+   waits, the shape of the handler is worth two orders of magnitude, and the
+   shape that *looks* async is the worst of the four. Re-derived here so that
+   editing a number in the widget without editing the lesson fails the build. */
+{
+  const page = fs.readFileSync('index.html', 'utf8');
+  vm.runInContext(fs.readFileSync('js/fastapi.js', 'utf8'), ctx);
+  const F = ctx.window.FASTAPI;
+  assert(F, 'fastapi.js did not publish its model');
+  assert(page.includes('id="fastapi-conc"'), 'the FastAPI widget is never mounted on the page');
+  assert(page.includes('css/fastapi.css'), 'fastapi.css is not linked');
+  assert(page.includes('js/fastapi.js'), 'fastapi.js is not loaded');
+
+  assert(F.HANDLERS.length === 4, 'the chapter promises four handler shapes');
+  F.HANDLERS.forEach(h => {
+    ['n', 'ico', 'c', 'tag', 'one', 'why', 'code'].forEach(k =>
+      assert(h[k] && String(h[k]).trim(), `handler "${h.id}" is missing ${k}`));
+    assert(/^@app\.\w+\(/m.test(h.code) && /\bdef \w+\(/.test(h.code),
+      `handler "${h.id}" does not show a real handler signature`);
+    assert(h.why.length > 80, `handler "${h.id}" never explains why it behaves that way`);
+  });
+
+  const base = { workers: 4, cpuMs: 5, ioMs: 800, pool: F.POOL_DEFAULT, offered: 120 };
+  const at = id => F.capacity(Object.assign({}, base, { handler: id }));
+  const asyncOk = at('async'), blocked = at('asyncblock'), plainDef = at('def'), pushed = at('threadpool');
+
+  // an awaited async handler is bounded by CPU work alone — waiting is free
+  near(asyncOk.perWorker, 1000 / base.cpuMs, 1e-9, 'awaited async capacity is not the CPU ceiling');
+  assert(asyncOk.ceiling === 'cpu', 'the awaited handler should be CPU-bound, not framework-bound');
+
+  // a blocking call inside async def parks the loop: one request at a time, per worker
+  assert(blocked.inflight === 1, 'a blocked event loop must hold exactly one request');
+  near(blocked.perWorker, 1000 / (base.cpuMs + base.ioMs), 1e-9,
+    'a blocked loop must serve strictly one request at a time');
+
+  // the headline of the chapter, and the reason it is worth a chapter
+  assert(blocked.total < plainDef.total,
+    'the chapter claims async-with-a-blocking-call loses to a plain def; the model disagrees');
+  assert(plainDef.total / blocked.total > 10,
+    `plain def is only ${(plainDef.total / blocked.total).toFixed(1)}x better than the blocked loop; ` +
+    'the chapter presents that gap as dramatic');
+  assert(asyncOk.total / blocked.total > 50,
+    'the widget claims two orders of magnitude between the best and worst shape; it no longer holds');
+
+  // def and run_in_threadpool must share a ceiling — that is why one is the escape hatch for the other
+  near(pushed.total, plainDef.total, 1e-9, 'def and run_in_threadpool must share the threadpool ceiling');
+  assert(plainDef.ceiling === 'pool', 'at these settings the plain def handler should be threadpool-bound');
+
+  // raising the threadpool moves the wall; awaiting removes it. Both halves must be true.
+  const bigPool = F.capacity(Object.assign({}, base, { handler: 'def', pool: 400 }));
+  assert(bigPool.total > plainDef.total, 'a bigger threadpool changed nothing, so the slider teaches nothing');
+  assert(bigPool.ceiling === 'cpu', 'a threadpool large enough should hand the ceiling back to the CPU');
+  assert(bigPool.total <= asyncOk.total + 1e-9,
+    'no threadpool size may beat the CPU ceiling the awaited handler already reaches');
+
+  // with nothing to wait for, async buys nothing — the verdict says so on screen
+  const noWait = id => F.capacity(Object.assign({}, base, { handler: id, ioMs: 0 }));
+  ['asyncblock', 'def', 'threadpool'].forEach(id => near(noWait(id).total, noWait('async').total, 1e-9,
+    `with no waiting, "${id}" must collapse to the same ceiling as async — async is a waiting feature`));
+
+  // past capacity there is no latency to print, only a queue that grows
+  const over = F.capacity(Object.assign({}, base, { handler: 'asyncblock', offered: 500 }));
+  assert(over.over && !isFinite(over.latencyMs), 'overload must not report a finite latency');
+  assert(!at('async').over, 'the awaited handler should still be inside capacity at this offered load');
+
+  // the timeout stack only teaches "the smallest wins" if the layer people actually
+  // tune -- the model SDK -- is the one that never fires
+  const modelSdk = F.TIMEOUTS.find(t => /httpx/i.test(t.layer));
+  assert(modelSdk, 'the timeout stack no longer names the model SDK layer');
+  assert(F.TIMEOUTS.every(t => t === modelSdk || t.typical <= modelSdk.typical),
+    'the timeout lesson breaks unless the model SDK is the most generous layer: the whole point ' +
+    'is that the timeout people tune is the one that never fires');
+  F.TIMEOUTS.forEach(t => assert(t.note.length > 60, `timeout layer "${t.layer}" is not explained`));
+
+  // the three shapes for a slow endpoint must each name what bites
+  assert(F.SHAPES.length === 3, 'the chapter promises three shapes for a slow endpoint');
+  F.SHAPES.forEach(x => assert(x.risk.length > 60, `shape "${x.n}" does not say what goes wrong with it`));
+
+  console.log(`  4 FastAPI handler shapes: ${Math.round(blocked.total)}/s blocked → ` +
+              `${Math.round(plainDef.total)}/s on def → ${Math.round(asyncOk.total)}/s awaited, ` +
+              `${Math.round(asyncOk.total / blocked.total)}x on identical hardware`);
+}
+
+
 console.log('ok — content data and widget arithmetic are consistent');

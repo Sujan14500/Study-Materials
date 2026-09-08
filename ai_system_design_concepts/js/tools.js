@@ -201,3 +201,55 @@ C.toolstrips.operate = {
       use: 'Every agentic path. Without it one bad run can cost more than a month of normal traffic.' }
   ]
 };
+
+/* ---------- Ch: FastAPI & serving ---------- */
+C.toolstrips.fastapi = {
+  title: 'Tools & frameworks — the serving layer',
+  sub: 'Five pieces, and the interview tell is knowing which of them your problem actually belongs to. A timeout is not a framework question; a blocking client is not a server question.',
+  tools: [
+    { n: 'FastAPI', by: 'Sebastián Ramírez / community', mark: '⚡', c: '#009688',
+      what: 'The framework: routing, dependency injection, and validation plus OpenAPI docs generated from ordinary type hints.',
+      pro: ['One declaration is the API contract, the tool schema and the output validator',
+            'Async-native, so a worker holds hundreds of in-flight model calls',
+            'dependency_overrides makes the expensive parts genuinely testable'],
+      con: ['Async is opt-in correctness — one blocking call silently costs you two orders of magnitude',
+            'Does not serve anything by itself; the operational questions all live in Uvicorn'],
+      use: 'The default for any Python service other software will call. You should be able to defend it.' },
+
+    { n: 'Uvicorn + Gunicorn', by: 'Encode / community', mark: 'uv', c: '#2dd4bf',
+      what: 'The ASGI server that runs the app, usually supervised by Gunicorn for process management in production.',
+      pro: ['Gunicorn adds graceful restarts, worker recycling and supervision',
+            'Worker count is a real lever: I/O-bound LLM work wants far more concurrency per core than the CPU-count rule',
+            'Graceful shutdown means a rolling deploy does not kill a paid generation mid-flight'],
+      con: ['Default timeouts are shorter than a long generation, and the worker timeout kills every request on that process',
+            'Each worker is a separate event loop and a separate threadpool — per-process caches are not shared'],
+      use: 'Every FastAPI service that leaves your laptop. Not optional, just easy to forget to mention.' },
+
+    { n: 'Pydantic', by: 'Pydantic', mark: 'pd', c: '#e92063',
+      what: 'The validation layer underneath most of this ecosystem: a class of type hints becomes parsing, validation and JSON Schema.',
+      pro: ['A money or scope limit in the type is a guarantee; the same limit in a prompt is a suggestion',
+            'model_json_schema() gives the model its tool definition from the same class',
+            'v2 core is Rust, which matters when you validate on every request'],
+      con: ['v1 and v2 APIs differ enough that mixed dependency trees are a real annoyance',
+            'Strict typing fights genuinely free-form model output — you will still need a repair path'],
+      use: 'Every boundary where data enters or leaves: the request, the tool call, and the model\'s reply.' },
+
+    { n: 'httpx', by: 'Encode', mark: 'hx', c: '#60a5fa',
+      what: 'The async-capable HTTP client. The specific import that decides whether your async handler is async.',
+      pro: ['AsyncClient actually yields the event loop, which is the whole point of the handler being async',
+            'A persistent client reuses connections, removing a TCP and TLS handshake per request',
+            'Per-request timeout granularity: connect, read, write and pool separately'],
+      con: ['Swapping requests for httpx and keeping the synchronous API changes nothing — you must await it',
+            'A client created per request throws away the connection pooling that made it worth using'],
+      use: 'Any outbound call from an async handler. Create one client at startup and inject it.' },
+
+    { n: 'ARQ / Celery / RQ', by: 'Samuel Colvin / community', mark: '📬', c: '#a78bfa',
+      what: 'Task queues: the thing BackgroundTasks is not, once the work outlives a request or must survive a deploy.',
+      pro: ['Work survives a restart, and failures retry instead of vanishing',
+            'Long agent runs stop occupying a web worker, so the API stays responsive',
+            'ARQ is asyncio-native and Redis-backed, which fits an async FastAPI service with no new concepts'],
+      con: ['Another process, another deployment, another thing to monitor',
+            'Celery brings a broker and a large surface area that a small service will not use'],
+      use: 'Anything over about thirty seconds, anything with retries, anything that must not die with a deploy.' }
+  ]
+};
