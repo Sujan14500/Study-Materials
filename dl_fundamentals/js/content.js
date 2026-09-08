@@ -388,3 +388,144 @@ C.glossary = C.glossary.concat([
   ["Gradient accumulation", "Calling backward() several times before step(), on purpose, to simulate a batch bigger than your memory. The same mechanism that makes a forgotten zero_grad() silent.",
    "Collecting the blame from four small batches before turning any dial, to fake one big batch your memory could never hold. Which is exactly why a forgotten zero_grad() still looks like a working program."]
 ]);
+
+/* ============================================================
+   Plain-English chapter openers.
+
+   C.plain[id]  — [headline, body]. Written to be read by someone who
+                  has never met any of this. No symbols, no acronyms.
+   C.terms[id]  — the words that actually appear on that chapter's
+                  screen, defined where you meet them rather than
+                  only in the glossary at the very end.
+
+   demos.js injects both above the first panel, so adding a chapter
+   means adding an entry here and nothing else. test.js refuses a
+   chapter with no entry, and refuses an opener that leans on the
+   jargon it is supposed to be explaining.
+   ============================================================ */
+C.plain = {
+  neuron: ['One neuron is a weighted vote: multiply each fact by how much it matters, add them up, decide.',
+    'Think of a single judge on a panel. They are handed a few facts, they care about some of them far more than others, they have their own default leaning before hearing anything at all, and at the end they say yes or no. Everything in this course is that, repeated a great many times and wired together.'],
+
+  activations: ['Without a deliberate bend in each layer, a hundred layers stacked up are exactly as clever as one.',
+    'Adding and multiplying are "straight" operations, and stringing straight operations together only ever gives you another straight operation &mdash; so a deep stack of them collapses back down to a single step. The activation function is a deliberate kink placed in the middle of every layer, and that kink is the entire reason depth buys you anything.'],
+
+  xor: ['Four dots that a single neuron cannot separate &mdash; and that stalled the whole field for years.',
+    'Arrange four points so that the two belonging together sit diagonally opposite each other. No single straight line can put that pair on the same side. One neuron draws exactly one straight line, so one neuron cannot do it. Two layers can, by bending the space before deciding, and working that out is what eventually restarted the whole field.'],
+
+  forward: ['Push the numbers in at one end and follow them, layer by layer, until an answer falls out the other.',
+    'There is nothing hidden in this part. Each layer multiplies what it received by its own weights, adds its offsets, applies the kink, and hands the result to the next layer along. Doing that in order from input to output <i>is</i> the prediction &mdash; the animation just makes you watch every number as it goes past.'],
+
+  backprop: ['The answer came out wrong. Now work out how much of that was each individual weight\'s fault.',
+    'A network can hold millions of adjustable numbers, and for every single one of them you need to know whether nudging it up or down would have helped. This gets all of them in one sweep backwards from the answer to the input, handing each layer its share of the blame on the way past. It is one rule from calculus, applied very methodically.'],
+
+  training: ['Predict, measure the miss, hand out the blame, nudge every number. Then do it a few thousand more times.',
+    'That four-step loop is all training is. The one setting that most often decides whether it works at all is how far you nudge: too small and it never gets anywhere in your lifetime, too large and it thrashes about and sometimes blows up entirely. Everything else in this chapter is a refinement of that single loop.'],
+
+  regularisation: ['Deliberately handicap the network while it trains, so it cannot get away with memorising.',
+    'A large network has more than enough room to memorise your training examples outright, which looks like success and is not. So you make life slightly harder for it on purpose &mdash; switch off random parts of it, tax large numbers, stop early &mdash; and it is pushed into finding a pattern that actually generalises rather than a lookup table.'],
+
+  gradients: ['Blame gets quieter every layer it travels back, and in a deep network the first layers hear nothing at all.',
+    'This is why deep networks were thought untrainable for years. Every layer the blame passes back through multiplies it by something small, and small numbers multiplied together shrink towards nothing alarmingly fast. The earliest layers get a signal so faint they never change. The opposite failure also exists &mdash; the numbers grow instead, until everything falls over &mdash; and the fixes for both are what made modern depth possible.'],
+
+  conv: ['One small pattern-detector, slid across the whole picture, instead of a separate rule for every pixel.',
+    'An edge is an edge whether it turns up in the top left corner or the bottom right, so learning it separately for every position is enormously wasteful. This approach learns one small stencil and slides it everywhere. That is both far fewer numbers to learn and the reason it still works when the thing you are looking for moves.'],
+
+  sequences: ['For language and for time, the order carries the meaning &mdash; so the model needs a way to remember.',
+    'A picture can be taken in all at once. A sentence cannot: "the dog bit the man" and "the man bit the dog" contain exactly the same words. There are two ideas for handling that. Read it one word at a time while carrying a running summary, or let every word look directly at every other word simultaneously. The second turned out to work far better, and it is what modern language models are built from.'],
+
+  practice: ['It compiles, it runs, and it learns nothing. Here is the order to check things in.',
+    'Debugging a network is unlike debugging ordinary code, because nothing throws an error. The loss simply sits there, or wanders about, or looks perfectly healthy while the predictions are rubbish. What saves you is a fixed order of suspects, plus one test that rules out half of them: if the model cannot memorise ten examples, the bug is in your wiring, not in your data.'],
+
+  pytorch: ['Let the library keep the receipts and do the calculus, so you only ever write the forward direction.',
+    'You have already worked a backward pass out by hand, which is exactly why this chapter comes here rather than at the beginning. The library records every operation as you compute forwards, and that record is all it needs to work out every gradient backwards on request. You write the prediction; it works out the blame.'],
+
+  quiz: ['Every question here is about something you already watched happen on screen.',
+    'Nothing new turns up in the quiz. A wrong answer is information rather than a failure &mdash; each explanation names what is worth going back to, and you can retake the whole thing as often as you like. Underneath it is the glossary: every term in the course, each one with a plain-English example attached.']
+};
+
+C.terms = {
+  neuron: [
+    ['Input <span class="mono">x</span>', 'One fact handed to the neuron. Hours studied, the brightness of a pixel, a word.'],
+    ['Weight <span class="mono">w</span>', 'How much this neuron cares about that particular fact. A big weight means a big influence. These are what training changes.'],
+    ['Bias <span class="mono">b</span>', 'The neuron\'s default leaning, added on regardless of the inputs. A grumpy judge needs more evidence before saying yes.'],
+    ['Weighted sum <span class="mono">z</span>', 'Every input multiplied by its weight, all added together, plus the bias. One single number.'],
+    ['Activation', 'What that number is turned into before it leaves the neuron &mdash; the moment it commits to something instead of merely adding up.']
+  ],
+  activations: [
+    ['Activation function', 'The kink. A small rule applied to each neuron\'s output before it moves along.'],
+    ['ReLU', '"If it came out negative, output zero; otherwise pass it straight through." Crude, cheap, and the usual default.'],
+    ['Sigmoid', 'Squashes any number onto a 0-to-1 dial. Good as a final answer, sluggish in the middle of a deep network because the dial barely moves at either end.'],
+    ['Tanh', 'The same S-shape as sigmoid but centred on zero, running from &minus;1 to 1.'],
+    ['Non-linearity', 'The formal name for that kink, and the property that makes stacking layers worth doing.']
+  ],
+  xor: [
+    ['XOR', '"One or the other, but not both." The four-point pattern drawn in the picture.'],
+    ['Hidden layer', 'A layer sitting between the input and the output. It is what lets the network reshape the problem before anything decides.'],
+    ['Linearly separable', 'Whether one straight line could do the job. XOR is the famous case where it cannot.'],
+    ['Representation', 'What the hidden layer produces: a redrawn version of the input in which the problem has become easy.']
+  ],
+  forward: [
+    ['Forward pass', 'Input to answer, layer by layer, in order. That is the whole of it.'],
+    ['Layer', 'A group of neurons all fed by the same previous layer.'],
+    ['Matrix multiplication', 'The efficient way of doing a whole layer at once rather than one neuron at a time. It is the reason graphics cards turned out to matter.'],
+    ['Stored activations', 'The intermediate numbers at each layer. They are kept during training because the backward pass needs them, which is why training uses far more memory than prediction does.']
+  ],
+  backprop: [
+    ['Loss', 'How wrong the answer was, expressed as one number.'],
+    ['Backward pass', 'The sweep from the answer back to the input, handing out blame on the way.'],
+    ['Gradient', 'One weight\'s share of that blame: "nudging this up a little changes the loss by this much."'],
+    ['Chain rule', 'The rule that lets blame travel through a chain of steps &mdash; multiply the effects together as you go back.'],
+    ['Autograd', 'The library doing all of the above for you, from a record it quietly kept during the forward pass.']
+  ],
+  training: [
+    ['Learning rate', 'How far each number gets nudged. The single most important value you choose.'],
+    ['Epoch', 'One full pass over every training example. Ten epochs means the network has been shown the whole set ten times over.'],
+    ['Batch size', 'How many examples are judged before anything moves. Bigger is steadier and needs more memory.'],
+    ['Optimiser', 'The rule deciding how the nudge is worked out. Plain SGD nudges everything the same amount; Adam gives each number its own pace.'],
+    ['Momentum', 'Carrying part of the previous step into the next one, so a consistent direction builds up speed and random jitter cancels itself out.']
+  ],
+  regularisation: [
+    ['Dropout', 'Randomly switching off some neurons on each training pass, so no single one becomes indispensable. Everything is switched back on for real predictions.'],
+    ['Weight decay', 'A small tax on large weights, nudging the whole network towards milder opinions.'],
+    ['Early stopping', 'Stopping the moment the score on held-out data starts getting worse. The free regulariser.'],
+    ['Generalisation', 'Doing well on data it has never seen. The only thing that actually matters.']
+  ],
+  gradients: [
+    ['Vanishing gradient', 'Blame shrinking towards nothing as it travels back, so the early layers never learn anything.'],
+    ['Exploding gradient', 'The reverse: blame growing at every hop until the numbers blow up and training falls over.'],
+    ['Gradient clipping', 'Putting a cap on how large the blame is allowed to get. The blunt fix for the exploding version.'],
+    ['Initialisation', 'What the numbers are set to before training begins. Getting that scale right is most of the fix for the vanishing version.'],
+    ['Normalisation', 'Rescaling the numbers between layers so they stay in a sensible range all the way down the stack.'],
+    ['Skip connection', 'A shortcut that lets blame bypass a layer entirely, so it reaches the bottom undiminished.']
+  ],
+  conv: [
+    ['Kernel / filter', 'The small stencil &mdash; often just three by three numbers. Training decides what pattern it hunts for; nobody draws it.'],
+    ['Convolution', 'Sliding that stencil across the whole input and recording how strongly it matched at each position.'],
+    ['Feature map', 'The result: a copy of the picture marked wherever the stencil got a hit.'],
+    ['Stride', 'How far the stencil jumps between positions. Bigger jumps produce a smaller output.'],
+    ['Padding', 'A border of zeros added around the edge, so the stencil can reach the corners properly.'],
+    ['Pooling', 'Shrinking the picture by keeping only the strongest signal in each little square. It says "somewhere around here" rather than "at exactly this pixel".']
+  ],
+  sequences: [
+    ['Sequence', 'Data where the order carries meaning: words, sounds, sensor readings through time.'],
+    ['RNN', 'Reads one step at a time, carrying a running summary in its head. By step two hundred the beginning is a blur.'],
+    ['LSTM / GRU', 'The same reader given a notepad and rules about what to write down, what to keep and what to cross out. The summary survives much further.'],
+    ['Attention', 'Every position looks directly at every other one and decides which of them matter. "It" glances back and finds "the dog".'],
+    ['Transformer', 'The architecture built entirely out of attention. Nothing is read one step at a time, which is why it trains so fast on a graphics card.']
+  ],
+  practice: [
+    ['Loss curve', 'The loss plotted against training steps. Its shape is the main diagnostic you have.'],
+    ['Overfit one batch', 'Try to drive the loss to nearly zero on ten examples. Any working network can. If yours cannot, stop tuning and go and find the bug.'],
+    ['Learning rate finder', 'Sweeping the learning rate to see where the loss falls fastest, instead of guessing at it.'],
+    ['Transfer learning', 'Starting from a model somebody else already trained and adapting it. Usually the right answer before you train anything from scratch.']
+  ],
+  pytorch: [
+    ['Tensor', 'A spreadsheet allowed more than two dimensions. It knows what kind of numbers it holds, whether it lives on the processor or the graphics card, and whether to remember how it was made.'],
+    ['requires_grad', 'The flag saying "remember how this was produced". It is the difference between a plain array and something trainable.'],
+    ['loss.backward()', 'Walk the recorded steps in reverse and fill in each number\'s share of the blame. It only computes; it changes nothing.'],
+    ['optimizer.step()', 'Actually move the numbers, using the blame that backward() just worked out.'],
+    ['optimizer.zero_grad()', 'Clear the previous blame. Forget this and blame piles up across iterations, silently, with no error anywhere.'],
+    ['nn.Module', 'A box that keeps track of its own numbers, so you never have to hand them to the optimiser one at a time.']
+  ]
+};

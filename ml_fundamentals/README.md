@@ -8,6 +8,12 @@ in `js/content.js`. Ordinary least squares, gradient descent, logistic regressio
 Gini impurity and k-means all run for real. Nothing is a pre-baked figure, so nothing can
 quietly stop being true.
 
+**Written for someone with no prior experience.** Every chapter opens with a plain-English
+box — one sentence of what this is really about, a short paragraph you could read on its own,
+and then every term that chapter's widgets put on screen, defined right there rather than only
+in the glossary at the end. `test.js` refuses a chapter without one, refuses an opener that
+leans on the jargon it is meant to explain, and refuses a definition too short to help.
+
 ## Run it
 
 Open `index.html` in a browser. That's it — no build, no server, no dependencies.

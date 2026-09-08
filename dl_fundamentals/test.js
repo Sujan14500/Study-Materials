@@ -365,6 +365,46 @@ C.glossary.forEach(t => assert(t.length === 3 && t[0] && t[1] && t[2],
   `glossary entry "${t[0]}" is missing its plain-English line — every term needs one`));
 
 /* ---------------------------------------------------------------
+   Readable without prior experience
+
+   The course is meant to open every chapter in plain English before
+   it uses a single symbol. That is the kind of promise that quietly
+   rots the next time somebody adds a chapter, so it is enforced.
+   --------------------------------------------------------------- */
+{
+  const html = fs.readFileSync('index.html', 'utf8');
+  const ids = [...html.matchAll(/data-id="([a-z]+)"/g)].map(m => m[1]).filter(id => id !== 'welcome');
+  ids.forEach(id => assert(C.plain[id], `chapter "${id}" has no plain-English opener in C.plain`));
+  Object.keys(C.plain).forEach(id => assert(ids.includes(id), `C.plain has "${id}", which is not a chapter`));
+
+  // the openers must not lean on the jargon they exist to explain
+  const banned = /\bMSE\b|\bReLU\b|\bAUC\b|\bSGD\b|\bGini\b|\bReLU\b|\bL1\b|\bL2\b|\bRNN\b|\bLSTM\b|\bGRU\b/;
+  Object.keys(C.plain).forEach(id => {
+    const text = C.plain[id].join(' ');
+    assert(!banned.test(text),
+      `the plain-English opener for "${id}" uses jargon it is supposed to be explaining: ${(text.match(banned) || [])[0]}`);
+    assert(C.plain[id][0].length < 130, `plain[${id}] headline is too long to scan at a glance`);
+    assert(C.plain[id][1].length > 150, `plain[${id}] body is too thin to explain anything`);
+  });
+
+  // every chapter with a widget must define the words that widget puts on screen
+  Object.keys(C.terms).forEach(id => {
+    assert(ids.includes(id), `C.terms has "${id}", which is not a chapter`);
+    assert(C.terms[id].length >= 3, `chapter "${id}" defines fewer than three of its own terms`);
+    C.terms[id].forEach(t => {
+      assert(t.length === 2 && t[0] && t[1], `a term in "${id}" is malformed`);
+      assert(!/<b>/.test(t[0]),
+        `the term "${t[0]}" in "${id}" nests a <b> inside the <b> the renderer already adds`);
+      assert(t[1].length > 45, `the term "${t[0]}" in "${id}" has a definition too short to help anyone`);
+    });
+  });
+  const noTerms = ids.filter(id => id !== 'quiz' && !C.terms[id]);
+  assert(noTerms.length === 0, `these chapters name no terms at all: ${noTerms.join(', ')}`);
+  console.log(`  ${ids.length} chapters open in plain English, ` +
+    `${Object.values(C.terms).reduce((a, t) => a + t.length, 0)} terms defined where they appear`);
+}
+
+/* ---------------------------------------------------------------
    Wiring
    --------------------------------------------------------------- */
 const ids = new Set();

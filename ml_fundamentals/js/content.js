@@ -330,3 +330,143 @@ C.glossary = [
   ['Drift', 'The world changes and the training distribution stops matching production.',
    "Your 2019 model prices houses the way people wanted houses in 2019. The model has not changed; the world did."]
 ];
+
+/* ============================================================
+   Plain-English chapter openers.
+
+   C.plain[id]  — [headline, body]. Read on its own, by someone who
+                  has never met any of this. No symbols, no acronyms.
+   C.terms[id]  — the words that actually appear on that chapter's
+                  screen, defined where you meet them rather than
+                  only in the glossary at the very end.
+
+   demos.js injects both above the first panel, so adding a chapter
+   means adding an entry here and nothing else. test.js refuses a
+   chapter that has no entry, and refuses an opener that uses the
+   jargon it is supposed to be explaining.
+   ============================================================ */
+C.plain = {
+  what: ['Instead of writing the rule yourself, you show a computer thousands of examples and let it work the rule out.',
+    'Writing "an email is spam if it contains the word viagra" is you knowing the rule. Machine learning is handing over ten thousand emails you have already sorted and letting the computer find the pattern for itself &mdash; including the parts you would never have thought to write down. It is worth doing only when the rule is too messy or changes too often to write by hand, which is the first question this chapter makes you ask.'],
+
+  data: ['Hide some of your data before you start, and do not look at it again until the very end.',
+    'If you use every row to build the model, you have no honest way of telling whether it learned anything or simply memorised what it was shown. So you put a portion in a drawer. The model never sees it while learning, and how it does on that hidden portion is the only trustworthy guess you have about how it will behave on real data tomorrow.'],
+
+  regression: ['Draw the straightest line you can through a cloud of dots, then measure how badly it misses.',
+    'Each blue dot in the picture is one of 24 students: how many hours they studied, and what they scored in the exam. You want a rule that turns hours into a predicted score, and the simplest possible rule is a straight line. A straight line is completely described by exactly two numbers &mdash; how steep it is, and how high up it starts. Training, here, means nothing more mysterious than hunting for the pair of numbers that makes the line pass as close as it can to all 24 dots at once.'],
+
+  gradient: ['When you cannot just solve for the best answer, feel which way is downhill and take a step.',
+    'Picture standing on a hillside in thick fog, trying to reach the lowest point. You cannot see the valley, but you can feel which way the ground slopes under your feet, so you step that way and then feel again. That is the entire algorithm. The hillside is "how wrong the model is" for every possible setting of its numbers, and the bottom of the valley is the setting you are looking for.'],
+
+  classification: ['The same idea as the line, except the answer is now a category rather than a number.',
+    'Predicting an exam score gives you a number. Predicting spam or not spam is a choice between two boxes. So instead of a line drawn <i>through</i> the dots, you want a line drawn <i>between</i> two groups of dots, keeping them apart. The model still works in numbers underneath, but at the end it squeezes its answer into a confidence between 0 and 1: how sure am I that this one belongs in the first box.'],
+
+  evaluation: ['How often the model is right is usually the least useful thing you can measure.',
+    'If one card payment in ten thousand is fraudulent, a model that shrugs and says "not fraud" every single time is right 99.99% of the time and catches nothing at all. That is why the rest of this chapter exists. You need numbers that tell the two different ways of being wrong apart, because in real life a false alarm and a miss almost never cost the same amount.'],
+
+  overfitting: ['A model can score brilliantly on the data it studied and be useless on anything new.',
+    'It is the student who memorised last year\'s exam paper instead of learning the subject. Given enough freedom, a model starts fitting the random flukes in your training rows as though they were the pattern. On the rows it studied it looks like it is still improving. On the only thing you actually care about &mdash; tomorrow\'s data &mdash; it is getting worse, and nothing warns you.'],
+
+  cv: ['One split is one opinion. Rotate the split five times and you get an answer you can trust.',
+    'If you hold back a single chunk of your data and score against it, all you have learned is how the model does on that one chunk. Draw an unlucky chunk and you will throw away a perfectly good model; draw a lucky one and you will ship a bad one with confidence. So you repeat the whole exercise with a different chunk held back each time, until every row has had exactly one turn at being the test.'],
+
+  trees: ['Twenty questions. Each question splits the group in two, and the model keeps whichever question separates best.',
+    'A decision tree asks something like "did they study more than four hours?", splits everyone into a yes pile and a no pile, then asks another question inside each pile. It keeps going until the piles are tidy enough. Nothing about it is clever: at every step it simply tries every question it could ask and keeps the one that tidies the piles the most.'],
+
+  clustering: ['Nobody labelled anything. You are asking the data what groups are hiding in it.',
+    'Everything up to here had right answers to learn from. This does not &mdash; just customers, or documents, or readings, and a suspicion that they fall into natural groups. The catch is that with no right answers there is also nothing to check yourself against, which makes "is this any good?" a genuinely harder question than it first sounds.'],
+
+  features: ['The columns you feed the model matter far more than which model you picked.',
+    'Two things go wrong here, both silently. One: your columns are on wildly different scales &mdash; salary in tens of thousands sitting next to age in tens &mdash; and the model concludes salary is a thousand times more important purely because of the units it happens to be measured in. Two: a category like colour gets numbered 1, 2 and 3, which quietly tells the model that green sits halfway between red and blue. Neither of them raises an error.'],
+
+  workflow: ['Nine steps from a question to something running, and a specific way to trip over each one.',
+    'Most real machine learning failures are not clever modelling mistakes. They are ordinary process mistakes: rescaling the data before splitting it, having no simple baseline so nobody can tell whether the model is actually any good, or shipping something with no way of noticing when it slowly stops working.'],
+
+  quiz: ['Every question here is about something you already dragged a slider on.',
+    'Nothing in the quiz is new material. Getting one wrong is useful rather than embarrassing &mdash; each explanation names the chapter worth going back to, and you can retake the whole thing as often as you like. Underneath it is the glossary: every term in the course, each with a plain-English example attached.']
+};
+
+C.terms = {
+  what: [
+    ['Model', 'What comes out of the whole process. Hand it a new email and it guesses spam or not spam.'],
+    ['Training', 'Showing it examples where you already know the right answer, so it can find the pattern.'],
+    ['Supervised', 'You have the right answers for your examples. Almost all useful machine learning is this.'],
+    ['Unsupervised', 'You have no answers, only the data, and you are asking what structure is already in there.']
+  ],
+  data: [
+    ['Training set', 'The rows the model actually learns from. Usually about 60&ndash;70% of what you have.'],
+    ['Validation set', 'The rows you use to choose between options &mdash; which settings, which model. You may look at this one as often as you like.'],
+    ['Test set', 'The rows you look at once, at the very end, to report a number. Looking twice quietly turns it into another validation set.'],
+    ['Data leakage', 'Anything from outside the training rows sneaking into the model. It makes your scores look wonderful and mean nothing.']
+  ],
+  regression: [
+    ['Slope <span class="mono">w</span>', 'How steep the line is &mdash; how many extra exam marks one extra hour of study buys you. Drag it and the line tilts.'],
+    ['Intercept <span class="mono">b</span>', 'Where the line starts: the score it predicts for someone who studied zero hours. Drag it and the whole line slides up or down without tilting.'],
+    ['Residual', 'One red vertical line in the picture &mdash; the gap between what a real student actually scored and what your line predicted for them. That gap is the miss.'],
+    ['Mean squared error', 'One number summing up all 24 misses. Square each gap, so that too high and too low are both simply "wrong", then take the average. Lower is a better line; zero would mean the line goes exactly through every dot.'],
+    ['Fitting', 'The hunt for the slope and intercept that make that number as small as it will go. That is all training is here.']
+  ],
+  gradient: [
+    ['Gradient', 'Which way is downhill, and how steeply &mdash; worked out with calculus rather than by feel.'],
+    ['Learning rate', 'How big a step you take. Tiny steps take forever; huge steps leap clean over the valley and land higher up the other side.'],
+    ['Epoch', 'One complete pass over all of your training rows.'],
+    ['Batch', 'How many rows you look at before taking one step. All of them is slow and steady, one at a time is fast and jittery, a few dozen is the usual compromise.'],
+    ['Convergence', 'The point where further steps stop improving anything, because you have reached the bottom or something flat enough to call the bottom.']
+  ],
+  classification: [
+    ['Decision boundary', 'The line the model draws between the two groups. Anything on one side gets one label, anything on the other side gets the other.'],
+    ['Logistic regression', 'The standard way of doing this. Despite the name it classifies &mdash; the "regression" part is what happens before the squashing.'],
+    ['Sigmoid', 'The squash. It takes whatever number the model produced and bends it into a confidence between 0 and 1.'],
+    ['Threshold', 'How confident the model has to be before you actually act on it. Move it and you trade one kind of mistake for the other.'],
+    ['Linearly separable', 'Whether one straight line can genuinely keep the two groups apart. Often it cannot, which is where curves and neural networks come in.']
+  ],
+  evaluation: [
+    ['Accuracy', 'What fraction of all predictions were right. Fine when both outcomes are common, actively misleading when one of them is rare.'],
+    ['Precision', 'Of the things you flagged, how many really were. Low precision means you cry wolf.'],
+    ['Recall', 'Of the things that really were, how many you caught. Low recall means you let them through.'],
+    ['F1', 'One number combining precision and recall, for when both matter about equally. It punishes being brilliant at one and hopeless at the other.'],
+    ['Confusion matrix', 'The four boxes underneath all of the above: caught it, false alarm, missed it, correctly ignored.'],
+    ['ROC-AUC', 'Take one real positive and one real negative at random. This is how often the model rates the positive as the more likely of the two. 0.5 is a coin flip.']
+  ],
+  overfitting: [
+    ['Overfitting', 'Great on the rows it studied, poor on new ones. The model chased the noise.'],
+    ['Underfitting', 'Poor on both. The model was too simple to catch the pattern in the first place.'],
+    ['Bias', 'Error that comes from being too simple &mdash; a straight line where the truth curves.'],
+    ['Variance', 'Error that comes from being too sensitive &mdash; the answer swings about wildly if you change a handful of training rows.'],
+    ['Regularisation', 'Deliberately penalising complexity, so the model prefers a simple explanation over an elaborate one.'],
+    ['L1 and L2', 'Two ways of applying that penalty. L1 tends to switch whole features off; L2 tends to shrink them all a little.']
+  ],
+  cv: [
+    ['Fold', 'One of the chunks you cut the data into. Five folds means five chunks, and five separate rounds of train-then-score.'],
+    ['k-fold', 'The standard version of this. k is how many chunks; five or ten are the usual choices.'],
+    ['Stratified', 'Cutting the chunks so each one holds the same mix of outcomes as the whole. Essential as soon as one outcome is rare.'],
+    ['Learning curve', 'Score plotted against how much data you used. It answers "would collecting more data actually help, or am I stuck?"']
+  ],
+  trees: [
+    ['Split', 'One question, and the threshold it uses. "Hours studied above 4.2?"'],
+    ['Gini impurity', 'How mixed a pile is. Pull one member out at random and guess their label from the pile\'s own mix &mdash; Gini is how often you would be wrong. Zero means the pile is entirely one label.'],
+    ['Depth', 'How many questions deep the tree may go. Deeper fits the training rows better and starts memorising sooner.'],
+    ['Random forest', 'Grow hundreds of trees on random slices of the data and average them. Individually shaky, collectively steady.'],
+    ['Boosting', 'Grow trees one after another, each new one concentrating on what the previous ones got wrong. Usually the strongest thing you can run on table-shaped data.']
+  ],
+  clustering: [
+    ['Cluster', 'One of the groups the algorithm decides is there.'],
+    ['Centroid', 'The middle of a cluster &mdash; the average of everything currently assigned to it.'],
+    ['k-means', 'Drop k markers on the map, send every point to its nearest marker, move each marker to the middle of its own points, and repeat until nothing moves.'],
+    ['k', 'How many groups you told it to find. It will happily find exactly that many whether or not they exist.'],
+    ['Inertia', 'Total distance from points to their own centroid. It always improves when you add more clusters, which is precisely why it cannot tell you the right k on its own.']
+  ],
+  features: [
+    ['Feature', 'One input column. Hours studied is a feature; so is postcode.'],
+    ['Scaling / standardising', 'Rewriting every column onto a comparable range, so none of them dominates simply by being measured in bigger units.'],
+    ['Normalising', 'A related rescaling that squeezes values into a fixed range, often 0 to 1.'],
+    ['One-hot encoding', 'Turning a category into one yes-no column per value, so the model cannot invent an ordering that was never there.'],
+    ['Pipeline', 'Bundling the rescaling and the model together, so the rescaling is worked out from training rows only. Doing it beforehand across all your data is leakage.']
+  ],
+  workflow: [
+    ['Baseline', 'The dumbest reasonable answer &mdash; always guess the average, or always guess the commonest outcome. Everything else is measured against it.'],
+    ['Pipeline', 'The whole sequence wired up as one object, so the steps always happen in the same order during training and on live data.'],
+    ['Drift', 'The world moving away from the data you trained on. Nothing breaks and no error appears; the model just quietly gets worse.'],
+    ['Monitoring', 'Watching for exactly that. It belongs in the design, not in a follow-up ticket.']
+  ]
+};

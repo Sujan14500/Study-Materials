@@ -9,6 +9,12 @@ initialisation, the forward pass, binary cross-entropy, backpropagation, gradien
 test suite verifies the gradients against numerical differentiation — so the arithmetic the
 course shows you is the arithmetic it actually does.
 
+**Written for someone with no prior experience.** Every chapter opens with a plain-English
+box — one sentence of what this is really about, a short paragraph you could read on its own,
+and then every term that chapter's widgets put on screen, defined right there rather than only
+in the glossary at the end. `test.js` refuses a chapter without one, refuses an opener that
+leans on the jargon it is meant to explain, and refuses a definition too short to help.
+
 Chapter 12 is the deliberate exception. Once you have written backpropagation by hand there is
 a reason to see PyTorch, and it arrives in that order on purpose: `loss.backward()` only means
 something once you have derived the seven lines it replaces. That chapter still runs its own

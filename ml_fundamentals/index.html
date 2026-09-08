@@ -173,15 +173,17 @@
 
   <div class="panel">
     <div class="panel-head"><h3>📉 Fit it by hand</h3><span class="panel-tag">interactive</span></div>
-    <p class="panel-sub">24 students. Move the sliders and watch the red residuals — the vertical misses that get squared and averaged into the loss. Get the MSE as low as you can, then press <b>Solve exactly</b>.</p>
+    <p class="panel-sub">Each blue dot is one of 24 students: <b>hours studied</b> along the bottom, <b>exam score</b> up the side. Your job is to lay one straight line through the cloud so it comes as close as possible to all of them at once. <b>Slope</b> tilts the line; <b>intercept</b> slides it up and down without tilting it. Every red line is one student your line got wrong — that vertical gap is the miss. Make the number underneath as small as you can, then press <b>Solve exactly</b> to see the best line that exists.</p>
     <div class="reg-wrap">
       <canvas id="reg-canvas" class="chart" height="330"></canvas>
       <div class="reg-side">
         <label class="ctrl">slope <b>w</b> <span class="mono" id="reg-wv"></span>
           <input type="range" id="reg-w" min="0" max="10" step="0.05" value="2"></label>
+        <div class="reg-hint">How steep. Extra marks earned per extra hour of study.</div>
         <label class="ctrl">intercept <b>b</b> <span class="mono" id="reg-bv"></span>
           <input type="range" id="reg-b" min="20" max="70" step="0.5" value="55"></label>
-        <div class="metric-big"><span>mean squared error</span><b id="reg-mse">—</b></div>
+        <div class="reg-hint">How high it starts. The score predicted for zero hours studied.</div>
+        <div class="metric-big"><span>mean squared error</span><b id="reg-mse">—</b><i>the average of the squared red gaps. Lower is a better line; zero would mean the line passes exactly through every dot.</i></div>
         <div class="score-wrap"><div class="score-bar"><div class="score-fill" id="reg-bar"></div></div></div>
         <div class="reg-verdict mono" id="reg-verdict"></div>
         <pre class="code" id="reg-eq"></pre>

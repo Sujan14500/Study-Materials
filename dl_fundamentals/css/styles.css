@@ -513,6 +513,25 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .abox.hl{border-color:var(--violet);background:rgba(124,92,255,.14)}
 .arch-sep{text-align:center;color:var(--txt-3);font-size:16px;line-height:1}
 
+/* ---------- plain-English chapter opener ---------- */
+.plainbox{background:linear-gradient(120deg,rgba(20,184,166,.13),rgba(45,212,191,.04));
+  border:1px solid rgba(20,184,166,.3);border-left-width:3px;border-radius:13px;
+  padding:16px 20px;margin-bottom:24px}
+.pb-tag{font-size:10px;text-transform:uppercase;letter-spacing:1.3px;color:var(--violet);
+  font-weight:700;margin-bottom:7px}
+.pb-one{font-size:16.5px;font-weight:700;color:var(--txt);line-height:1.5;margin-bottom:7px}
+.pb-body{font-size:14px;color:var(--txt-2);line-height:1.72}
+.pb-terms{margin-top:15px;padding-top:14px;border-top:1px dashed rgba(20,184,166,.28)}
+.pb-terms h5{font-size:10px;text-transform:uppercase;letter-spacing:1.3px;color:var(--cyan);
+  font-weight:700;margin-bottom:10px}
+.pb-term{display:grid;grid-template-columns:190px 1fr;gap:14px;padding:6px 0;
+  border-bottom:1px solid rgba(255,255,255,.05)}
+.pb-term:last-child{border-bottom:none}
+.pb-term b{font-size:13px;color:var(--txt);line-height:1.5}
+.pb-term span{font-size:13px;color:var(--txt-2);line-height:1.62}
+@media(max-width:720px){.pb-term{grid-template-columns:1fr;gap:2px}
+  .pb-term b{color:var(--cyan)}}
+
 /* ---------- ch14 quiz + glossary ---------- */
 .quiz-q{margin-bottom:20px;padding-bottom:18px;border-bottom:1px solid var(--line)}
 .quiz-q:last-of-type{border-bottom:none}

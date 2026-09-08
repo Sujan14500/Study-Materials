@@ -918,9 +918,37 @@ function initQuiz() {
   renderG('');
 }
 
+/* ============================================================
+   Plain-English chapter openers
+
+   Injected from C.plain / C.terms rather than written into the
+   markup, so adding a chapter means adding one entry to
+   content.js and nothing else. The terms strip exists because
+   the glossary is at the end of the course and the words are
+   needed at the start of the chapter.
+   ============================================================ */
+function initPlain() {
+  $$('.chapter').forEach(ch => {
+    const p = C.plain[ch.dataset.id];
+    if (!p) return;
+    const head = $('.ch-head', ch);
+    if (!head) return;
+    const terms = (C.terms && C.terms[ch.dataset.id]) || [];
+    head.insertAdjacentElement('afterend', el('div', 'plainbox',
+      '<div class="pb-tag">in plain English</div>' +
+      '<div class="pb-one">' + p[0] + '</div>' +
+      '<div class="pb-body">' + p[1] + '</div>' +
+      (terms.length
+        ? '<div class="pb-terms"><h5>the words on this page</h5>' +
+          terms.map(t => '<div class="pb-term"><b>' + t[0] + '</b><span>' + t[1] + '</span></div>').join('') +
+          '</div>'
+        : '')));
+  });
+}
+
 /* ---------- boot ---------- */
 document.addEventListener('DOMContentLoaded', () => {
-  [initBackground, initNeuron, initActivations, initXor, initWalk, initBackpropWalk,
+  [initPlain, initBackground, initNeuron, initActivations, initXor, initWalk, initBackpropWalk,
    initMoons, initLR, initReg, initFlow, initConv, initSeq, initDebug, initQuiz]
     .forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 });
