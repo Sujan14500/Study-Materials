@@ -16,7 +16,7 @@ time you have, and a button that opens whatever you should do next.
 | Folder | What it is | Size |
 |--------|-----------|------|
 | [`START_HERE`](START_HERE) | The roadmap, a skills tree that maps every skill to the course teaching it, and the course launcher | 1 page |
-| [`ai_interview_prep`](ai_interview_prep) | 569 interview questions with plain-English *and* technical answers, 236 multiple-choice questions, flashcards, timed mock interview | 569 questions |
+| [`ai_interview_prep`](ai_interview_prep) | 570 interview questions with plain-English *and* technical answers, 236 multiple-choice questions, flashcards, timed mock interview | 570 questions |
 | [`genai_flow`](genai_flow) | How LLMs actually work — tokens through to shipping, plus deep dives on one transformer block, decoding controls, chunking, the fine-tuning menu, LLM-as-judge, multimodal and beyond-RAG | 25 chapters |
 | [`ai_system_design_concepts`](ai_system_design_concepts) | AI/ML system design — metrics, latency budgets, capacity, vector indexes, serving, plus caching layers, parallelism, Elasticsearch and big-files-small-RAM, the nine vector search techniques drawn, eight latency fixes on a live waterfall, and the four FastAPI handler shapes with their throughput side by side | 24 chapters |
 | [`agentic_ai_flow`](agentic_ai_flow) | Agent architecture — the loop, tools, planning, memory, multi-agent, MCP, plus harness engineering and an eight-failure playbook | 17 chapters |
