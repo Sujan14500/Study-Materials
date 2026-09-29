@@ -31,9 +31,14 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
+python -m ipykernel install --user --name study-notebooks --display-name "Study Notebooks (.venv)"
 ```
 
-Open any notebook in VS Code (or `jupyter lab`), pick the `.venv` kernel, and **Run All**.
+The last line registers the venv as the Jupyter kernel every notebook asks for, so VS Code and
+JupyterLab pick it automatically. Open any notebook and **Run All**. If you ever see
+`ModuleNotFoundError: No module named 'matplotlib'` (or numpy, torch, ...), the notebook is running
+on your global Python instead: click the kernel name at the top right and choose
+**Study Notebooks (.venv)**.
 The Hugging Face, RAG and fine-tuning notebooks download a few small models on first run
 (about 750 MB in total, cached afterwards in `~/.cache/huggingface`).
 
