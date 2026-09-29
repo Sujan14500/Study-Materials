@@ -232,8 +232,8 @@ C.memKinds = [
     watch: 'This is the one you edit by hand. "The agent keeps doing X" is nearly always a procedural-memory bug.' }
 ];
 C.memConvo = [
-  { who: 'user',  t: 'Hi — I\'m Priya, I run infra at Northwind.', store: ['working', 'episodic'],
-    fact: 'user = Priya, role = infra lead, company = Northwind' },
+  { who: 'user',  t: 'Hi — I\'m Mamitha, I run infra at Northwind.', store: ['working', 'episodic'],
+    fact: 'user = Mamitha, role = infra lead, company = Northwind' },
   { who: 'user',  t: 'Always give me answers in metric units, I never want Fahrenheit.', store: ['episodic', 'procedural'],
     fact: 'preference: metric units, standing instruction' },
   { who: 'agent', t: 'Looking up your current cluster config…', store: ['working'], fact: '' },

@@ -806,4 +806,96 @@ ids.forEach(id => assert(html.includes('id="' + id + '"') || demos.includes('id=
   console.log(`  hybrid RAG: 4 stages, ${H.QUERIES.length} fusion queries, RRF re-derived`);
 }
 
+/* ---- Llama 3.2 3B: the printout chapter must agree with the real model ---- */
+/* Every number on that page is derived from one config object. Re-derive the
+   parameter count independently and pin it to Meta's published figure, so a
+   typo in the config cannot quietly teach a wrong architecture.             */
+{
+  const page = fs.readFileSync('index.html', 'utf8');
+  const lCtx = { window: {} }; lCtx.window.window = lCtx.window;
+  vm.createContext(lCtx);
+  vm.runInContext(fs.readFileSync('js/llama.js', 'utf8'), lCtx);
+  const Lm = lCtx.window.LLAMA;
+
+  assert(Lm, 'llama.js did not publish its data');
+  assert(page.includes('data-id="llama"'), 'the print(model) chapter is missing from the page');
+  assert(page.includes('css/llama.css') && page.includes('js/llama.js'), 'llama.css / llama.js not linked');
+  ['ll-print', 'll-arch', 'll-detail', 'll-shapes', 'll-params', 'll-dtypes', 'll-gqa', 'll-kvmodes',
+   'll-kvstats', 'll-lora-r', 'll-lora-t', 'll-lora-out', 'll-myths', 'll-slot-print', 'll-slot-arch', 'll-runorder', 'll-T', 'll-B', 'll-ctx', 'll-bs']
+    .forEach(id => assert(page.includes('id="' + id + '"'), `llama.js reaches for #${id}, which the page never creates`));
+
+  const c = Lm.CFG;
+  assert.strictEqual(c.heads * c.headDim, c.d, 'q_proj must be heads x head_dim = hidden size');
+  assert.strictEqual(c.heads % c.kvHeads, 0, 'query heads must divide evenly into KV groups');
+  assert.strictEqual(c.ffn, 8 / 3 * c.d, 'the chapter claims intermediate_size is exactly 8/3 x hidden');
+
+  /* independent re-derivation, straight from the printed Linear shapes */
+  const lin = (i, o) => i * o;
+  const layer = lin(3072, 3072) + lin(3072, 1024) * 2 + lin(3072, 3072)   // q k v o
+              + lin(3072, 8192) * 2 + lin(8192, 3072)                     // gate up down
+              + 3072 * 2;                                                 // two RMSNorms
+  const total = 128256 * 3072 + 28 * layer + 3072;                        // tied head adds nothing
+  assert.strictEqual(total, 3212749824, 'Llama 3.2 3B has 3,212,749,824 parameters');
+  const P = Lm.count(c);
+  assert.strictEqual(P.total, total, `count() says ${P.total}, the printout says ${total}`);
+  assert.strictEqual(P.layer, layer, 'per-layer parameter count disagrees with the printout');
+  assert.strictEqual(Lm.count(Object.assign({}, c, { tied: false })).total, 3606752256,
+    'the "naively add every shape" figure the myths quote is wrong');
+
+  /* the claims in the prose */
+  assert(Math.round(P.mlp / P.layer * 100) === 75, 'the chapter says the MLP is 75% of each layer');
+  assert(Math.round(28 * P.mlp / P.total * 100) === 66, 'the chapter says the MLP is 66% of the model');
+  assert(Math.round(28 * P.attn / P.total * 100) === 22, 'the chapter says attention is 22% of the model');
+  assert(Math.round(P.embed / P.total * 100) === 12, 'the chapter says embeddings are 12% of the model');
+  assert.strictEqual((P.total * 4 / 1e9).toFixed(1), '12.9', 'fp32 footprint must reproduce the notebook\'s 12.9 GB');
+  assert.strictEqual((P.total * 2 / 1e9).toFixed(1), '6.4', 'bf16 footprint is quoted as 6.4 GB');
+  const kv = Lm.kvPerToken(c, c.kvHeads, 2);
+  assert.strictEqual(kv, 114688, 'KV cache per token in bf16 should be 112 KiB');
+  assert.strictEqual(Lm.kvPerToken(c, c.heads, 2) / kv, 3, 'GQA is claimed to cut the KV cache 3x vs MHA');
+  assert(Math.round(kv * 131072 / 1e9) === 15, 'the attention card claims ~15 GB of cache at 128k context');
+  const lora = Lm.loraCount(c, 16, ['q_proj', 'k_proj', 'v_proj', 'o_proj', 'gate_proj', 'up_proj', 'down_proj']);
+  assert.strictEqual(lora, 24313856, 'LoRA r=16 on all seven linears should train 24,313,856 weights');
+  assert(lora / P.total < 0.01, 'LoRA on this model should train under 1% of the weights');
+
+  /* the printout must be the real one, and every clickable line must be explained */
+  const lines = Lm.printout(c);
+  const text = lines.map(l => l[0]);
+  ['Embedding(128256, 3072)', '(0-27): 28 x LlamaDecoderLayer(',
+   '(k_proj): Linear(in_features=3072, out_features=1024, bias=False)',
+   '(down_proj): Linear(in_features=8192, out_features=3072, bias=False)',
+   '(input_layernorm): LlamaRMSNorm((3072,), eps=1e-05)',
+   '(lm_head): Linear(in_features=3072, out_features=128256, bias=False)']
+    .forEach(s => assert(text.some(t => t.includes(s)), `the printout no longer shows "${s}"`));
+  assert.strictEqual(lines.length, 26, 'print(model) for this model is 26 lines');
+  let depth = 0;
+  lines.forEach(([t]) => { depth += (t.match(/\($/) ? 1 : 0) - (t === ')' ? 1 : 0); });
+  assert.strictEqual(depth, 0, 'the printout\'s brackets do not balance');
+  lines.filter(l => l[1]).forEach(([t, id]) => {
+    const m = Lm.M[id];
+    assert(m, `printout line "${t}" points at "${id}", which has no explanation`);
+    ['t', 'lay', 'what', 'shape', 'formula', 'why', 'trap'].forEach(k =>
+      assert(m[k] && m[k].length > (k === 't' || k === 'shape' || k === 'formula' ? 3 : 60),
+        `module "${id}" is missing a real "${k}"`));
+    if (m.p) assert(Lm.count(c)[m.p] !== undefined, `module "${id}" cites unknown parameter key "${m.p}"`);
+  });
+
+  /* run order: the point of the toggle is that it differs from print order */
+  const R = Lm.RUN;
+  assert(R.ln1 < R.q && R.ln2 < R.gate, 'norms must run before the sublayers they feed (pre-norm)');
+  assert(R.act < R.down && R.rope < R.attn && R.embed < R.rope && R.norm < R.head, 'run order is wrong');
+  const printed = lines.map(l => l[1]).filter(id => R[id]);
+  assert(printed.some((id, i) => i && R[id] < R[printed[i - 1]]),
+    'if print order matched run order the chapter\'s warning would be false');
+
+  Lm.TRACE.forEach(([st, f, , id]) => {
+    assert(Lm.M[id], `shape trace row "${st}" links to unknown module "${id}"`);
+    assert(f(2, 10).every(n => Number.isInteger(n) && n > 0), `shape trace row "${st}" produces a bad shape`);
+  });
+  assert.deepStrictEqual([...Lm.TRACE[Lm.TRACE.length - 1][1](1, 7)], [1, 7, 128256], 'the trace must end in logits');
+  assert(Lm.MYTHS.length === 6, 'the panel title promises six myths');
+
+  console.log(`  llama: ${lines.length}-line printout, ${Object.keys(Lm.M).length} modules explained, ` +
+              `${P.total.toLocaleString('en-US')} params re-derived`);
+}
+
 console.log('ok — content data is consistent');

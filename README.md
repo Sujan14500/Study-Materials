@@ -2,7 +2,9 @@
 
 Interactive, animated courses for getting from "what even is a token" to designing and
 defending a production GenAI system in an interview. Everything is plain HTML, CSS and
-JavaScript — no build, no server, no dependencies. Open a file, learn a thing.
+JavaScript — no build, no server, no dependencies. Open a file, learn a thing. The one
+exception is [`jupyter_notebooks`](jupyter_notebooks), the hands-on half: Python notebooks
+with their own `requirements.txt` that make the theory runnable.
 
 ## Start here
 
@@ -16,8 +18,9 @@ time you have, and a button that opens whatever you should do next.
 | Folder | What it is | Size |
 |--------|-----------|------|
 | [`START_HERE`](START_HERE) | The roadmap, a skills tree that maps every skill to the course teaching it, and the course launcher | 1 page |
-| [`ai_interview_prep`](ai_interview_prep) | 570 interview questions with plain-English *and* technical answers, 236 multiple-choice questions, flashcards, timed mock interview | 570 questions |
-| [`genai_flow`](genai_flow) | How LLMs actually work — tokens through to shipping, plus deep dives on one transformer block, decoding controls, chunking, the fine-tuning menu, LLM-as-judge, multimodal and beyond-RAG | 25 chapters |
+| [`jupyter_notebooks`](jupyter_notebooks) | The practical half: runnable notebooks from Python basics, DSA, NumPy/Pandas/PyTorch and ML through LLM internals, RAG, Hugging Face, LoRA/QLoRA/DPO, evals, LangChain, LangGraph, agents, production and the live-coding interview rounds. CPU-only toy data, OpenAI / local Ollama / free offline stand-in, and an [interview map](jupyter_notebooks/INTERVIEW_MAP.md) from 380 theory questions to the code that answers them | 128 notebooks |
+| [`ai_interview_prep`](ai_interview_prep) | 578 interview questions with plain-English *and* technical answers, 240 multiple-choice questions, flashcards, timed mock interview | 578 questions |
+| [`genai_flow`](genai_flow) | How LLMs actually work — tokens through to shipping, plus deep dives on one transformer block, a real Llama 3.2 3B print(model) taken apart line by line, decoding controls, chunking, the fine-tuning menu, LLM-as-judge, multimodal and beyond-RAG | 26 chapters |
 | [`ai_system_design_concepts`](ai_system_design_concepts) | AI/ML system design — metrics, latency budgets, capacity, vector indexes, serving, plus caching layers, parallelism, Elasticsearch and big-files-small-RAM, the nine vector search techniques drawn, eight latency fixes on a live waterfall, and the four FastAPI handler shapes with their throughput side by side | 24 chapters |
 | [`agentic_ai_flow`](agentic_ai_flow) | Agent architecture — the loop, tools, planning, memory, multi-agent, MCP, plus harness engineering and an eight-failure playbook | 17 chapters |
 | [`projects_walkthrough`](projects_walkthrough) | Two real systems taken apart: a refund agent and a support platform | 18 chapters |
@@ -72,6 +75,10 @@ for d in genai_flow ai_system_design_concepts agentic_ai_flow ai_tooling langcha
   printf '%-28s ' "$d"; (cd "$d" && node test.js | tail -1)
 done
 ```
+
+The notebooks have the same idea in Python: every notebook is full of `assert`s, and
+`python run_all_notebooks.py` (from `jupyter_notebooks/`, inside its venv) executes all of
+them against a free offline LLM stand-in.
 
 ## Conventions
 

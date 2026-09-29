@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="css/notes.css">
 <link rel="stylesheet" href="css/prod40.css">
 <link rel="stylesheet" href="css/hybridrag.css">
+<link rel="stylesheet" href="css/llama.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
 <style id="mm-css">
 .mf-panel{background:rgba(0,0,0,.26);border:1px solid var(--line);border-top:3px solid var(--c);
@@ -1560,6 +1561,124 @@ SUMX(Sales,
 </section>
 
 <!-- ============================================================= -->
+<!-- LLAMA, PRINTED — reading print(model) line by line             -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="llama" data-title="Reading print(model)" data-icon="&#129433;" data-group="Deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Deep dive &middot; a real model, taken apart</div>
+    <h2>Reading <span class="grad">print(model)</span>: Llama 3.2 3B, line by line</h2>
+    <p class="lead">Chapter 18 built a transformer four numbers wide. This is the same machine at full size: the exact printout you get when you load Llama 3.2 3B in a notebook and type <span class="mono">base_model</span>. Twenty-six lines of text, 3,212,749,824 parameters. By the end of this chapter every line should mean something to you &mdash; its shape, its job, its share of the weights, and the question an interviewer will ask about it.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#127981;</div>
+    <div><b>The layman version.</b> The model is a factory with 28 identical floors. At the door, each word is swapped for a list of 3,072 numbers (<b>embed_tokens</b>). On every floor, two things happen: the words hold a meeting and copy notes from each other (<b>self_attn</b>), then each word goes to its own desk and looks things up in a huge private memory (<b>mlp</b>). Before each of those, someone levels the volume so nobody shouts (<b>the RMSNorms</b>). A clock on the wall tells everyone how far apart they are sitting (<b>rotary_emb</b>). At the top floor, the last word's notes are compared against all 128,256 word-pieces the factory knows, and the best match is the next word (<b>lm_head</b>).</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128424; The printout, every line clickable</h3><span class="panel-tag">click any line</span></div>
+    <p class="panel-sub">This is the printout exactly as the notebook shows it. Click any line and its full explanation opens underneath: what it does in plain English, the tensor shape going in and out, its exact parameter count, the maths, why Llama chose it, and the trap an interviewer will set.</p>
+    <div class="ll-toolbar">
+      <label class="toggle" id="ll-runorder"><span class="toggle-box">&#10003;</span><span>Number each line by when it actually runs</span></label>
+    </div>
+    <div class="ll-print" id="ll-print" aria-label="print(model) output"></div>
+    <div class="goldrule" style="margin-top:14px">
+      <div class="kp-ico">&#9888;</div>
+      <div><h4>Table of contents, not a flowchart</h4><p>The printout lists modules in the order they were created in <span class="mono">__init__</span>. Turn on the run-order numbers: both norms run <i>before</i> the sublayers they are printed after, <span class="mono">act_fn</span> runs before <span class="mono">down_proj</span>, and <span class="mono">rotary_emb</span> is printed last but runs second. The attention maths itself has no line at all &mdash; it is a function call, not a module.</p></div>
+    </div>
+    <div id="ll-slot-print"><div class="ll-detail" id="ll-detail"></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127959; The same model, drawn the way data flows</h3><span class="panel-tag">click any box</span></div>
+    <p class="panel-sub">Same modules, now in execution order. The dashed violet line is the <b>residual stream</b>: each half of every layer reads a normalised copy of it and adds its result back with &oplus;. Clicking a box selects the same module in the printout above and opens its explanation here.</p>
+    <div class="ll-figure" id="ll-arch"></div>
+    <div id="ll-slot-arch"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128208; Where every number in the printout comes from</h3><span class="panel-tag">the config</span></div>
+    <p class="panel-sub">The printout never says "24 heads" or "grouped-query". You infer them. These eight numbers from <span class="mono">config.json</span> generate every shape above &mdash; the whole chapter is computed from them.</p>
+    <div class="ll-anatomy">
+      <div style="--c:#f472b6"><b>vocab_size = 128,256</b>embed_tokens rows and lm_head outputs. 128,000 BPE tokens + 256 reserved special tokens.</div>
+      <div style="--c:#94a3b8"><b>hidden_size = 3,072</b>Width of the residual stream. Every in_features=3072 and every RMSNorm((3072,)).</div>
+      <div style="--c:#94a3b8"><b>num_hidden_layers = 28</b>The "(0-27): 28 x". Each layer has its own weights.</div>
+      <div style="--c:#7c5cff"><b>num_attention_heads = 24</b>Not printed. q_proj is 3072 wide = 24 heads &times; 128.</div>
+      <div style="--c:#7c5cff"><b>num_key_value_heads = 8</b>Why k_proj and v_proj are 1024 = 8 &times; 128. Grouped-query attention, 3 query heads per KV head.</div>
+      <div style="--c:#fbbf24"><b>intermediate_size = 8,192</b>The MLP width. Exactly 8/3 &times; 3072 &mdash; the SwiGLU rule for three matrices.</div>
+      <div style="--c:#22d3ee"><b>rms_norm_eps = 1e-05</b>The eps printed on all three kinds of RMSNorm.</div>
+      <div style="--c:#34d399"><b>rope_theta = 500,000</b>Not printed. Base frequency of rotary_emb; with llama3 scaling it reaches a 131,072-token context.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128207; Follow one tensor through the model</h3><span class="panel-tag">live shapes</span></div>
+    <p class="panel-sub">Set the batch and sequence length and read the shape after each step. Watch two rows turn red as T grows: the <b>attention scores</b> (T&times;T per head &mdash; which FlashAttention never actually stores) and the <b>logits</b> (128,256 per position, the biggest activation in fine-tuning). Click a row to open that module.</p>
+    <div class="ll-sliders">
+      <label>Sequence length T: <b id="ll-T-v">512</b><input type="range" id="ll-T" min="1" max="8192" step="1" value="512"></label>
+      <label>Batch size B: <b id="ll-B-v">1</b><input type="range" id="ll-B" min="1" max="32" step="1" value="1"></label>
+    </div>
+    <div id="ll-shapes"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9878; Where the 3.21 billion parameters live</h3><span class="panel-tag">and why it said 12.9 GB</span></div>
+    <p class="panel-sub">The notebook reported a memory footprint of 12.9 GB. That is not the model being big &mdash; it is the model being loaded in <b>float32</b> because no dtype was given. Pick a precision; then tick "untied" to see the 3.6B figure you get by naively adding every printed shape.</p>
+    <div class="chip-row" id="ll-dtypes"></div>
+    <div id="ll-params"></div>
+    <pre class="code ll-code">import torch
+from transformers import AutoModelForCausalLM
+
+base_model = AutoModelForCausalLM.from_pretrained(
+    "meta-llama/Llama-3.2-3B",
+    torch_dtype=torch.bfloat16,     # leave this out and you get fp32: 12.9 GB
+    device_map="auto",
+)
+print(base_model)                                         # the printout above
+print(sum(p.numel() for p in base_model.parameters()))    # 3212749824 (tied weight counted once)
+print(base_model.lm_head.weight is base_model.model.embed_tokens.weight)   # True
+print(base_model.get_memory_footprint() / 1e9, "GB")      # ~6.4 in bf16</pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129513; Why k_proj is a third the size of q_proj</h3><span class="panel-tag">grouped-query attention</span></div>
+    <p class="panel-sub">Each colour is one key/value head and the query heads that share it. Switch between the three designs and watch the KV cache &mdash; the memory that decides how many users and how much context a GPU can hold. Llama 3.2 3B sits in the middle on purpose.</p>
+    <div class="chip-row" id="ll-kvmodes"></div>
+    <div id="ll-gqa"></div>
+    <div class="ll-sliders">
+      <label>Context length: <b id="ll-ctx-v">8,192</b><input type="range" id="ll-ctx" min="1024" max="131072" step="1024" value="8192"></label>
+      <label>Concurrent sequences: <b id="ll-bs-v">8</b><input type="range" id="ll-bs" min="1" max="64" step="1" value="8"></label>
+    </div>
+    <div class="stat-row" id="ll-kvstats"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128295; Where LoRA plugs into this printout</h3><span class="panel-tag">fine-tuning</span></div>
+    <p class="panel-sub">The names in the printout are exactly the strings you pass as <span class="mono">target_modules</span>. LoRA freezes each chosen Linear and trains two thin matrices beside it, costing <span class="mono">r &times; (in + out)</span> parameters per module per layer. Toggle modules and rank.</p>
+    <div class="chip-row" id="ll-lora-r"></div>
+    <div class="chip-row" id="ll-lora-t"></div>
+    <div id="ll-lora-out"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#10060; Six things people say about this printout that are wrong</h3></div>
+    <dl class="deflist" id="ll-myths"></dl>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>Every shape comes from eight config numbers.</b> 3072 wide, 28 deep, 24 query heads, 8 KV heads of 128, MLP 8192, vocab 128,256. Infer the head counts from q_proj and k_proj.</li>
+      <li><b>k_proj and v_proj at 1024 are grouped-query attention.</b> Three query heads share each KV head, so the KV cache is 3&times; smaller than full multi-head &mdash; a serving decision, not a quality one.</li>
+      <li><b>The MLP is 75% of every layer and 66% of the model.</b> Three matrices because it is SwiGLU; 8192 because 8/3 &times; 3072 keeps the budget equal to a 4&times; two-matrix MLP.</li>
+      <li><b>RMSNorm runs before each sublayer, and once more at the end.</b> Pre-norm keeps the residual stream an untouched highway; the final norm exists because nothing else ever normalised it.</li>
+      <li><b>Position lives in rotary_emb, not in the embeddings.</b> It rotates Q and K inside every layer and has no trainable weights.</li>
+      <li><b>lm_head and embed_tokens are one tensor.</b> 3.21B, not 3.61B. And 12.9 GB was fp32 &mdash; the same model is 6.4 GB in bf16.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
 <!-- 19. DECODING CONTROLS                                          -->
 <!-- ============================================================= -->
 <section class="chapter" data-id="decoding" data-title="Decoding controls" data-icon="19" data-group="Deep dives">
@@ -1938,6 +2057,7 @@ SUMX(Sales,
 <script src="js/app.js"></script>
 <script src="js/multimodal.js"></script>
 <script src="js/hybridrag.js"></script>
+<script src="js/llama.js"></script>
 <script src="js/toolstrip.js"></script>
 <script src="js/prod40.js"></script>
 </body>

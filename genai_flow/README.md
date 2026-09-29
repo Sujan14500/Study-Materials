@@ -1,7 +1,7 @@
 # GenAI Flow
 
 An interactive, animated course that takes someone from "what even is a token" to
-"I could ship a RAG-backed agent". Twenty-four chapters, every concept attached to
+"I could ship a RAG-backed agent". Twenty-six chapters, every concept attached to
 something you can click, drag or break.
 
 ## Run it
@@ -37,6 +37,7 @@ open index.html           # macOS
 | 16 | Mem0: agent memory | Step a conversation through extract → reconcile and watch ADD/UPDATE/DELETE/NOOP fire, then search the store |
 | 17 | Data Formulator | Fill in encoding shelves, ask for a field the data doesn't have, read the pandas/SQL it generates |
 | 18 | One transformer block | A real 4-dim, 1-head model computed live: step all ten operations, then switch the feed-forward off and watch the prediction flip from "cat" to "mat" |
+| 18b | Reading print(model) | The real Llama 3.2 3B printout, every line clickable and synced to a data-flow diagram: plain-English and technical explanation, shapes, exact parameter count, maths and interview trap for each module. Plus a live tensor-shape tracer, where the 3.21B parameters live (and why the notebook said 12.9 GB), GQA vs MHA vs MQA with a KV cache calculator, and a LoRA target_modules calculator |
 | 19 | Decoding controls | Temperature, top-k, top-p, repetition penalty, stop sequences and max tokens applied to one real distribution, in the order a server applies them |
 | 20 | Chunking | Six splitters run live on one document, plus a probe question whose answer sits on a boundary |
 | 21 | Fine-tuning menu | A four-question decision tool, a LoRA-vs-QLoRA table, a draggable-rank LoRA diagram and exact parameter arithmetic |
@@ -54,6 +55,7 @@ css/styles.css    one theme, no framework
 js/content.js     every piece of course content — edit here to change the course
 js/demos.js       the interactive widgets
 js/hybridrag.js   hybrid RAG: the animated pipeline and the RRF fusion bench
+js/llama.js       Reading print(model): Llama 3.2 3B, every widget driven by one config
 js/app.js         navigation, progress, XP
 test.js           node test.js — fails if the course data goes inconsistent
 ```
@@ -74,7 +76,7 @@ The deep-dive chapters get the same treatment. Chapter 18's transformer is re-im
 from scratch in `test.js` and asserted: every attention row sums to 1, nothing attends to the
 future, "sat" really does attend mostly to "cat", and — the claim the chapter is built on —
 the feed-forward ON predicts a *place* word while feed-forward OFF predicts an *animate* one.
-Chapter 19 asserts that temperature monotonically raises entropy and that top-p keeps the
+The print(model) chapter re-derives Llama 3.2 3B’s parameter count straight from the printed shapes and pins it to 3,212,749,824, checks that fp32 reproduces the notebook’s 12.9 GB, that GQA really cuts the KV cache 3×, that 8192 is exactly 8/3 × 3072, that every printed line has a full explanation, and that print order really does differ from run order. Chapter 19 asserts that temperature monotonically raises entropy and that top-p keeps the
 smallest set covering the mass. Chapter 21 checks the LoRA arithmetic really is under 1% of
 the base model and that the VRAM ordering QLoRA < LoRA < full holds. Chapter 22 asserts the
 naive judge looks unreliable, the mitigated one reaches 100%, and position swap is the single
@@ -111,6 +113,7 @@ teaching something false and the test says so.
   8 tokens of vocabulary. The weights are hand-designed so the dimensions mean something
   (animate / action / place / modifier) and so one feed-forward neuron is a readable "fact"
   neuron. Real models learn these; the *mechanism* on screen is the real thing.
+- The print(model) chapter uses the real Llama 3.2 3B config (hidden 3072, 28 layers, 24 query / 8 KV heads, MLP 8192, vocab 128,256, tied embeddings, rope_theta 500,000). The printout text matches recent transformers releases; older ones print `SiLU()` instead of `SiLUActivation()` and put `rotary_emb` inside each attention layer.
 - Chapter 22's judge bench is a deterministic simulation over eight real answer pairs, with
   each documented bias modelled as an explicit term. Toggling a mitigation zeroes its term.
   The agreement numbers are what that model produces, not measurements of a specific judge.

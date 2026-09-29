@@ -241,8 +241,8 @@ C.techniques = [
 
 /* ---------- Ch9: context ---------- */
 C.ctxTurns = [
-  { who: 'user', t: 'Hi! I’m planning a trip to Lisbon in March. My name is Priya.', n: 22 },
-  { who: 'assistant', t: 'Lovely choice, Priya. March is mild — 15–20°C and quieter than summer.', n: 26 },
+  { who: 'user', t: 'Hi! I’m planning a trip to Lisbon in March. My name is Mamitha.', n: 22 },
+  { who: 'assistant', t: 'Lovely choice, Mamitha. March is mild — 15–20°C and quieter than summer.', n: 26 },
   { who: 'user', t: 'I’m vegetarian and I really dislike crowds.', n: 14 },
   { who: 'assistant', t: 'Noted — I’ll steer you to veggie spots and early-morning visits.', n: 20 },
   { who: 'user', t: 'What about day trips?', n: 8 },
@@ -660,12 +660,12 @@ m = Memory.from_config({
                                "username": "neo4j", "password": "password"}},
 })
 
-m.add("Priya is my manager. She reports to Arun, the VP of Engineering.",
+m.add("Mamitha is my manager. She reports to Arun, the VP of Engineering.",
       user_id="sujan")
 
 # Edges extracted:
-#   (Sujan) -[:MANAGED_BY]-> (Priya)
-#   (Priya) -[:REPORTS_TO]-> (Arun)
+#   (Sujan) -[:MANAGED_BY]-> (Mamitha)
+#   (Mamitha) -[:REPORTS_TO]-> (Arun)
 #   (Arun)  -[:HAS_ROLE]->   (VP of Engineering)
 
 res = m.search("who is my manager's manager?", user_id="sujan")

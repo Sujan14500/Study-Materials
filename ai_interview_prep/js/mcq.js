@@ -71,6 +71,14 @@ window.MCQ = (window.MCQ || []).concat([
   e: 'Softmax must put its mass somewhere, and heads dump spare attention on the first tokens. Keep about four of them permanently when you implement KV eviction.' },
 { topic: 'transformers', q: 'PagedAttention is analogous to which operating-system idea?', o: ['garbage collection', 'virtual memory paging', 'process scheduling', 'copy-on-write forking only'], a: 1,
   e: 'Fixed-size KV blocks with a block table, so waste is bounded by a block instead of by max_tokens. Block sharing with copy-on-write gives prefix caching for free.' },
+{ topic: 'transformers', q: 'In a printout, q_proj is Linear(3072 → 3072) and k_proj is Linear(3072 → 1024) with head_dim 128. What does that tell you?', o: ['The keys are compressed with a low-rank projection', '24 query heads share 8 key/value heads: grouped-query attention', 'The model uses multi-query attention with a single KV head', 'k_proj was pruned after training to save memory'], a: 1,
+  e: '3072/128 = 24 query heads, 1024/128 = 8 KV heads, so three query heads per KV head. MQA would be 128 wide (one head). The point of GQA is a 3x smaller KV cache, not fewer parameters.' },
+{ topic: 'transformers', q: 'Llama 3.2 3B loaded with no torch_dtype reports a 12.9 GB memory footprint. Why?', o: ['The KV cache is pre-allocated for the full 128k context', 'The weights are loaded as float32, 4 bytes each', 'lm_head and embed_tokens are stored twice', 'The optimizer state is allocated at load time'], a: 1,
+  e: '3.21B parameters x 4 bytes = 12.85 GB. The checkpoint ships in bf16; pass torch_dtype=torch.bfloat16 and it is 6.4 GB. No cache or optimizer exists at load time, and tied weights are counted once.' },
+{ topic: 'transformers', q: 'The Llama printout lists input_layernorm AFTER self_attn and mlp. When does it actually run?', o: ['After the MLP, as a post-norm on the layer output', 'Before self_attn, on a copy of the residual stream', 'Once, before the first decoder layer only', 'After self_attn, before the residual add'], a: 1,
+  e: 'Print order is __init__ registration order, not execution order. Llama is pre-norm: h = h + attn(input_layernorm(h)). The residual stream itself is never normalised until the final norm.' },
+{ topic: 'transformers', q: 'Why does Llama 3.2 3B have 3.21B parameters when adding every printed Linear and Embedding gives 3.61B?', o: ['Biases are excluded from the count', 'lm_head shares its weight with embed_tokens', 'The 28 layers share some of their weights', 'RMSNorm weights are frozen and not counted'], a: 1,
+  e: 'tie_word_embeddings=True: the 128256 x 3072 matrix (394M params) is one tensor used twice. Every layer has its own weights, there are no biases at all (bias=False), and the norms are trainable but tiny.' },
 
 /* ---------------- training ---------------- */
 { topic: 'training', q: 'Which stage gives a model most of its knowledge?', o: ['SFT', 'pretraining', 'RLHF', 'prompt engineering'], a: 1,

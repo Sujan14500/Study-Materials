@@ -891,7 +891,7 @@ function initContext() {
       '<div class="ctx-msg' + (m.dropped ? ' dropped' : '') + '"><span class="who">' + m.who + '</span>' + m.t + '</div>').join('');
     log.scrollTop = log.scrollHeight;
     strat.innerHTML = dropped
-      ? '⚠️ Context overflowed — the oldest turns were dropped. Ask "what was my name again?" now and the model genuinely cannot answer: <b>Priya</b> fell out of the window. Real fixes: summarise old turns, or store them and retrieve on demand (RAG).'
+      ? '⚠️ Context overflowed — the oldest turns were dropped. Ask "what was my name again?" now and the model genuinely cannot answer: <b>Mamitha</b> fell out of the window. Real fixes: summarise old turns, or store them and retrieve on demand (RAG).'
       : msgs.length ? '' : '';
   }
 

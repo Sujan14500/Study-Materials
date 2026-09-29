@@ -1,8 +1,8 @@
 # AI Interview Prep
 
-570 GenAI and AI-engineer interview questions, each answered twice — once in plain
+578 GenAI and AI-engineer interview questions, each answered twice — once in plain
 English so it sticks, once at interview depth so it survives the follow-up — plus
-236 multiple-choice questions, flashcards with spaced repetition, and a timed mock
+240 multiple-choice questions, flashcards with spaced repetition, and a timed mock
 interview that makes you answer out loud.
 
 Built because the gap between *"I know this"* and *"I can say this in ninety
@@ -21,7 +21,7 @@ open index.html           # macOS
 
 | Mode | What it is for |
 |------|----------------|
-| **Study** | Browse and search all 570 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
+| **Study** | Browse and search all 578 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
 | **Flashcards** | Recall, not recognition. Say the answer out loud, flip, then rate yourself. Cards you rate badly come back sooner — the schedule is SM-2-lite and lives in `localStorage`. |
 | **Quiz** | Multiple choice with an explanation after every question, optionally timed. Every wrong option is a real misconception, and the explanation says why the tempting answer is wrong. |
 | **Mock interview** | A timed round for a chosen role and level. Questions arrive one at a time with a clock and a target answer length. Reveal, self-rate, and get a report with your weakest topic and how often you ran long. |
@@ -33,7 +33,7 @@ open index.html           # macOS
 | Topic | Questions | Covers |
 |-------|-----------|--------|
 | Foundations | 32 | tokens, embeddings, context, sampling, hallucination, when not to use an LLM |
-| Transformers | 36 | attention, feed-forward, residual stream, RoPE, GQA, prefill vs decode, KV cache |
+| Transformers | 45 | attention, feed-forward, residual stream, RoPE, GQA, prefill vs decode, KV cache, reading a real Llama printout line by line |
 | Training & tuning | 40 | pretraining, SFT, LoRA, QLoRA, DPO, RLHF, GRPO, distillation, forgetting |
 | Inference & serving | 42 | KV cache, prompt caching, batching, PagedAttention, quantisation, routing, cost |
 | Prompting & context | 32 | few-shot, chain of thought, structured output, memory layers, context engineering |
@@ -127,7 +127,7 @@ Two multiple-choice guards worth explaining, because they are the interesting on
 
 The interactive courses this bank cross-references:
 
-- [`genai_flow`](../genai_flow) — how LLMs actually work, 24 chapters
+- [`genai_flow`](../genai_flow) — how LLMs actually work, 26 chapters
 - [`agentic_ai_flow`](../agentic_ai_flow) — agent architecture, 17 chapters
 - [`ai_system_design_concepts`](../ai_system_design_concepts) — the systems layer, 23 chapters
 - [`langchain`](../langchain) and [`langgraph`](../langgraph) — the frameworks

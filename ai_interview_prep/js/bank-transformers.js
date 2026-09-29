@@ -350,6 +350,117 @@ print(serving_memory_gb(70.6e9, 80, 8, 128, 8192, 32, 4))  # ~82 GB at int4`,
     cap: 'The lookup is order-blind: without step 5, "dog bites man" and "man bites dog" are the same set of vectors.' },
   trap: 'The distinction that separates a read-about-it answer from a built-it one: "we add positional encoding to the embeddings" is wrong for any RoPE model. Say which family the model belongs to, and where the position information is actually applied.',
   tags: ['embeddings', 'positional'],
-  xref: [['Step through one transformer block', '../genai_flow/index.html']] }
+  xref: [['Step through one transformer block', '../genai_flow/index.html']] },
+
+/* ---------------- reading a real printout: Llama 3.2 3B ----------------
+   The interviewer pastes print(model) and asks you to talk. These eight
+   cards are that conversation, one module family at a time.            */
+
+{ id: 'tr38', topic: 'transformers', level: 2,
+  q: 'Walk me through this print(model) output for Llama 3.2 3B, top to bottom.',
+  lay: 'Read it as a factory. At the door, each word-piece is swapped for a list of 3,072 numbers. Then there are 28 identical floors. On each floor the words first hold a meeting and copy what is useful from earlier words, then each word goes to its own desk and looks things up in a big private memory. Before each of those two steps the numbers are rescaled so nothing gets too loud. At the top, the last word\'s numbers are compared against all 128,256 word-pieces the model knows, and the best match becomes the next word.',
+  tech: '<ol><li><b>embed_tokens</b> — Embedding(128256, 3072): a lookup table, token id → 3072-dim vector. This starts the residual stream, shape [B, T, 3072].</li><li><b>layers</b> — 28 × LlamaDecoderLayer, each a pre-norm residual block: <span class="mono">h = h + self_attn(input_layernorm(h))</span>, then <span class="mono">h = h + mlp(post_attention_layernorm(h))</span>.</li><li><b>self_attn</b> — q_proj 3072→3072 (24 heads × 128), k_proj and v_proj 3072→1024 (8 KV heads × 128, so grouped-query attention with 3 query heads per KV head), o_proj 3072→3072. RoPE rotates q and k; the attention itself is an SDPA call, which is why it has no line.</li><li><b>mlp</b> — SwiGLU: <span class="mono">down(SiLU(gate(x)) ⊙ up(x))</span>, 3072→8192→3072.</li><li><b>norm</b> — one final RMSNorm, because pre-norm never normalises the stream itself.</li><li><b>rotary_emb</b> — computes cos/sin once per forward (θ = 500,000) for every layer. No trainable weights.</li><li><b>lm_head</b> — 3072→128256 logits, <i>tied</i> to embed_tokens.</li></ol>Totals: 100.7M parameters per layer (75% MLP, 25% attention), 3,212,749,824 overall.',
+  dgm: { nodes: [{ t: 'input_ids', s: '[B, T]' }, { t: 'embed_tokens', s: '128256 × 3072' }, { t: '28 × decoder layer', s: 'RMSNorm → GQA attn → + → RMSNorm → SwiGLU → +', k: 'alt' }, { t: 'norm', s: 'final RMSNorm' }, { t: 'lm_head', s: 'tied, → 128256' }, { t: 'logits', s: '[B, T, 128256]', k: 'ok' }],
+    cap: 'rotary_emb is printed last but feeds every attention layer; the printout is __init__ order, not run order.' },
+  trap: 'Strong candidates volunteer three things the printout does not say out loud: the head counts (inferred from 3072 = 24×128 and 1024 = 8×128), that the norms run <i>before</i> the sublayers despite being printed after them, and that lm_head shares its weight with embed_tokens.',
+  tags: ['architecture', 'llama', 'printout'],
+  xref: [['Click through the printout, line by line', '../genai_flow/index.html']] },
+
+{ id: 'tr39', topic: 'transformers', level: 2,
+  q: 'Why are k_proj and v_proj 1024 wide when q_proj is 3072?',
+  lay: 'Each attention step needs questions, labels and messages. This model keeps a full set of 24 questions but only 8 sets of labels and messages, and lets three questions share each one. The labels and messages are what the model has to keep in memory for every earlier word while it writes, so sharing them makes that memory three times smaller, for a very small loss in quality.',
+  tech: 'Grouped-query attention. q_proj outputs 24 heads × 128 = 3072; k_proj and v_proj output 8 KV heads × 128 = 1024. Query heads 0–2 use KV head 0, 3–5 use KV head 1, and so on (<span class="mono">repeat_kv</span> expands them for the matmul). Queries are never cached, so shrinking them saves nothing; K and V are cached for every past token, so shrinking them shrinks the KV cache: <span class="mono">2 × 28 layers × 8 heads × 128 × 2 bytes = 112 KiB per token</span> in bf16, versus 336 KiB with full multi-head. At a 128k context that is ~15 GB instead of ~45 GB per sequence.',
+  compare: { cols: ['MHA', 'GQA (this model)', 'MQA'],
+    rows: [
+      ['KV heads', '24', '8', '1'],
+      ['k_proj / v_proj out', '3072', '1024', '128'],
+      ['KV cache per token (bf16)', '336 KiB', '112 KiB', '14 KiB'],
+      ['Quality', 'baseline', 'close to baseline', 'measurable drop'],
+      ['Used by', 'GPT-2, Llama 1', 'Llama 2 70B, Llama 3 all sizes', 'PaLM, Falcon']
+    ] },
+  trap: 'Say that GQA is a <i>serving</i> optimisation, not a training one: it barely changes parameter count (attention is 25M of 100.7M per layer) but it triples the batch size or context you can fit in the same GPU memory.',
+  tags: ['gqa', 'kv-cache', 'llama', 'printout'],
+  xref: [['GQA vs MHA vs MQA with a live KV cache', '../genai_flow/index.html']] },
+
+{ id: 'tr40', topic: 'transformers', level: 3,
+  q: 'How many parameters does Llama 3.2 3B have, working only from the printout?',
+  lay: 'Every layer printed as "Linear(in, out)" is a grid of in × out numbers, and every normalisation layer has one number per feature. Multiply out one floor of the factory, multiply by 28 floors, add the lookup table at the door. The one catch is that the table at the door and the guessing layer at the top are the same table printed twice, so you count it once.',
+  tech: 'Per layer: attention = 3072·3072 (q) + 2·3072·1024 (k, v) + 3072·3072 (o) = 25,165,824. MLP = 3 · 3072·8192 = 75,497,472. Two RMSNorms = 6,144. Layer total = <b>100,669,440</b>. Model = 128256·3072 (embed, 394,002,432) + 28 · 100,669,440 + 3072 (final norm) = <b>3,212,749,824</b>. lm_head adds zero because <span class="mono">tie_word_embeddings=True</span>. Shares: MLP 66%, attention 22%, embeddings 12%, norms 0.005%.',
+  code: `d, V, L, f, kv = 3072, 128256, 28, 8192, 1024
+attn  = d*d + d*kv + d*kv + d*d          # q, k, v, o   = 25,165,824
+mlp   = 3 * d*f                           # gate, up, down = 75,497,472
+layer = attn + mlp + 2*d                  # + two RMSNorms = 100,669,440
+total = V*d + L*layer + d                 # tied lm_head adds nothing
+print(f"{total:,}")                       # 3,212,749,824
+
+# check against the real thing
+sum(p.numel() for p in model.parameters())   # 3212749824 — shared params counted once`,
+  trap: 'Adding every printed shape including lm_head gives 3,606,752,256, which is wrong for this checkpoint. Interviewers use this to see whether you know about weight tying — and whether you notice that 128256×3072 is 12% of a 3B model.',
+  tags: ['parameters', 'llama', 'printout'],
+  xref: [['The parameter breakdown, interactive', '../genai_flow/index.html']] },
+
+{ id: 'tr41', topic: 'transformers', level: 2,
+  q: 'Why does the MLP have three Linear layers, why is it 8192 wide, and what does act_fn do?',
+  lay: 'The memory step works like a dimmer and a light. One layer (the gate) decides how much each of 8,192 memory slots should open for this word; a second (up) prepares what each slot would contribute; the two are multiplied, so a closed slot contributes nothing; a third (down) squeezes the result back to normal size. The filter on the gate is a smooth "let positives through, mostly block negatives" rule, without which the whole thing would collapse into one plain multiplication.',
+  tech: 'It is SwiGLU: <span class="mono">down_proj( SiLU(gate_proj(x)) ⊙ up_proj(x) )</span>, with <span class="mono">SiLU(x) = x·σ(x)</span>. Gated linear units beat a plain two-matrix GELU/ReLU MLP at equal parameters. Because there are three matrices instead of two, the hidden size is scaled from 4d to (8/3)d to keep the budget equal — and 8/3 × 3072 is <b>exactly 8192</b>. The MLP is 75.5M of each layer\'s 100.7M parameters, and it is position-wise: no information moves between tokens here.',
+  compare: { cols: ['Classic MLP (GPT-2)', 'SwiGLU (Llama)'],
+    rows: [
+      ['Matrices', '2 (up, down)', '3 (gate, up, down)'],
+      ['Hidden width', '4d', '(8/3)d, here 8192'],
+      ['Non-linearity', 'GELU on everything', 'SiLU on the gate only, then multiply'],
+      ['Params per layer at d=3072', '2·3072·12288 = 75.5M', '3·3072·8192 = 75.5M']
+    ] },
+  trap: 'SiLU goes on gate_proj only. A reimplementation that applies it to up_proj loads the weights without complaint and produces garbage. And act_fn is printed after down_proj but runs before it.',
+  tags: ['ffn', 'swiglu', 'llama', 'printout'],
+  xref: [['The MLP explained module by module', '../genai_flow/index.html']] },
+
+{ id: 'tr42', topic: 'transformers', level: 1,
+  q: 'The notebook says the memory footprint of this 3B model is 12.9 GB. Why, and how would you cut it?',
+  lay: 'Each of the 3.2 billion weights is being stored at full precision, 4 bytes apiece, because the loading code did not ask for anything smaller. The model was trained in a half-size format, so asking for that halves the memory with no loss. Squeezing further, to one byte or half a byte per weight, costs a little quality and is how people fine-tune on a free notebook GPU.',
+  tech: '3,212,749,824 × 4 bytes = 12.85 GB: <span class="mono">from_pretrained</span> without <span class="mono">torch_dtype</span> loads float32. Options, in order: <span class="mono">torch_dtype=torch.bfloat16</span> → 6.4 GB, lossless relative to the released weights; 8-bit (bitsandbytes) → ~3.2 GB; 4-bit NF4 → ~1.6 GB plus overhead, the QLoRA setting. Weights are only part of the bill: at inference add the KV cache (112 KiB per token here), in training add gradients, optimizer state (Adam is 8 bytes/param in fp32) and activations — the logits tensor alone is [B, T, 128256].',
+  compare: { cols: ['bytes / param', 'weights for 3.21B'],
+    rows: [
+      ['float32 (the default)', '4', '12.9 GB'],
+      ['bfloat16', '2', '6.4 GB'],
+      ['int8', '1', '3.2 GB'],
+      ['NF4 (4-bit)', '0.5', '1.6 GB']
+    ] },
+  trap: 'Do not say "it is a big model". The follow-up is "so what would full fine-tuning need?" — roughly 16 bytes per parameter with Adam in mixed precision, ~51 GB before activations, which is why LoRA/QLoRA exist.',
+  tags: ['memory', 'quantisation', 'llama', 'printout'],
+  xref: [['Precision vs memory, interactive', '../genai_flow/index.html']] },
+
+{ id: 'tr43', topic: 'transformers', level: 2,
+  q: 'Where is the positional encoding in this printout, and why is there no bias anywhere?',
+  lay: 'Word order is handled by rotary_emb. Instead of stamping a position number onto each word at the start, the model rotates each word\'s question and label by an angle that depends on where it sits, inside every attention step. How well two words match then depends on how far apart they are. It has no learned numbers, which is why it is easy to overlook. The missing extra offsets on every layer were simply found to be unnecessary, so they were dropped.',
+  tech: '<b>RoPE.</b> <span class="mono">LlamaRotaryEmbedding</span> computes cos/sin tables once per forward from position_ids and passes them to all 28 attention layers, where q and k (never v, never the embeddings) are rotated pairwise with frequencies <span class="mono">θ^(−2i/128)</span>, θ = 500,000, plus Llama-3 frequency scaling to reach 131,072 tokens. Because <span class="mono">R(mω)ᵀR(nω) = R((n−m)ω)</span>, scores depend only on relative offset. It holds only a non-persistent <span class="mono">inv_freq</span> buffer, so it has 0 parameters.<br><br><b>bias=False</b> everywhere: biases add parameters and compute, RMSNorm already removes the need for re-centring, and large-scale training (PaLM onwards) found removing them slightly improves stability. It also makes every projection a pure matmul, which is what quantisation kernels and LoRA assume.',
+  trap: '"We add positional encodings to the token embeddings" is wrong for this model — nothing is added at embed_tokens. Also point out that rotary_emb sits at the <i>model</i> level in recent transformers versions, not inside each attention layer, precisely because it is shared.',
+  tags: ['positional', 'rope', 'llama', 'printout'],
+  xref: [['rotary_emb explained in the printout chapter', '../genai_flow/index.html']] },
+
+{ id: 'tr44', topic: 'transformers', level: 3,
+  q: 'lm_head is printed as its own Linear. Is it a separate weight, and what does it cost at training time?',
+  lay: 'In this model it is not separate: the guessing layer at the top reuses the lookup table from the door, turned around. That saves about 400 million numbers — an eighth of the model. It still costs a lot while training, because for every word in every example it produces a score for all 128,256 word-pieces, and those scores are the single biggest thing held in memory.',
+  tech: 'Llama 3.2 1B and 3B set <span class="mono">tie_word_embeddings=True</span>: <span class="mono">model.lm_head.weight is model.model.embed_tokens.weight</span> returns True, <span class="mono">model.parameters()</span> yields it once, and the saved checkpoint stores it once. The larger Llamas (8B, 70B) do not tie. Tying saves 394M parameters and forces input and output token representations to share one space. The cost is in activations: logits are [B, T, 128256]; in fp32 at B=1, T=8192 that is 4.2 GB, plus the same again for its gradient. Mitigations: compute the loss in chunks, only materialise logits where labels exist, or use a fused/"cut" cross-entropy kernel.',
+  trap: 'Two practical gotchas. If you resize the vocabulary, tied weights resize together — untie by accident (e.g. a naive state-dict edit) and saving doubles the file. And when LoRA targets <span class="mono">lm_head</span> on a tied model, you are also changing the input embeddings.',
+  tags: ['weight-tying', 'memory', 'llama', 'printout'],
+  xref: [['lm_head and weight tying, explained', '../genai_flow/index.html']] },
+
+{ id: 'tr45', topic: 'transformers', level: 2,
+  q: 'You are fine-tuning this model with LoRA. Which modules from the printout go in target_modules, and how many weights will you train?',
+  lay: 'The names in the printout are exactly the names you hand to the fine-tuning library. LoRA leaves every original weight frozen and adds two thin extra layers beside each one you choose. Choosing all seven layers in each floor, with the usual size setting, trains about 24 million numbers — under 1% of the model — and the saved result is small enough to email.',
+  tech: 'Target the seven Linear layers in every decoder layer: <span class="mono">q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj</span>. Each adds <span class="mono">r × (in + out)</span> parameters. At r = 16: q and o 98,304 each, k and v 65,536 each, gate, up and down 180,224 each → 868,352 per layer × 28 = <b>24,313,856</b>, 0.76% of the base model, ~49 MB in bf16. Attention-only (q, v) as in the original LoRA paper is 4.6M, but targeting the MLP too consistently fine-tunes better because that is where most of the capacity is. Do not target the norms, rotary_emb or act_fn (nothing to adapt), and think twice about lm_head/embed_tokens here because they are tied.',
+  code: `from peft import LoraConfig, get_peft_model
+config = LoraConfig(
+    r=16, lora_alpha=32, lora_dropout=0.05,
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
+                    "gate_proj", "up_proj", "down_proj"],
+    task_type="CAUSAL_LM",
+)
+model = get_peft_model(base_model, config)
+model.print_trainable_parameters()
+# trainable params: 24,313,856 || all params: 3,237,063,680 || trainable%: 0.7511`,
+  trap: 'The follow-up is "why not just q and v?" Answer with the numbers: 75% of every layer is MLP, so leaving it out means adapting a quarter of the network. And pair it with QLoRA (base in 4-bit NF4) if the 12.9 GB fp32 load was the reason you are on a small GPU.',
+  tags: ['lora', 'fine-tuning', 'llama', 'printout'],
+  xref: [['The LoRA calculator on this exact model', '../genai_flow/index.html']] }
 
 ]);
