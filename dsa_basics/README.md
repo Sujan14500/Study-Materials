@@ -10,6 +10,10 @@ a reversed linked list". This is the conceptual half: what each structure *is*, 
 makes cheap, what it makes expensive, and why — each definition immediately attached to
 something you can push, step and watch.
 
+The coding half lives in the notebooks: [`jupyter_notebooks/03_dsa`](../jupyter_notebooks/03_dsa) has the
+patterns as runnable code, and then the top 100 easy and medium LeetCode questions (notebooks 15–19), each with a
+Python 3 answer and a step-by-step animation.
+
 Companion to the AI courses in this repo — [`genai_flow`](../genai_flow),
 [`agentic_ai_flow`](../agentic_ai_flow), [`langchain`](../langchain),
 [`langgraph`](../langgraph) and
