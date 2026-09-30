@@ -349,6 +349,119 @@ text = tokenizer.apply_chat_template(msgs, tokenize=False,
   lay: 'Retrieve. Weights are a terrible place for facts that change — you cannot update one, you cannot cite one, you cannot delete one, and you would be retraining every week to keep up.',
   tech: 'Retrieval, and the argument has five parts: <ol><li><b>Freshness</b> — an index update is seconds; a fine-tune is days and would need to be weekly forever.</li><li><b>Citations</b> — you know which chunk you sent, so the answer can be attributed and checked.</li><li><b>Deletion</b> — removing a document from an index is immediate; removing a fact from weights is not reliably possible.</li><li><b>Permissions</b> — retrieval can filter by the caller\'s access; weights cannot.</li><li><b>Debuggability</b> — you can inspect exactly what was retrieved and why. A wrong answer from weights has no trace.</li></ol>Fine-tuning still has a role here — teaching the model your citation format, your refusal behaviour and your tone — but not as the knowledge store.',
   trap: 'If the interviewer pushes ("but fine-tuning is cheaper per request"), agree on the token cost and reframe: you are not comparing costs, you are comparing a system that can be corrected with one that cannot.',
-  tags: ['rag', 'finetuning'], orig: 5 }
+  tags: ['rag', 'finetuning'], orig: 5 },
+
+{ id: 'tn41', topic: 'training', level: 2,
+  q: 'What are the five key hyperparameters of a QLoRA setup, and what does each one control?',
+  lay: 'Five dials. Which parts of the model get the clip-on glasses (target modules). How much room the glasses have for new behaviour (r). How loudly the change is played on top of the original (alpha). How tightly the frozen original is compressed so it fits on your GPU (quantization). And how much of the input is randomly blanked during practice, so the glasses learn the pattern instead of memorising the examples (dropout).',
+  tech: 'The first four decide what gets trained and how the base is stored; dropout is the regulariser. <ul><li><b>target_modules</b> — which nn.Linear layers get an A and B, by the names print(model) shows. Each costs r &times; (in + out) parameters per layer. The QLoRA paper adapted every linear layer and found that mattered more than rank.</li><li><b>r</b> — the inner dimension of A and B, so the update has rank at most r. Parameters grow linearly with it.</li><li><b>lora_alpha</b> — the adapter output is multiplied by &alpha;/r, so the ratio is what matters. Convention: &alpha; = 2r.</li><li><b>quantization</b> — BitsAndBytesConfig: 4-bit NF4, double quantisation, bf16 compute dtype. Only the frozen base is quantised; adapters stay 16/32-bit.</li><li><b>lora_dropout</b> — dropout on the adapter input only, off at inference. Matters on small datasets.</li></ul>',
+  compare: { cols: ['Controls', 'Typical', 'Turn it when'],
+    rows: [
+      ['Target modules', 'where the adapters go', '"all-linear" or q,k,v,o', 'add the MLP when the task needs new associations'],
+      ['r', 'adapter capacity and size', '16 (8–64)', 'underfitting → up; memorising a small set → down'],
+      ['Alpha', 'adapter scale, α/r', 'α = 2r', 'move it WITH r so the scale stays fixed'],
+      ['Quantization', 'memory of the frozen base', '4-bit NF4 + double quant', 'skip it (plain LoRA) if the bf16 model fits'],
+      ['Dropout', 'regularisation of the adapter', '0.05–0.1', 'eval loss rising on a small dataset → up']
+    ] },
+  code: `bnb_config = BitsAndBytesConfig(            # quantization
+    load_in_4bit=True, bnb_4bit_quant_type="nf4",
+    bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=torch.bfloat16)
+lora_config = LoraConfig(
+    target_modules="all-linear",            # which Linears get adapters
+    r=16,                                   # adapter rank
+    lora_alpha=32,                          # scale = alpha / r = 2
+    lora_dropout=0.05,                      # on the adapter input only
+    task_type="CAUSAL_LM")`,
+  trap: '"You doubled r and results got worse — why?" Because alpha stayed put, so α/r halved and the adapter got quieter. Changing r alone changes two things at once. Say you move alpha with it.',
+  tags: ['qlora', 'lora', 'hyperparameters'], xref: [['The ten knobs of a QLoRA run', '../genai_flow/index.html']] },
+
+{ id: 'tn42', topic: 'training', level: 3,
+  q: 'Which quantization settings do you choose for QLoRA, and what does each one cost?',
+  lay: 'You are choosing how hard to squash the frozen original model. Squash it to 4 bits with the method designed for the shape of real model weights, squash the bookkeeping too, and do the actual arithmetic in a normal-width number format. The part you train is never squashed.',
+  tech: 'Four settings in BitsAndBytesConfig: <ul><li><b>Bits</b> — <span class="mono">load_in_4bit</span> (QLoRA) or <span class="mono">load_in_8bit</span>. 8-bit halves memory versus bf16 but its matmuls are slow; 4-bit is the standard.</li><li><b>bnb_4bit_quant_type</b> — "nf4" puts the 16 levels at the quantiles of a normal distribution, where pretrained weights actually sit, with one fp32 absmax per 64 weights. "fp4" has lower error on nothing you care about; always NF4.</li><li><b>bnb_4bit_use_double_quant</b> — quantises those absmax scales to 8-bit: overhead drops from 0.5 to ~0.127 bits per weight, about 3 GB on a 65B model. Free; always on.</li><li><b>bnb_4bit_compute_dtype</b> — each block is de-quantised into this dtype for the matmul. bf16 on any modern GPU; fp32 doubles activation memory and loses the tensor-core speed-up.</li></ul>Only the decoder Linears are quantised: embeddings, lm_head and norms stay 16-bit, and prepare_model_for_kbit_training upcasts them to fp32 for stable training.',
+  compare: { cols: ['bf16 (plain LoRA)', '8-bit', '4-bit NF4 + double quant'],
+    rows: [
+      ['Bits per base weight', '16', '8', '~4.13'],
+      ['Llama 3 8B, frozen base', '~16.1 GB', '~9.1 GB', '~5.7 GB'],
+      ['Llama 3 70B, frozen base', '~141 GB', '~73 GB', '~40 GB — one 80 GB card'],
+      ['Speed per step', 'fastest', 'slowest — int8 matmuls', '~25–40% slower than bf16'],
+      ['Quality', 'the reference', 'close', 'usually within about a point'],
+      ['Pick it when', 'the model fits', 'rarely', 'the model would not fit otherwise']
+    ] },
+  trap: '"Can I merge the adapter into the 4-bit model?" Not cleanly: merge into a bf16 copy of the base, then quantise again for serving if you need to. Merging into the quantised weights rounds your adapter away.',
+  tags: ['qlora', 'quantisation', 'hyperparameters'], xref: [['The ten knobs of a QLoRA run', '../genai_flow/index.html']] },
+
+{ id: 'tn43', topic: 'training', level: 2,
+  q: 'What are the five key training hyperparameters for a LoRA or QLoRA fine-tune, and how do you set them?',
+  lay: 'How many times you read the whole training set (epochs). How many examples you look at together (batch size). How big a correction you make each time (learning rate). How many small batches you add up before making one correction, so a small GPU can act like a big one (gradient accumulation). And the rule that turns corrections into changes (optimizer).',
+  tech: '<ul><li><b>num_train_epochs</b> — 1–3. Eval loss usually bottoms out in that range, then climbs while train loss keeps falling. Keep the best checkpoint, not the last.</li><li><b>per_device_train_batch_size</b> — the micro-batch that fits: 1–8. Activation memory (batch &times; sequence length), not the weights, is what runs out in QLoRA.</li><li><b>learning_rate</b> — 1e-4 to 3e-4, about 10&times; a full fine-tune, because only small zero-initialised adapters move. With a schedule: warmup ~3% of steps, then cosine or linear decay.</li><li><b>gradient_accumulation_steps</b> — sum gradients over N micro-batches, then step once. Effective batch = batch &times; accumulation &times; GPUs; aim for 16–64.</li><li><b>optim</b> — paged_adamw_8bit or paged_adamw_32bit for QLoRA: AdamW whose state can page to CPU RAM instead of crashing on a memory spike.</li></ul>',
+  compare: { cols: ['Typical', 'Too low', 'Too high'],
+    rows: [
+      ['Epochs', '1–3', 'underfit: still improving at the end', 'eval loss rises: it recites the training set'],
+      ['Batch size (per GPU)', '1–8', 'noisy updates (fix with accumulation)', 'out of memory'],
+      ['Learning rate', '2e-4 + warmup', 'loss flat: "the fine-tune did nothing"', 'spikes, NaN, forgetting'],
+      ['Gradient accumulation', 'to effective 16–64', 'effective batch too small, noisy', 'few steps per epoch, slow'],
+      ['Optimizer', 'paged AdamW (8- or 32-bit)', 'SGD: needs far more LR tuning', 'unpaged 32-bit: OOM on a long sequence']
+    ] },
+  code: `train_config = SFTConfig(
+    num_train_epochs=2,
+    per_device_train_batch_size=4,
+    gradient_accumulation_steps=4,      # effective batch 4 x 4 = 16
+    learning_rate=2e-4,
+    lr_scheduler_type="cosine", warmup_ratio=0.03,
+    optim="paged_adamw_8bit",
+    bf16=True)
+# 5,000 examples / 16 = 313 optimizer steps per epoch, 626 in total`,
+  trap: '"What effective batch size were you using?" Know the number. If you halve the per-GPU batch to fit memory, double the accumulation, and nothing about the result changes except the wall-clock time.',
+  tags: ['training', 'hyperparameters', 'lora'], xref: [['The ten knobs of a QLoRA run', '../genai_flow/index.html']] },
+
+{ id: 'tn44', topic: 'training', level: 3,
+  q: 'Which optimizer do you use for LoRA and QLoRA, and what do the 8-bit and paged variants actually change?',
+  lay: 'The optimizer keeps a short memory of which way each setting has been moving, so the steps are smooth. That memory costs space. The 8-bit version stores it more compactly. The paged version lets it spill over into ordinary computer memory for a moment instead of crashing when the GPU gets full.',
+  tech: 'AdamW keeps two running averages per trainable parameter — momentum and variance — 8 bytes in fp32. In full fine-tuning that is the bulk of the ~16 bytes/param: an 8B model needs ~64 GB of Adam state alone. In LoRA it applies only to the adapters: r=16 on all seven linears of Llama 3 8B is 41.9M parameters, so ~336 MB. <ul><li><b>adamw_bnb_8bit</b> — both averages in 8 bits with block-wise scales: 2 bytes/param, results within noise.</li><li><b>paged_adamw_32bit / paged_adamw_8bit</b> — the state lives in CUDA unified memory and pages to CPU RAM when a long sequence spikes GPU memory, instead of OOM-crashing. This is the QLoRA paper\'s third idea.</li><li><b>adamw_torch (fused)</b> — fastest when memory is comfortable.</li></ul>SGD is rarely used for LLMs: no per-parameter scaling, so it needs much more learning-rate tuning. Weight decay 0–0.01 is typical for adapters.',
+  compare: { cols: ['State per trainable param', 'Pages to CPU on a spike', 'Use it when'],
+    rows: [
+      ['adamw_torch', '8 bytes', 'no', 'plain LoRA, plenty of memory'],
+      ['adamw_bnb_8bit', '2 bytes', 'no', 'memory is tight but steady'],
+      ['paged_adamw_32bit', '8 bytes', 'yes', 'QLoRA default in many recipes'],
+      ['paged_adamw_8bit', '2 bytes', 'yes', 'QLoRA on the smallest GPU'],
+      ['sgd', '0 (no momentum)', 'no', 'almost never, for LLMs']
+    ] },
+  trap: '"So the 8-bit optimizer is what makes QLoRA fit?" No. With adapters the optimizer state is a few hundred MB. The 4-bit base is what makes it fit; paging is what stops the rare memory spike from killing a six-hour run.',
+  tags: ['optimizer', 'qlora', 'memory'], xref: [['The ten knobs of a QLoRA run', '../genai_flow/index.html']] },
+
+{ id: 'tn45', topic: 'training', level: 3,
+  q: 'Your QLoRA run is misbehaving. For each symptom, which hyperparameter do you check first?',
+  lay: 'Each symptom points at one dial. Nothing is changing: the correction size is too small. Wild jumps: it is too big. Great on practice, bad on new examples: too many passes or too little variety. Out of memory: shrink what is held at once and make it up in more small batches.',
+  tech: 'Read the train and eval loss curves together, then change one knob at a time against a fixed eval set. The order that saves the most time: learning rate and &alpha;/r first (they decide whether anything moves at all), then epochs and dropout (overfitting), then target modules and r (capacity), then batch size and accumulation (noise and memory).',
+  compare: { cols: ['First knob', 'What to do'],
+    rows: [
+      ['Loss flat from step one', 'learning rate, then α/r', 'LR up to ~2e-4; keep α ≈ 2r'],
+      ['Loss spikes or goes NaN', 'learning rate', 'lower it, add warmup, clip gradients (max_grad_norm 0.3–1.0)'],
+      ['Train loss falls, eval loss rises', 'epochs', 'fewer epochs or more data; dropout 0.1; lower r'],
+      ['Learns the format, not the task', 'target modules, r', 'add gate/up/down; raise r'],
+      ['OOM loading the model', 'quantization', '4-bit NF4 + double quant'],
+      ['OOM during training', 'batch size', 'halve batch, double accumulation; gradient checkpointing; paged optimizer'],
+      ['Noisy, run-to-run variance', 'effective batch', 'raise gradient accumulation; fix the seed']
+    ] },
+  trap: 'Changing three knobs at once and reporting that "it worked" is the answer that loses the point. The follow-up is always "which one mattered?", and you should be able to say.',
+  tags: ['debugging', 'qlora', 'hyperparameters'], xref: [['The ten knobs of a QLoRA run', '../genai_flow/index.html']] },
+
+{ id: 'tn46', topic: 'training', level: 1,
+  q: 'What are the four steps of training, and where does each hyperparameter act?',
+  lay: 'Training is tweaking a model\'s settings using example data, in a way that should also work on data it has never seen. Every step does four things: make a prediction, measure how wrong it was, work out which way each setting should move, then move every setting a tiny bit. Repeat thousands of times.',
+  tech: '<ol><li><b>Forward pass</b> — predict the output from the inputs. Batch size, quantization (the base is de-quantised on the fly), target modules and dropout act here.</li><li><b>Loss calculation</b> — how far the prediction was from the ground truth: cross-entropy on the answer tokens. With gradient accumulation the loss is divided by N.</li><li><b>Backward pass</b> — loss.backward() computes the gradients: which way each trainable parameter should move. In LoRA they flow through the frozen base into A and B only; r and target modules decide how many there are.</li><li><b>Optimization</b> — optimizer.step() moves each parameter a tiny step against its gradient. Learning rate and optimizer act here; &alpha;/r scales the result; epochs decide how often the whole loop runs over the data.</li></ol>The goal is generalisation, not a low training loss, which is why you watch eval loss on held-out data.',
+  dgm: { nodes: [{ t: 'forward', s: 'predict' }, { t: 'loss', s: 'how wrong?', k: 'alt' }, { t: 'backward', s: 'gradients', k: 'alt' }, { t: 'optimize', s: 'tiny step' }],
+    cap: 'Then zero the gradients and repeat, for every batch, for every epoch.' },
+  code: `for epoch in range(num_epochs):
+    for batch in loader:
+        out = model(**batch)          # 1. forward pass: predict
+        loss = out.loss               # 2. loss: how wrong vs the labels
+        loss.backward()               # 3. backward pass: gradients
+        optimizer.step()              # 4. optimization: a tiny step
+        scheduler.step()              #    (learning-rate schedule)
+        optimizer.zero_grad()         #    gradients would add up otherwise`,
+  trap: '"Why zero_grad?" PyTorch adds new gradients to old ones. Forgetting it is a bug, and doing it on purpose only every N steps is exactly what gradient accumulation is.',
+  tags: ['training', 'basics', 'hyperparameters'], xref: [['The ten knobs of a QLoRA run', '../genai_flow/index.html']] }
 
 ]);

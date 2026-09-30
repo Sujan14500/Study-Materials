@@ -1,8 +1,8 @@
 # AI Interview Prep
 
-578 GenAI and AI-engineer interview questions, each answered twice — once in plain
+584 GenAI and AI-engineer interview questions, each answered twice — once in plain
 English so it sticks, once at interview depth so it survives the follow-up — plus
-240 multiple-choice questions, flashcards with spaced repetition, and a timed mock
+248 multiple-choice questions, flashcards with spaced repetition, and a timed mock
 interview that makes you answer out loud.
 
 Built because the gap between *"I know this"* and *"I can say this in ninety
@@ -21,7 +21,7 @@ open index.html           # macOS
 
 | Mode | What it is for |
 |------|----------------|
-| **Study** | Browse and search all 578 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
+| **Study** | Browse and search all 584 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
 | **Flashcards** | Recall, not recognition. Say the answer out loud, flip, then rate yourself. Cards you rate badly come back sooner — the schedule is SM-2-lite and lives in `localStorage`. |
 | **Quiz** | Multiple choice with an explanation after every question, optionally timed. Every wrong option is a real misconception, and the explanation says why the tempting answer is wrong. |
 | **Mock interview** | A timed round for a chosen role and level. Questions arrive one at a time with a clock and a target answer length. Reveal, self-rate, and get a report with your weakest topic and how often you ran long. |
@@ -34,7 +34,7 @@ open index.html           # macOS
 |-------|-----------|--------|
 | Foundations | 32 | tokens, embeddings, context, sampling, hallucination, when not to use an LLM |
 | Transformers | 45 | attention, feed-forward, residual stream, RoPE, GQA, prefill vs decode, KV cache, reading a real Llama printout line by line |
-| Training & tuning | 40 | pretraining, SFT, LoRA, QLoRA, DPO, RLHF, GRPO, distillation, forgetting |
+| Training & tuning | 46 | pretraining, SFT, LoRA, QLoRA, DPO, RLHF, GRPO, distillation, forgetting, the four steps of training, the ten QLoRA and training hyperparameters |
 | Inference & serving | 42 | KV cache, prompt caching, batching, PagedAttention, quantisation, routing, cost |
 | Prompting & context | 32 | few-shot, chain of thought, structured output, memory layers, context engineering |
 | RAG | 56 | chunking, hybrid search, reranking, agentic RAG, GraphRAG, OKF, failure modes |

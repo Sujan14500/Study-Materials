@@ -1,0 +1,64 @@
+/* ============================================================
+   qlora.css — "The ten knobs of a QLoRA run" (chapter 21).
+   ============================================================ */
+
+/* ---------- the four steps of training ---------- */
+.qk-steps{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin:6px 0 18px}
+.qk-step{flex:1 1 190px;min-width:0;background:rgba(0,0,0,.28);border:1px solid var(--line);
+  border-top:2px solid var(--cyan);border-radius:12px;padding:12px 14px;position:relative}
+.qk-step:nth-child(3){border-top-color:var(--amber)}   /* steps sit at 1, 3, 5, 7: arrows between */
+.qk-step:nth-child(5){border-top-color:var(--red)}
+.qk-step:nth-child(7){border-top-color:var(--violet)}
+.qk-step-n{position:absolute;top:10px;right:12px;font-family:var(--mono);font-size:11px;color:var(--txt-3)}
+.qk-step b{display:block;font-size:14px;margin-bottom:3px}
+.qk-step-s{font-size:12px;color:#cfe9ff;margin-bottom:7px;line-height:1.5}
+.qk-step-d{font-size:12px;color:var(--txt-2);line-height:1.6;margin-bottom:9px}
+.qk-step-k{display:flex;flex-wrap:wrap;gap:5px}
+.qk-step-k span{font-size:10.5px;padding:2px 8px;border-radius:99px;border:1px solid var(--line-2);
+  color:var(--txt-2);cursor:pointer}
+.qk-step-k span:hover{border-color:var(--cyan);color:var(--txt)}
+.qk-step-arrow{align-self:center;color:var(--txt-3);font-size:18px}
+.qk-step-loop{flex-basis:100%;font-size:12.5px;color:var(--txt-3);text-align:center;line-height:1.6}
+.qk-step-loop b{color:var(--txt)}
+@media(max-width:900px){.qk-step-arrow{display:none}}
+
+/* ---------- controls and output ---------- */
+.qk-grid{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:20px;align-items:start;margin-top:4px}
+@media(max-width:900px){.qk-grid{grid-template-columns:minmax(0,1fr)}}
+.qk-set{background:rgba(0,0,0,.24);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:10px}
+.qk-set-h{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--txt-3);margin-bottom:8px}
+.qk-ctl{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px;
+  font-size:12px;color:var(--txt-2)}
+.qk-ctl>span{white-space:nowrap}
+.qk-ctl select{font-family:var(--mono);font-size:11.5px;background:var(--bg-2);color:var(--txt);
+  border:1px solid var(--line-2);border-radius:7px;padding:3px 6px;max-width:190px}
+.qk-ctl[data-knob="target"]{flex-direction:column;align-items:flex-start}
+.qk-chips{display:flex;flex-wrap:wrap;gap:5px}
+.qk-chips .chip{font-family:var(--mono);font-size:10.5px;padding:3px 8px}
+
+.qk-out .stat-row{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+.qk-out .stat-v.bad{color:var(--red)}
+.qk-review{margin:14px 0;display:flex;flex-direction:column;gap:7px}
+.qk-rv{font-size:12.5px;line-height:1.6;color:var(--txt-2);border-left:2px solid var(--line-2);
+  padding:6px 11px;border-radius:0 8px 8px 0;background:rgba(255,255,255,.025)}
+.qk-rv span{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:1px;margin-bottom:1px}
+.qk-bad{border-left-color:var(--red)}   .qk-bad span{color:var(--red)}
+.qk-warn{border-left-color:var(--amber)} .qk-warn span{color:var(--amber)}
+.qk-info{border-left-color:var(--cyan)}  .qk-info span{color:var(--cyan)}
+.qk-ok{border-left-color:var(--green)}   .qk-ok span{color:var(--green)}
+
+.qk-curve{background:rgba(0,0,0,.24);border:1px solid var(--line);border-radius:12px;padding:6px 8px;margin-bottom:12px}
+.qk-svg{width:100%;height:auto;display:block}
+.qk-axis{stroke:var(--line-2);stroke-width:1}
+.qk-warm{stroke:var(--amber);stroke-width:1;stroke-dasharray:3 3}
+.qk-line{fill:none;stroke:var(--cyan);stroke-width:2}
+.qk-lbl{fill:var(--txt-3);font-size:10px;font-family:var(--mono)}
+.qk-code{white-space:pre;overflow-x:auto;font-size:11.5px;max-height:none}
+
+/* ---------- the ten cards ---------- */
+.qk-knobs{margin-top:18px}
+.qk-grp{font-size:13px;color:var(--txt);margin:14px 0 10px}
+.qk-knob{transition:border-color .2s var(--ease),background .2s var(--ease)}
+.qk-knob.lit{border-color:var(--cyan);background:rgba(34,211,238,.07)}
+.qk-knob>b code{font-family:var(--mono);font-size:11px;color:var(--txt-3);font-weight:400;margin-left:4px}
+.qk-knob .knob-tech code,.qk-knob .knob-when code{font-family:var(--mono);font-size:11.5px;color:var(--cyan)}

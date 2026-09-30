@@ -507,6 +507,87 @@ ids.forEach(id => assert(html.includes('id="' + id + '"') || demos.includes('id=
   C.loraVsQlora.rows.forEach(r => assert(r.length === 3, `LoRA/QLoRA row "${r[0]}" has ${r.length - 1} cells for 2 columns`));
 }
 
+/* ---- ch21: the ten knobs of a QLoRA run ---- */
+/* The config builder derives every number from real model shapes. Re-derive
+   them here, pin the parameter totals to the published model sizes, and check
+   that each scenario really triggers the review it exists to demonstrate.    */
+{
+  const page = fs.readFileSync('index.html', 'utf8');
+  const qCtx = { window: {} }; qCtx.window.window = qCtx.window;
+  vm.createContext(qCtx);
+  vm.runInContext(fs.readFileSync('js/qlora.js', 'utf8'), qCtx);
+  const Q = qCtx.window.QLORA;
+  /* arrays built inside the vm have another realm's prototype, so compare by value */
+  const same = (a, b, msg) => assert.strictEqual(JSON.stringify(a), JSON.stringify(b), msg);
+  assert(Q, 'qlora.js did not publish its data');
+  assert(page.includes('css/qlora.css') && page.includes('js/qlora.js'), 'qlora.css / qlora.js not linked');
+  ['qk-steps', 'qk-scen', 'qk-controls', 'qk-stats', 'qk-review', 'qk-curve', 'qk-code', 'qk-knobs']
+    .forEach(id => assert(page.includes('id="' + id + '"'), `qlora.js reaches for #${id}, which the page never creates`));
+
+  /* parameter totals straight from the config.json shapes (untied lm_head) */
+  const total = (d, kv, ff, L, V) => L * (2 * d * d + 2 * d * kv + 3 * d * ff + 2 * d) + d + 2 * V * d;
+  const pinned = { l8: 8030261248, m7: 7241732096, l70: 70553706496 };
+  Q.MODELS.forEach(m => {
+    assert.strictEqual(total(m.d, m.kv, m.ff, m.layers, m.vocab), pinned[m.id], `${m.n} should have ${pinned[m.id]} parameters`);
+    assert.strictEqual(Q.params(m).total, pinned[m.id], `params() disagrees with the shapes for ${m.n}`);
+    /* storage must shrink monotonically with the precision the chapter lists */
+    const b = Q.QUANT.map(q => Q.baseBytes(m, q.id));
+    assert(b[0] > b[1] && b[1] > b[3] && b[3] > b[4], `base memory ordering broken for ${m.n}`);
+    assert.strictEqual(Q.baseBytes(m, 'fp4'), Q.baseBytes(m, 'nf4'), 'FP4 and NF4 store the same bits; only the levels differ');
+  });
+  const L8 = Q.MODELS[0], all7 = Q.MODULES.map(x => x.id);
+  assert.strictEqual(Q.loraCount(L8, 16, all7), 41943040, 'r=16 on all seven Llama 3 8B linears trains 41,943,040 weights');
+  assert.strictEqual(Q.loraCount(L8, 32, all7), 2 * Q.loraCount(L8, 16, all7), 'doubling r must double the adapter');
+  assert.strictEqual((Q.baseBytes(L8, 'bf16') / 1e9).toFixed(1), '16.1', 'the tn42 card quotes ~16 GB for an 8B bf16 base');
+  assert.strictEqual((Q.baseBytes(L8, 'int8') / 1e9).toFixed(1), '9.1', 'the tn42 card quotes ~9 GB for an 8B 8-bit base');
+  assert.strictEqual((Q.baseBytes(L8, 'nf4dq') / 1e9).toFixed(1), '5.7', 'the tn42 card quotes ~5.7 GB for an 8B NF4+DQ base');
+  assert(Q.baseBytes(Q.MODELS[2], 'nf4dq') < 80e9 * 0.55, '70B in NF4 must leave an 80 GB card room for activations');
+  assert(Math.abs((4 + 8 / 64 + 32 / (64 * 256)) - 4 - 0.127) < 0.001, 'double quantisation overhead is quoted as 0.127 bits');
+
+  /* the ten knobs: five and five, exactly the ones the chapter names, all explained */
+  same(Q.KNOBS.filter(k => k.grp === 'qlora').map(k => k.id), ['target', 'r', 'alpha', 'quant', 'dropout']);
+  same(Q.KNOBS.filter(k => k.grp === 'train').map(k => k.id), ['epochs', 'batch', 'lr', 'accum', 'optim']);
+  Q.KNOBS.forEach(k => ['n', 'arg', 'lay', 'tech', 'typical', 'when'].forEach(f =>
+    assert(k[f] && k[f].length > (f === 'lay' || f === 'tech' || f === 'when' ? 50 : 0), `knob "${k.id}" is missing a real "${f}"`)));
+  /* the four steps: in order, and every knob acts in at least one of them */
+  same(Q.STEPS.map(s => s.id), ['forward', 'loss', 'backward', 'optimize'], 'the four steps are out of order');
+  const placed = new Set([].concat(...Q.STEPS.map(s => s.knobs)));
+  Q.KNOBS.forEach(k => assert(placed.has(k.id), `knob "${k.id}" is not placed in any of the four training steps`));
+  placed.forEach(id => assert(Q.KNOBS.some(k => k.id === id), `a training step cites unknown knob "${id}"`));
+
+  /* effective batch and step arithmetic, as the Trainer does it */
+  const D = Q.compute(Q.DEFAULT);
+  assert.strictEqual(D.effBatch, 16, 'default effective batch is 4 x 4');
+  assert.strictEqual(D.steps, 2 * Math.ceil(Math.ceil(5000 / 4) / 4), 'default optimizer steps');
+  assert.strictEqual(D.scale, 2, 'the default is alpha = 2r');
+  /* the schedule: zero at step 0, peak at the end of warmup, zero at the end */
+  assert.strictEqual(Q.lrAt(Q.DEFAULT, 0, D.steps), 0, 'warmup must start from zero');
+  assert(Math.abs(Q.lrAt(Q.DEFAULT, D.warmup, D.steps) - Q.DEFAULT.lr) < 1e-12, 'the peak must land at the end of warmup');
+  assert(Q.lrAt(Q.DEFAULT, D.steps, D.steps) < 1e-12, 'cosine must decay to zero');
+
+  /* the review: the default is clean, and each broken scenario is caught for the right reason */
+  const cfgOf = s => Object.assign({}, Q.DEFAULT, { targets: Q.DEFAULT.targets.slice() }, s.cfg);
+  const flags = s => Q.review(cfgOf(s)).filter(x => x.lvl === 'bad' || x.lvl === 'warn').map(x => x.id);
+  const S = id => Q.SCENARIOS.filter(s => s.id === id)[0];
+  same(flags(S('good')), [], 'the "sensible default" scenario should not raise a warning');
+  same(flags(S('big')), [], 'the 70B scenario should be a clean config');
+  ['lr', 'alpha', 'target'].forEach(id => assert(flags(S('flat')).includes(id), `"did nothing" should flag ${id}`));
+  ['epochs', 'dropout', 'r', 'accum'].forEach(id => assert(flags(S('memo')).includes(id), `"memorised" should flag ${id}`));
+  const flagsFor = over => Q.review(Object.assign({}, Q.DEFAULT, { targets: Q.DEFAULT.targets.slice() }, over)).map(x => x.id);
+  assert(flagsFor({ optim: 'adamw_torch' }).includes('optim'), 'a 4-bit run without a paged optimizer should be flagged');
+  assert(!flagsFor({ optim: 'adamw_torch', quant: 'bf16' }).includes('optim'), 'plain LoRA does not need paging');
+  assert(flagsFor({ quant: 'fp4' }).includes('quant'), 'FP4 should be flagged');
+
+  /* the generated Python must set every one of the ten knobs */
+  const code = Q.pyCode(Q.DEFAULT);
+  ['target_modules=', 'r=16', 'lora_alpha=32', 'bnb_4bit_quant_type="nf4"', 'lora_dropout=0.05', 'num_train_epochs=2',
+   'per_device_train_batch_size=4', 'learning_rate=2e-4', 'gradient_accumulation_steps=4', 'optim="paged_adamw_8bit"']
+    .forEach(s => assert(code.includes(s), `the generated config is missing ${s}`));
+  assert(Q.pyCode(Object.assign({}, Q.DEFAULT, { quant: 'bf16' })).includes('torch_dtype=torch.bfloat16'), 'plain LoRA must load a bf16 base');
+
+  console.log(`  qlora knobs: ${Q.KNOBS.length} knobs across ${Q.STEPS.length} training steps, ${Q.MODELS.length} models re-derived, ${Q.SCENARIOS.length} scenarios reviewed`);
+}
+
 /* ---- ch22: the judge bench must actually improve with mitigations ---- */
 {
   const seeded = (str) => {

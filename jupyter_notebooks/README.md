@@ -8,7 +8,7 @@ engineering — plus the hands-on coding rounds interviewers actually give ("bui
 
 It is the practical companion to [`../ai_interview_prep`](../ai_interview_prep/index.html): every notebook
 opens with a table of the theory questions it makes concrete, and [`INTERVIEW_MAP.md`](INTERVIEW_MAP.md)
-goes the other way — from any of the 578 theory questions to the notebook where you can run the answer.
+goes the other way — from any of the 584 theory questions to the notebook where you can run the answer.
 
 Everything is small on purpose: toy datasets, tiny models, CPU only, each notebook runs top to bottom in
 about a minute, and nothing costs money unless you choose to use a real API key.

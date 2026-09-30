@@ -40,7 +40,7 @@ open index.html           # macOS
 | 18b | Reading print(model) | The real Llama 3.2 3B printout, every line clickable and synced to a data-flow diagram: plain-English and technical explanation, shapes, exact parameter count, maths and interview trap for each module. Plus a live tensor-shape tracer, where the 3.21B parameters live (and why the notebook said 12.9 GB), GQA vs MHA vs MQA with a KV cache calculator, and a LoRA target_modules calculator |
 | 19 | Decoding controls | Temperature, top-k, top-p, repetition penalty, stop sequences and max tokens applied to one real distribution, in the order a server applies them |
 | 20 | Chunking | Six splitters run live on one document, plus a probe question whose answer sits on a boundary |
-| 21 | Fine-tuning menu | A four-question decision tool, a LoRA-vs-QLoRA table, a draggable-rank LoRA diagram and exact parameter arithmetic |
+| 21 | Fine-tuning menu | A four-question decision tool, a LoRA-vs-QLoRA table, a draggable-rank LoRA diagram, exact parameter arithmetic, and the ten knobs of a QLoRA run: the four steps of training with the knobs that act in each, a config builder for the five QLoRA knobs (target modules, r, alpha, quantization, dropout) and the five training knobs (epochs, batch size, learning rate, gradient accumulation, optimizer) that reviews your settings, draws the learning-rate schedule and writes the Python |
 | 22 | LLM as a judge | Eight judged answer pairs with the biases switched on; toggle mitigations and watch agreement with humans climb from 25% to 100% |
 | 23 | Beyond RAG | A long-context-vs-RAG calculator on your own numbers, classic vs agentic RAG animated, five architectures compared, and an Arabic retrieval debug |
 | 24 | Final quiz | 35 questions with explanations, plus an 80-term glossary |
@@ -56,6 +56,7 @@ js/content.js     every piece of course content — edit here to change the cour
 js/demos.js       the interactive widgets
 js/hybridrag.js   hybrid RAG: the animated pipeline and the RRF fusion bench
 js/llama.js       Reading print(model): Llama 3.2 3B, every widget driven by one config
+js/qlora.js       the ten knobs of a QLoRA run: config builder, review, LR schedule, generated Python
 js/app.js         navigation, progress, XP
 test.js           node test.js — fails if the course data goes inconsistent
 ```
@@ -78,7 +79,12 @@ future, "sat" really does attend mostly to "cat", and — the claim the chapter 
 the feed-forward ON predicts a *place* word while feed-forward OFF predicts an *animate* one.
 The print(model) chapter re-derives Llama 3.2 3B’s parameter count straight from the printed shapes and pins it to 3,212,749,824, checks that fp32 reproduces the notebook’s 12.9 GB, that GQA really cuts the KV cache 3×, that 8192 is exactly 8/3 × 3072, that every printed line has a full explanation, and that print order really does differ from run order. Chapter 19 asserts that temperature monotonically raises entropy and that top-p keeps the
 smallest set covering the mass. Chapter 21 checks the LoRA arithmetic really is under 1% of
-the base model and that the VRAM ordering QLoRA < LoRA < full holds. Chapter 22 asserts the
+the base model and that the VRAM ordering QLoRA < LoRA < full holds; its QLoRA config builder
+re-derives Llama 3 8B, Mistral 7B and Llama 3 70B from their real shapes (8,030,261,248 /
+7,241,732,096 / 70,553,706,496 parameters), pins r=16 on all seven linears of the 8B to 41,943,040,
+places every one of the ten knobs in one of the four training steps, and checks that the sensible
+default raises no warning while the "did nothing" and "memorised" scenarios are caught for the
+right reasons. Chapter 22 asserts the
 naive judge looks unreliable, the mitigated one reaches 100%, and position swap is the single
 biggest lever. Chapter 23 asserts stuffing a corpus costs far more than retrieving from it and
 that the lost-in-the-middle curve dips in the middle and is symmetric.

@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="css/prod40.css">
 <link rel="stylesheet" href="css/hybridrag.css">
 <link rel="stylesheet" href="css/llama.css">
+<link rel="stylesheet" href="css/qlora.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
 <style id="mm-css">
 .mf-panel{background:rgba(0,0,0,.26);border:1px solid var(--line);border-top:3px solid var(--c);
@@ -1848,6 +1849,25 @@ print(base_model.get_memory_footprint() / 1e9, "GB")      # ~6.4 in bf16</pre>
   </div>
 
   <div class="panel">
+    <div class="panel-head"><h3>&#127899; The ten knobs of a QLoRA run</h3><span class="panel-tag">config builder</span></div>
+    <p class="panel-sub">Training is <b>tweaking the parameters</b> of a model based on training data, in a way that should <b>generalise</b> to data it has never seen. Every training step does the same four things, and every hyperparameter you set acts inside one of them. Hover a knob to find its card below.</p>
+    <div class="qk-steps" id="qk-steps"></div>
+    <p class="panel-sub">Five knobs decide <b>what</b> gets trained and how the frozen base is stored: target modules, r, alpha, quantization, dropout. Five decide <b>how</b> the run goes: epochs, batch size, learning rate, gradient accumulation, optimizer. Set them, or load a scenario, and read what an experienced reviewer would say.</p>
+    <div class="chip-row" id="qk-scen"></div>
+    <div class="qk-grid">
+      <div class="qk-controls" id="qk-controls"></div>
+      <div class="qk-out">
+        <div class="stat-row" id="qk-stats"></div>
+        <div class="qk-review" id="qk-review"></div>
+        <div class="qk-curve" id="qk-curve"></div>
+        <pre class="code qk-code" id="qk-code"></pre>
+      </div>
+    </div>
+    <div class="qk-knobs" id="qk-knobs"></div>
+    <p class="dec-note"><span class="dim">Parameter counts use each model's real config.json shapes, including grouped-query k_proj and v_proj. Base memory counts the decoder Linears at the chosen precision and embeddings, lm_head and norms at 16-bit; <span class="mono">prepare_model_for_kbit_training</span> later upcasts those to fp32, and activations come on top. Steps follow the Trainer's rule: micro-batches per epoch divided by accumulation, rounded up.</span></p>
+  </div>
+
+  <div class="panel">
     <div class="panel-head"><h3>&#128202; All nine methods</h3><span class="panel-tag">click a card</span></div>
     <div class="ft-grid" id="ft-grid"></div>
     <div class="ft-detail" id="ft-detail"></div>
@@ -1859,6 +1879,7 @@ print(base_model.get_memory_footprint() / 1e9, "GB")      # ~6.4 in bf16</pre>
       <li><b>Prompt &rarr; RAG &rarr; LoRA &rarr; everything else.</b> Walk the ladder. Every rung you skip costs a month.</li>
       <li><b>Fine-tuning teaches form; RAG supplies facts.</b> Tuning a model on your docs to make it "know" them is the most expensive way to build a bad search engine.</li>
       <li><b>LoRA is the default, QLoRA is LoRA when it does not fit.</b> Same algorithm, one memory trick on the frozen part.</li>
+      <li><b>Ten knobs, two groups.</b> Target modules, r, alpha, quantization and dropout decide what trains; epochs, batch size, learning rate, gradient accumulation and optimizer decide how. When a fine-tune "did nothing", check the learning rate and alpha/r first.</li>
       <li><b>DPO replaced RLHF for almost everyone.</b> No reward model, no PPO loop, most of the benefit.</li>
       <li><b>GRPO needs a verifiable reward.</b> Maths, tests passing, output parsing. If a human has to judge it, you want DPO.</li>
       <li><b>Distillation is a cost project, not a quality project.</b> The student inherits every mistake the teacher makes.</li>
@@ -2058,6 +2079,7 @@ print(base_model.get_memory_footprint() / 1e9, "GB")      # ~6.4 in bf16</pre>
 <script src="js/multimodal.js"></script>
 <script src="js/hybridrag.js"></script>
 <script src="js/llama.js"></script>
+<script src="js/qlora.js"></script>
 <script src="js/toolstrip.js"></script>
 <script src="js/prod40.js"></script>
 </body>
