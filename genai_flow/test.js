@@ -979,4 +979,110 @@ ids.forEach(id => assert(html.includes('id="' + id + '"') || demos.includes('id=
               `${P.total.toLocaleString('en-US')} params re-derived`);
 }
 
+/* ---- ch20b: reading PDFs fast, HunyuanOCR-1.5 ---- */
+/* Every speed number is transcribed from the paper's tables, so check the
+   tables agree with themselves, then re-fit the latency model independently
+   and pin the prose to what the fit actually says.                          */
+{
+  const page = fs.readFileSync('index.html', 'utf8');
+  const oCtx = { window: {} }; oCtx.window.window = oCtx.window;
+  vm.createContext(oCtx);
+  vm.runInContext(fs.readFileSync('js/ocr.js', 'utf8'), oCtx);
+  const O = oCtx.window.OCR;
+  const near = (a, b, tol, msg) => assert(Math.abs(a - b) <= tol, `${msg}: ${a} vs ${b}`);
+  assert(O, 'ocr.js did not publish its data');
+  assert(page.includes('css/ocr.css') && page.includes('js/ocr.js'), 'ocr.css / ocr.js not linked');
+  ['oc-route', 'oc-route-stats', 'oc-spec-ctl', 'oc-spec', 'oc-calc', 'oc-calc-stats', 'oc-timeline', 'oc-len',
+   'oc-race', 'oc-conc', 'oc-bench', 'oc-tasks', 'oc-code-tabs', 'oc-code']
+    .forEach(id => assert(page.includes('id="' + id + '"'), `ocr.js reaches for #${id}, which the page never creates`));
+
+  /* Table 3: speedup is pages/s relative to plain HunyuanOCR-1.5, and latency ~ 1 / pages/s.
+     The paper's pages/s is measured over the whole run, so it drifts from 1 / latency by up
+     to 7% (Unlimited-OCR); more than 8% would mean a transcription slip.                    */
+  const base = O.SYSTEMS.filter(s => s.n === 'HunyuanOCR-1.5' && s.mode === 'AR')[0];
+  O.SYSTEMS.forEach(s => {
+    near(s.pps / base.pps, s.speed, 0.015, `${s.n} ${s.mode}: quoted speedup vs pages/s ratio`);
+    near(1 / s.lat, s.pps, 0.08 * s.pps, `${s.n} ${s.mode}: one request should give pages/s ~ 1 / latency`);
+  });
+  const fastest = O.SYSTEMS.slice().sort((a, b) => b.pps - a.pps)[0];
+  assert(fastest.n === 'HunyuanOCR-1.5' && fastest.mode === 'DFlash', 'the chapter says DFlash makes it the fastest in the table');
+  const e2eAR = O.SYSTEMS.filter(s => s.para === 'end-to-end' && s.mode === 'AR');
+  const cascades = O.SYSTEMS.filter(s => s.para === 'two-stage');
+  assert(Math.min(...cascades.map(s => s.pps)) > Math.max(...e2eAR.map(s => s.pps)),
+    'the chapter says both two-stage systems beat every end-to-end model decoding normally');
+
+  /* Table 6: c pages per batch, so pages/s = c / latency; speedup = DFlash / AR pages/s */
+  O.CONC.forEach(r => {
+    near(r.c / r.arLat, r.arPps, 0.002, `c=${r.c}: AR pages/s`);
+    near(r.c / r.dfLat, r.dfPps, 0.0055, `c=${r.c}: DFlash pages/s`);
+    near(r.dfPps / r.arPps, r.speed, 0.01, `c=${r.c}: speedup`);
+  });
+  const peak = O.CONC.slice().sort((a, b) => b.speed - a.speed)[0];
+  assert.strictEqual(peak.c, 4, 'the chapter says the speedup peaks at four in flight');
+  assert(O.CONC[O.CONC.length - 1].speed < O.CONC[0].speed, 'the chapter says the lead shrinks under load');
+  assert(O.CONC.every((r, i) => !i || (r.arPps > O.CONC[i - 1].arPps && r.dfPps > O.CONC[i - 1].dfPps)),
+    'throughput must still rise with concurrency in both modes');
+  near(O.HF.arLat / O.HF.dfLat, O.HF.speed, 0.01, 'the transformers speedup is a latency ratio');
+
+  /* the latency model, re-fitted here without ocr.js's fit() */
+  const ls = (xs, ys) => {
+    const n = xs.length, sx = xs.reduce((a, b) => a + b), sy = ys.reduce((a, b) => a + b);
+    const sxy = xs.reduce((a, x, i) => a + x * ys[i], 0), sxx = xs.reduce((a, x) => a + x * x, 0);
+    const b = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+    return { fixed: (sy - b * sx) / n, perToken: b };
+  };
+  const B = O.BUCKETS;
+  const ar = ls(B.map(x => x.arLat * x.arTps), B.map(x => x.arLat));
+  const df = ls(B.map(x => x.dfLat * x.dfTps), B.map(x => x.dfLat));
+  near(ar.fixed, O.AR_FIT.fixed, 1e-9, 'AR fit'); near(df.perToken, O.DF_FIT.perToken, 1e-12, 'DFlash fit');
+  near(ar.fixed, df.fixed, 0.01, 'the chapter says DFlash leaves the fixed cost unchanged');
+  B.forEach(x => {
+    near(x.dfLat / x.arLat, 1 / x.speed, 0.02 / x.speed, `bucket ${x.b}: speedup is the latency ratio`);
+    const pa = ar.fixed + ar.perToken * x.arLat * x.arTps, pd = df.fixed + df.perToken * x.dfLat * x.dfTps;
+    assert(Math.abs(pa / x.arLat - 1) < 0.08 && Math.abs(pd / x.dfLat - 1) < 0.08, `bucket ${x.b}: the straight line misses by more than 8%`);
+  });
+  assert(B.every((x, i) => !i || x.speed > B[i - 1].speed), 'the chapter says longer pages gain more');
+  /* the numbers the prose quotes */
+  const say = [ar.fixed.toFixed(2) + ' s', (ar.perToken * 1000).toFixed(2) + ' ms', (df.perToken * 1000).toFixed(2) + ' ms',
+               O.PASS_COST.toFixed(1), (ar.perToken / df.perToken).toFixed(1) + '&times;'];
+  assert.deepStrictEqual(say, ['0.53 s', '1.79 ms', '0.69 ms', '3.5', '2.6&times;'], 'the fit no longer matches the prose');
+  say.forEach(t => assert(page.includes('<b>' + t + '</b>'), `the calculator text should quote ${t}`));
+  const acc = B.map(x => x.acc);
+  assert(Math.min(...acc) >= 8 && Math.max(...acc) <= 9.6, 'the chapter says each pass keeps about 9 tokens');
+  /* the model reproduces the paper at the mean page and respects Amdahl */
+  const L = O.latency(1414, O.MEAN_ACC, O.PASS_COST);
+  near(L.ar, 3.032, 0.1, 'the model at 1,414 tokens vs the measured plain latency');
+  near(L.df, 1.408, 0.12, 'the model at 1,414 tokens vs the measured DFlash latency');
+  near(L.ceiling, ar.perToken / df.perToken, 1e-9, 'the ceiling is the per-token ratio');
+  assert(O.latency(100, O.MEAN_ACC, O.PASS_COST).speed < O.latency(4000, O.MEAN_ACC, O.PASS_COST).speed, 'Amdahl: short pages gain less');
+  assert(O.latency(1e9, O.MEAN_ACC, O.PASS_COST).speed < L.ceiling + 1e-6, 'nothing beats the ceiling');
+  /* per-token acceptance near 0.9 gives the ~8-9 tokens a 16-token block keeps */
+  near(O.expectedAccept(0.9, 16), 8.33, 0.01, 'Leviathan formula at a = 0.9, k = 16');
+  assert(O.expectedAccept(0, 16) === 1, 'a useless draft still yields the target\'s own token');
+
+  /* the stepper: its acceptance run sits inside the measured range and never keeps more than a block */
+  const run = O.ACC_RUN, mean = run.reduce((a, b) => a + b) / run.length;
+  assert(mean >= 8.39 && mean <= 9.5, `the stepper keeps ${mean} tokens a pass; the paper measures 8.39-9.50`);
+  assert(run.every(k => k >= 1 && k <= O.BLOCK), 'a pass keeps between 1 and a full block');
+  assert(O.PIECES.length > 3 * O.BLOCK, 'the sample must span several passes');
+
+  /* the router: every page gets a reason, and each OCR rule fires at least once */
+  const rs = O.PAGES.map(O.route);
+  rs.forEach((r, i) => assert(/^(ocr|native)$/.test(r.r) && r.why.length > 40, `page ${i + 1} is routed without a reason`));
+  assert(rs.some(r => r.r === 'native') && rs.some(r => r.r === 'ocr'), 'the router must show both routes');
+  ['picture', 'junk', 'thin text layer', 'table'].forEach(w =>
+    assert(rs.some(r => r.why.includes(w)), `no page exercises the "${w}" rule`));
+
+  /* the rest of the chapter */
+  const top = O.BENCH.slice().sort((a, b) => b.s - a.s)[0];
+  assert.strictEqual(top.n, 'HunyuanOCR-1.5', 'the chapter says it tops OmniDocBench v1.6');
+  assert.strictEqual(O.TASKS.length, 12, 'the chapter promises twelve tasks');
+  assert.strictEqual(new Set(O.TASKS.map(t => t.id)).size, 12, 'duplicate task id');
+  assert(O.TASKS.some(t => t.id === 'doc_parse'), 'doc_parse is the default task');
+  assert(page.includes(O.PROMPT_ZH) && page.includes(O.PROMPT_EN), 'the page must quote the same prompt ocr.js sends');
+
+  console.log(`  ocr: ${O.SYSTEMS.length} systems, ${O.CONC.length} concurrency rows and ${B.length} length buckets cross-checked; ` +
+              `fixed ${ar.fixed.toFixed(2)} s, ${(ar.perToken * 1000).toFixed(2)} -> ${(df.perToken * 1000).toFixed(2)} ms/token`);
+}
+
 console.log('ok — content data is consistent');

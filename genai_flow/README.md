@@ -1,7 +1,7 @@
 # GenAI Flow
 
 An interactive, animated course that takes someone from "what even is a token" to
-"I could ship a RAG-backed agent". Twenty-six chapters, every concept attached to
+"I could ship a RAG-backed agent". Twenty-seven chapters, every concept attached to
 something you can click, drag or break.
 
 ## Run it
@@ -40,6 +40,7 @@ open index.html           # macOS
 | 18b | Reading print(model) | The real Llama 3.2 3B printout, every line clickable and synced to a data-flow diagram: plain-English and technical explanation, shapes, exact parameter count, maths and interview trap for each module. Plus a live tensor-shape tracer, where the 3.21B parameters live (and why the notebook said 12.9 GB), GQA vs MHA vs MQA with a KV cache calculator, and a LoRA target_modules calculator |
 | 19 | Decoding controls | Temperature, top-k, top-p, repetition penalty, stop sequences and max tokens applied to one real distribution, in the order a server applies them |
 | 20 | Chunking | Six splitters run live on one document, plus a probe question whose answer sits on a boundary |
+| 20b | Reading PDFs: HunyuanOCR-1.5 | Tencent's 1B OCR model, July 2026. A per-page router that decides which pages need OCR at all, DFlash speculative decoding stepped one pass at a time, a latency calculator fitted to the paper's own measurements (why 6.37x in transformers but 2.14x on vLLM), the speed race against GLM-OCR, PaddleOCR-VL, DeepSeek-OCR 2 and dots.ocr, the lead shrinking under concurrency, OmniDocBench accuracy, the twelve task types, run-it code for vLLM, transformers and llama.cpp, and the other fast Chinese OCR models compared |
 | 21 | Fine-tuning menu | A four-question decision tool, a LoRA-vs-QLoRA table, a draggable-rank LoRA diagram, exact parameter arithmetic, and the ten knobs of a QLoRA run: the four steps of training with the knobs that act in each, a config builder for the five QLoRA knobs (target modules, r, alpha, quantization, dropout) and the five training knobs (epochs, batch size, learning rate, gradient accumulation, optimizer) that reviews your settings, draws the learning-rate schedule and writes the Python |
 | 22 | LLM as a judge | Eight judged answer pairs with the biases switched on; toggle mitigations and watch agreement with humans climb from 25% to 100% |
 | 23 | Beyond RAG | A long-context-vs-RAG calculator on your own numbers, classic vs agentic RAG animated, five architectures compared, and an Arabic retrieval debug |
@@ -57,6 +58,7 @@ js/demos.js       the interactive widgets
 js/hybridrag.js   hybrid RAG: the animated pipeline and the RRF fusion bench
 js/llama.js       Reading print(model): Llama 3.2 3B, every widget driven by one config
 js/qlora.js       the ten knobs of a QLoRA run: config builder, review, LR schedule, generated Python
+js/ocr.js         reading PDFs fast: page router, DFlash stepper, fitted latency model, speed and accuracy charts
 js/app.js         navigation, progress, XP
 test.js           node test.js — fails if the course data goes inconsistent
 ```
@@ -84,7 +86,11 @@ re-derives Llama 3 8B, Mistral 7B and Llama 3 70B from their real shapes (8,030,
 7,241,732,096 / 70,553,706,496 parameters), pins r=16 on all seven linears of the 8B to 41,943,040,
 places every one of the ten knobs in one of the four training steps, and checks that the sensible
 default raises no warning while the "did nothing" and "memorised" scenarios are caught for the
-right reasons. Chapter 22 asserts the
+right reasons. Chapter 20b cross-checks every number transcribed from the HunyuanOCR-1.5 paper
+(speedups against pages/s, pages/s against concurrency and latency), re-fits the latency model
+from the five length buckets and pins the prose to it — a 0.53 s fixed cost that DFlash leaves
+untouched, 1.79 -> 0.69 ms per token, a 2.6x ceiling — and checks that each page-router rule
+fires on at least one page. Chapter 22 asserts the
 naive judge looks unreliable, the mitigated one reaches 100%, and position swap is the single
 biggest lever. Chapter 23 asserts stuffing a corpus costs far more than retrieving from it and
 that the lost-in-the-middle curve dips in the middle and is symmetric.

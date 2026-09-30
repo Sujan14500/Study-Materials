@@ -338,6 +338,18 @@ C.cats.push(
       pick:'Any RAG system whose inputs are real-world documents rather than clean markdown.',
       watch:'hi_res is slow and CPU-hungry. Choose the strategy per document type, not globally.' },
 
+    { id:'hunyuanocr', n:'HunyuanOCR', by:'Tencent Hunyuan', kind:'ingestion',
+      two:'A 1B-parameter OCR model that reads a page image and writes markdown, with tables as HTML and formulas as LaTeX. Version 1.5 (July 2026) is the fastest small OCR model in its own comparison, thanks to speculative decoding.',
+      pts:[
+        'End-to-end: one small vision-language model (a ~0.4B vision encoder plus a 0.5B language model) instead of a layout detector, a text recogniser and glue code. It scores <b>94.74 on OmniDocBench v1.6</b>, first in the paper\'s comparison.',
+        'Its speed is <b>DFlash speculative decoding</b>: a 90.7M draft model proposes 16 tokens, the 1B model verifies them in one pass and keeps about 9. 0.706 pages/s for one request on vLLM, 1.98 at 32 in flight.',
+        'The honest speedup is <b>2.14×</b> on vLLM, not the 6.37× measured in plain transformers: the image encode and prefill (about 0.53 s a page) never get faster, so short pages gain least.',
+        'One model covers twelve tasks: document parsing, layout, tables, formulas, charts, text spotting with coordinates, and image-to-text translation. It serves an OpenAI-compatible API through vLLM or llama.cpp.',
+        'Its neighbours are the other Chinese OCR models: GLM-OCR and PaddleOCR-VL (two-stage and fast without speculation), DeepSeek-OCR 2, dots.ocr and MinerU. Naming the trade-off between two-stage and end-to-end is the senior answer.'
+      ],
+      pick:'Scanned, image-only or table-heavy pages at volume, on your own GPUs, in many languages.',
+      watch:'The licence is the Tencent Hunyuan Community License, not Apache, and it needs a GPU for real throughput. Route born-digital pages to the text layer first.' },
+
     { id:'firecrawl', n:'Firecrawl', by:'Firecrawl (Mendable)', kind:'ingestion',
       two:'Turns a URL — or a whole site — into clean Markdown an LLM can read, handling JavaScript rendering, crawling and rate limits so your pipeline does not have to.',
       pts:[

@@ -371,3 +371,36 @@ C.toolstrips.multimodal = {
       use: 'Turning real documents into text. This is the specialist that beats the generalist.' }
   ]
 };
+
+/* ---------- Ch20b: reading PDFs, OCR ---------- */
+C.toolstrips.ocr = {
+  title: 'Tools & frameworks — getting text out of PDFs',
+  sub: 'Three tiers: read the text layer when there is one, a fast OCR model when the page is a picture, and a hosted parser when you would rather not run GPUs.',
+  tools: [
+    { n: 'PyMuPDF', by: 'Artifex', mark: 'fz', c: '#94a3b8',
+      what: 'Reads a PDF\'s own text layer, with positions, and renders pages to PNG for the OCR model.',
+      pro: ['Milliseconds per page on a CPU', 'Exact text, no recognition errors', 'The same library renders pages for OCR'],
+      con: ['Useless on scans: no text layer, no text', 'Tables and formulas come out flattened', 'AGPL licence unless you buy the commercial one'],
+      use: 'Every page first. Only send a page to OCR when this finds nothing usable.' },
+    { n: 'HunyuanOCR-1.5', by: 'Tencent', mark: 'HY', c: '#0891b2',
+      what: '1B end-to-end OCR model: page image in, markdown with HTML tables and LaTeX out, sped up by DFlash speculative decoding.',
+      pro: ['Top of OmniDocBench v1.6 at 1B parameters', '0.706 pages/s on one request, 1.98 at 32 in flight', 'vLLM, transformers or llama.cpp; OpenAI-compatible server'],
+      con: ['Needs a GPU for real throughput', 'Tencent Hunyuan Community License, not Apache', 'Can hallucinate on blurry regions, like every OCR model'],
+      use: 'Scanned or image-only pages, tables and formulas, many languages, when you run your own GPUs.' },
+    { n: 'GLM-OCR', by: 'Zhipu (Z.ai)', mark: 'GL', c: '#2563eb',
+      what: '0.9B two-stage OCR: a layout model finds regions, a small model reads each one.',
+      pro: ['0.604 pages/s without speculative decoding', 'Topped OmniDocBench v1.5', 'Small enough for modest GPUs'],
+      con: ['Two models to deploy and keep in step', 'Narrower task coverage than an end-to-end model'],
+      use: 'Fast bulk page-to-markdown when you want a simple, proven pipeline.' },
+    { n: 'PaddleOCR-VL', by: 'Baidu', mark: 'PP', c: '#1d4ed8',
+      what: 'The vision-language model inside the PaddleOCR toolkit: layout detection plus a compact recogniser.',
+      pro: ['Mature ecosystem and deployment tooling', '0.562 pages/s in the HunyuanOCR comparison', 'Broad language support'],
+      con: ['PaddlePaddle stack if you go beyond the defaults', 'Two-stage errors: a missed region is never read'],
+      use: 'Teams that want a full OCR toolkit rather than one model.' },
+    { n: 'MinerU', by: 'OpenDataLab', mark: 'MU', c: '#7c3aed',
+      what: 'An open PDF-to-markdown toolkit built around its own 1.2B parsing model.',
+      pro: ['End-to-end tool: PDF in, markdown and images out', 'Popular default in Chinese RAG stacks', 'Handles formulas and tables'],
+      con: ['Heavier install than a single model', 'Not in the HunyuanOCR speed table, so time it on your pages'],
+      use: 'When you want a batteries-included converter rather than wiring a model yourself.' }
+  ]
+};

@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="css/hybridrag.css">
 <link rel="stylesheet" href="css/llama.css">
 <link rel="stylesheet" href="css/qlora.css">
+<link rel="stylesheet" href="css/ocr.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
 <style id="mm-css">
 .mf-panel{background:rgba(0,0,0,.26);border:1px solid var(--line);border-top:3px solid var(--c);
@@ -1806,6 +1807,184 @@ print(base_model.get_memory_footprint() / 1e9, "GB")      # ~6.4 in bf16</pre>
 </section>
 
 <!-- ============================================================= -->
+<!-- 20b. READING PDFS FAST: HUNYUANOCR-1.5                         -->
+<!-- ============================================================= -->
+<section class="chapter" data-id="ocr" data-title="Reading PDFs: HunyuanOCR" data-icon="&#128196;" data-group="Deep dives">
+  <header class="ch-head">
+    <div class="ch-kicker">Deep dive &middot; getting text out of documents</div>
+    <h2>Reading PDFs <span class="grad">fast</span>: HunyuanOCR-1.5</h2>
+    <p class="lead">Chunking assumed you already had clean text. For scanned contracts, slides saved as pictures, tables and formulas, you do not &mdash; and the tool people now reach for is a small vision-language model that looks at the page and writes markdown. <b>HunyuanOCR-1.5</b>, from Tencent's Hunyuan team (released July 2026, paper finalised 17 September 2026), is the newest of them and the fastest of the small ones: <b>one billion parameters</b>, top of OmniDocBench v1.6, and <b>0.706 pages a second</b> on one request. This chapter is about where that speed actually comes from, because it is not where most people guess.</p>
+  </header>
+
+  <div class="callout">
+    <div class="callout-ico">&#128220;</div>
+    <div><b>The layman version.</b> Old OCR was a clerk who could only recognise letters: it read every word on the page, in whatever order the ink happened to lie, and turned tables into confetti. The new kind is a clerk who <b>looks at the whole page</b> and retypes it properly &mdash; headings as headings, tables as tables, formulas as formulas. The catch is that this clerk types one word at a time. HunyuanOCR-1.5 hires an <b>apprentice who guesses the next sixteen words at once</b>; the clerk glances along the guess, keeps the part that is right, fixes the first wrong word, and carries on. Same page out, far fewer pauses.</div>
+  </div>
+
+  <div class="keypoint">
+    <div class="kp-ico">&#11088;</div>
+    <div><h4>Key point</h4>
+      <p><b>OCR is now next-token prediction, so OCR speed is decoding speed.</b> An average page is about 1,400 output tokens, and a 1B model writes them one at a time. HunyuanOCR-1.5 is fast because of <b>DFlash speculative decoding</b> &mdash; a 90.7M-parameter draft model proposes blocks of 16 tokens and the 1B model checks each block in one pass. It is <b>6.37&times;</b> faster in plain transformers but only <b>2.14&times;</b> under vLLM, and the calculator below shows exactly why: it speeds up the writing, never the reading of the image.</p></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129520; The model on one card</h3></div>
+    <div class="procon-wrap"><table class="procon">
+      <thead><tr><th>Fact</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Made by</td><td>Tencent Hunyuan. v1.0 came out in November 2025; <b>1.5</b> on 7 July 2026 (arXiv 2607.04884, final version 17 September 2026).</td></tr>
+        <tr><td>Size and shape</td><td><b>1B parameters</b>, end-to-end: a native-resolution vision encoder (Hunyuan-ViT, ~0.4B), an MLP connector that pools the image features, and a 0.5B Hunyuan language model. 1.5 keeps the v1.0 backbone.</td></tr>
+        <tr><td>What changed in 1.5</td><td>DFlash speculative decoding; images up to <b>4K</b> (was 2K); a <b>128K</b> context for multi-page questions; new data for 331 low-resource languages and seven historical Chinese scripts; a larger reinforcement-learning stage.</td></tr>
+        <tr><td>In</td><td>An image of a page. It never sees the PDF: you render each page to PNG first.</td></tr>
+        <tr><td>Out</td><td>Markdown in reading order, <b>tables as HTML</b>, <b>formulas as LaTeX</b>, headers and footers dropped &mdash; or one of eleven other task formats.</td></tr>
+        <tr><td>Speed</td><td>1.408 s and 0.706 pages/s for one request on vLLM; 1.98 pages/s with 32 in flight. The paper does not name the GPU.</td></tr>
+        <tr><td>Accuracy</td><td>94.74 on OmniDocBench v1.6, first among the models the paper compares, ahead of Gemini 3 Pro (92.91).</td></tr>
+        <tr><td>Runs on</td><td>vLLM (&ge; 0.25.1, CUDA 13), plain transformers (&ge; 5.13), or llama.cpp on a laptop. Weights: <span class="mono">tencent/HunyuanOCR</span> on Hugging Face.</td></tr>
+        <tr><td>Licence</td><td>Tencent Hunyuan Community License &mdash; <b>not</b> Apache or MIT. Read it before shipping it in a product.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="dec-note"><span class="dim">Heard of "the new fast Chinese OCR" but not sure it was this one? GLM-OCR, PaddleOCR-VL, DeepSeek-OCR 2, dots.ocr, MinerU and TeleOCR are compared at the end of the chapter.</span></p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128257; How one page flows through it</h3></div>
+    <div class="pipeline">
+      <div class="pl-step"><div class="pl-n">STEP 1</div><span class="pl-ico">&#128444;</span><h5>Render</h5>
+        <p>Your code turns the PDF page into a PNG, typically at 200 dpi. The model only reads images.</p></div>
+      <div class="pl-step"><div class="pl-n">STEP 2</div><span class="pl-ico">&#128065;</span><h5>Encode</h5>
+        <p>Hunyuan-ViT cuts the image into patches at its native resolution and aspect ratio &mdash; a long receipt is not squashed into a square.</p></div>
+      <div class="pl-step"><div class="pl-n">STEP 3</div><span class="pl-ico">&#128476;</span><h5>Compress</h5>
+        <p>The MLP connector pools neighbouring patch features, so a high-resolution page costs fewer tokens in the language model.</p></div>
+      <div class="pl-step"><div class="pl-n">STEP 4</div><span class="pl-ico">&#9997;</span><h5>Write</h5>
+        <p>The 0.5B language model writes the page token by token. Its positions track text order, height and width, so it knows where on the page each patch sits.</p></div>
+      <div class="pl-step"><div class="pl-n">STEP 5</div><span class="pl-ico">&#128196;</span><h5>Markdown</h5>
+        <p>Headings, paragraphs, HTML tables and LaTeX, in reading order. Your code chunks it like any other document.</p></div>
+    </div>
+    <div class="callout">
+      <div class="callout-ico">&#128161;</div>
+      <div><b>Steps 1 to 3 happen once per page. Step 4 happens once per token.</b> That asymmetry is the whole chapter. A two-column page of prose is roughly 1,400 output tokens, and a long table can be more than 3,000, so almost all of the time goes into step 4 &mdash; which is exactly the step speculative decoding attacks.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128678; Step zero: does this page need OCR at all?</h3><span class="panel-tag">page router</span></div>
+    <p class="panel-sub">The fastest OCR is the OCR you skip. A PDF typed in Word already has a perfect text layer, and reading it takes milliseconds on a CPU. Route <b>per page</b>, not per file: a typical contract mixes typed pages with a scanned signature page. Here are eight pages and the rule that routes them.</p>
+    <div class="oc-route" id="oc-route"></div>
+    <div class="stat-row" id="oc-route-stats"></div>
+    <p class="dec-note"><span class="dim">GPU hours use the paper's best throughput: one accelerator, DFlash, 32 pages in flight, 1.98 pages/s. The notebook for this chapter builds this router on a real PDF with PyMuPDF.</span></p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#9889; Why it is fast: DFlash, one pass at a time</h3><span class="panel-tag">step it</span></div>
+    <p class="panel-sub">Below is what the model writes for a small invoice. On top, ordinary decoding: <b>one full pass of the 1B model per token</b>. Underneath, DFlash: a <b>90.7M-parameter draft model</b> (five layers, copied from the last five layers of the 1B model) fills in a block of <b>16</b> tokens at once &mdash; it is a block-diffusion model, so it does not go left to right. The 1B model then checks all 16 in <b>one</b> pass, keeps the run it agrees with, and writes its own token at the first disagreement. The output is exactly what the 1B model would have written alone.</p>
+    <div class="chip-row" id="oc-spec-ctl">
+      <button class="chip" data-a="step">One pass</button>
+      <button class="chip" data-a="play">Play it through</button>
+      <button class="chip" data-a="reset">Reset</button>
+    </div>
+    <div id="oc-spec"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129518; Why 6.37&times; in one place and 2.14&times; in another</h3><span class="panel-tag">live calculator</span></div>
+    <p class="panel-sub">The paper times pages in five buckets by how many tokens they produce. Fit a straight line through those five points &mdash; <b>time per page = fixed cost + tokens &times; cost per token</b> &mdash; and the answer falls out. Under vLLM the fixed cost is <b>0.53 s</b> in both modes: DFlash does not touch it. What DFlash changes is the cost per token, from <b>1.79 ms</b> to <b>0.69 ms</b>. Each DFlash pass keeps about 9 tokens but costs about <b>3.5</b> ordinary passes, so the best it can ever do on vLLM is <b>2.6&times;</b>, and a short page gets much less because the fixed cost dominates.</p>
+    <div class="oc-calc" id="oc-calc"></div>
+    <div class="stat-row oc-calc-stats" id="oc-calc-stats"></div>
+    <div class="oc-timeline" id="oc-timeline"></div>
+    <div id="oc-len"></div>
+    <div class="callout">
+      <div class="callout-ico">&#129520;</div>
+      <div><b>So why 6.37&times; in plain transformers?</b> There, an ordinary pass is slow &mdash; 34.9 s a page, about 41 tokens a second &mdash; because each step pays per-step overhead that vLLM's engine has already stripped out. DFlash pays that overhead once per <em>nine</em> tokens instead of once per token, so it wins big where the overhead is big. The honest production number is the vLLM one. This is Amdahl's law: you can only speed up the part you touch, and "reading the image" is a part DFlash never touches.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127939; Against the field, one page at a time</h3><span class="panel-tag">vLLM, one request</span></div>
+    <p class="panel-sub">Pages per second on OmniDocBench, one request in flight, speedup relative to HunyuanOCR-1.5 decoding normally. The <b>two-stage</b> systems (PaddleOCR-VL, GLM-OCR) run a layout model first and then read each region with a small recogniser, in parallel &mdash; a large part of why, without DFlash, they beat every end-to-end model. With DFlash, the end-to-end model passes them.</p>
+    <div class="oc-bars" id="oc-race"></div>
+    <p class="dec-note"><span class="dim">All figures are from the HunyuanOCR-1.5 paper, measured by its authors on "one accelerator instance with comparable compute capacity" per system. Treat them as a vendor benchmark and time your own pages before deciding.</span></p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128200; Under load, the lead shrinks</h3><span class="panel-tag">concurrency</span></div>
+    <p class="panel-sub">Speculative decoding spends <b>spare GPU compute</b> to cut latency. With one or four pages in flight the GPU is mostly waiting on memory, so the drafting is almost free: 2.14&times; at one, <b>2.26&times;</b> at four. With 32 pages in flight, batching has already filled the GPU, and the extra work of drafting and checking starts to compete: <b>1.80&times;</b>. DFlash still wins on throughput (1.98 against 1.10 pages/s), but by less.</p>
+    <div id="oc-conc"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127919; Accuracy: OmniDocBench v1.6</h3></div>
+    <p class="panel-sub">Overall score on a benchmark of real document pages: text, tables, formulas and reading order. A 1B specialist beats a 235B general model and the best closed models on this one job &mdash; which is the multimodal chapter's golden rule in a single table.</p>
+    <div class="oc-bars" id="oc-bench"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#129520; Twelve tasks, one model</h3></div>
+    <p class="panel-sub">The repo's client takes a <span class="mono">--task-type</span> and fills in the matching prompt, so you choose a task, not a prompt. <span class="mono">python inference/vLLM/infer_vllm_client.py --list-tasks</span> prints them all.</p>
+    <div class="oc-tasks" id="oc-tasks"></div>
+    <div class="oc-prompt">The default <span class="mono">doc_parse</span> prompt, verbatim from the model card, and what it says:
+      <div lang="zh">提取文档图片中正文的所有信息用markdown格式表示，其中页眉、页脚部分忽略，表格用html格式表达，文档中公式用latex格式表示，按照阅读顺序组织进行解析。</div>
+      <div>Extract all the information in the body of the document image as markdown. Ignore the header and footer. Express tables as HTML and formulas as LaTeX. Organise the result in reading order.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#128187; Run it</h3><span class="panel-tag">code</span></div>
+    <p class="panel-sub">Four ways in, from the PDF to markdown. The vLLM server speaks the OpenAI API, so the client is the same code whether the model runs on a GPU box or under llama.cpp on a laptop.</p>
+    <div class="chip-row" id="oc-code-tabs"></div>
+    <pre class="code" id="oc-code"></pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>&#127464;&#127475; The other fast Chinese OCR models</h3><span class="panel-tag">comparison</span></div>
+    <p class="panel-sub">If "the new Chinese OCR" you heard about was not HunyuanOCR, it was probably one of these. Pages per second are from the same table as the race above; blanks were not measured there.</p>
+    <div class="procon-wrap"><table class="procon">
+      <thead><tr><th>Model</th><th>Maker</th><th>Size and design</th><th>Pages/s</th><th class="pro">Why people pick it</th></tr></thead>
+      <tbody>
+        <tr><td>HunyuanOCR-1.5</td><td>Tencent, Jul 2026</td><td>1B, end-to-end, DFlash</td><td>0.706</td><td class="pro">Fastest and most accurate small model in the paper; 331 languages, charts, historical scripts.</td></tr>
+        <tr><td>GLM-OCR</td><td>Zhipu (Z.ai), Feb 2026</td><td>0.9B, two-stage</td><td>0.604</td><td class="pro">Topped OmniDocBench v1.5 (94.62); the fastest model without speculative decoding.</td></tr>
+        <tr><td>PaddleOCR-VL-1.6</td><td>Baidu</td><td>layout model + small VLM, two-stage</td><td>0.562</td><td class="pro">The PaddleOCR ecosystem: mature tooling, many languages, easy to deploy.</td></tr>
+        <tr><td>DeepSeek-OCR 2</td><td>DeepSeek, Jan 2026</td><td>3B, end-to-end</td><td>0.179</td><td class="pro">Reliable page-to-markdown on a modern GPU; the DeepSeek-OCR line is known for squeezing a page into few vision tokens.</td></tr>
+        <tr><td>dots.ocr</td><td>rednote hi lab</td><td>~3B, end-to-end</td><td>0.136</td><td class="pro">Layout and content in one pass, strong multilingual coverage.</td></tr>
+        <tr><td>MinerU 2.5</td><td>OpenDataLab, Shanghai AI Lab</td><td>1.2B, coarse-to-fine two-stage</td><td>&ndash;</td><td class="pro">A whole PDF-to-markdown toolkit around the model; a common default in Chinese RAG stacks.</td></tr>
+        <tr><td>TeleOCR</td><td>China Telecom, Aug&ndash;Sep 2026</td><td>~1.2B vision-language model</td><td>&ndash;</td><td class="pro">The newest (renamed from NaviDC-OCR on 10 Sep 2026); too new for independent numbers.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="checkbox-list">
+    <h4>What goes wrong in production</h4>
+    <ul>
+      <li><b>The default prompt drops headers and footers</b>, and with them the page number. Carry the page number from your own loop as metadata, or citations point nowhere.</li>
+      <li><b>Tables come back as HTML.</b> Chunk a table whole, or convert it to rows with their header; a splitter that cuts through a <span class="mono">&lt;table&gt;</span> loses the header row.</li>
+      <li><b>OCR models hallucinate.</b> On a blurry region they write fluent, plausible text that was never there; the paper built a benchmark (CHAOS-Bench) just to measure it. Check numbers against the text layer where one exists.</li>
+      <li><b>Dense pages can loop.</b> Keep the repo's <span class="mono">repetition_penalty=1.08</span>, cap <span class="mono">max_tokens</span>, and flag output that repeats itself.</li>
+      <li><b>Resolution is a cost dial.</b> Too low and footnotes blur; too high and every page costs more vision tokens. 200 dpi by default, 300 for small print.</li>
+      <li><b>Text read from an image is untrusted input.</b> A scanned page can carry a prompt injection as easily as a web page.</li>
+      <li><b>Benchmarks are the authors' own.</b> Time and score a few hundred of <em>your</em> pages before you commit.</li>
+    </ul>
+  </div>
+
+  <div class="goldrule">
+    <div class="kp-ico">&#128161;</div>
+    <div><h4>Golden rule</h4>
+      <p>Do not OCR what you can read. Route every page: text layer when it is clean, the model when it is a picture, a table, a formula or garbage. Then size the OCR fleet with the <b>concurrent</b> throughput, not the single-request speedup &mdash; 2.14&times; is a latency number; at 32 in flight it is 1.80&times;.</p></div>
+  </div>
+
+  <div class="keytakeaways">
+    <h4>Key takeaways</h4>
+    <ul class="fact-list">
+      <li><b>HunyuanOCR-1.5 is Tencent's 1B end-to-end OCR model:</b> page image in, markdown with HTML tables and LaTeX out, 94.74 on OmniDocBench v1.6.</li>
+      <li><b>Its speed is DFlash speculative decoding:</b> a 90.7M draft model proposes 16 tokens, the 1B model verifies them in one pass and keeps about 9. Output is unchanged.</li>
+      <li><b>6.37&times; in transformers, 2.14&times; in vLLM, 1.80&times; at 32 in flight.</b> Same technique; the difference is how much per-step overhead and idle compute there was to recover.</li>
+      <li><b>The fixed cost per page (about 0.53 s) never shrinks</b>, so long pages gain the most (2.30&times;) and short ones the least (1.31&times;).</li>
+      <li><b>Two-stage systems are the fast default without speculation;</b> end-to-end models win on breadth and, with DFlash, on speed too.</li>
+      <li><b>Route per page.</b> A clean text layer beats any OCR model on cost and on accuracy.</li>
+    </ul>
+  </div>
+  <div data-toolstrip="ocr"></div>
+</section>
+
+<!-- ============================================================= -->
 <!-- 21. FINE-TUNING MENU                                           -->
 <!-- ============================================================= -->
 <section class="chapter" data-id="tuning" data-title="Fine-tuning menu" data-icon="21" data-group="Deep dives">
@@ -2080,6 +2259,7 @@ print(base_model.get_memory_footprint() / 1e9, "GB")      # ~6.4 in bf16</pre>
 <script src="js/hybridrag.js"></script>
 <script src="js/llama.js"></script>
 <script src="js/qlora.js"></script>
+<script src="js/ocr.js"></script>
 <script src="js/toolstrip.js"></script>
 <script src="js/prod40.js"></script>
 </body>

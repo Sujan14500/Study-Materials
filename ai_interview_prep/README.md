@@ -1,8 +1,8 @@
 # AI Interview Prep
 
-584 GenAI and AI-engineer interview questions, each answered twice — once in plain
+590 GenAI and AI-engineer interview questions, each answered twice — once in plain
 English so it sticks, once at interview depth so it survives the follow-up — plus
-248 multiple-choice questions, flashcards with spaced repetition, and a timed mock
+254 multiple-choice questions, flashcards with spaced repetition, and a timed mock
 interview that makes you answer out loud.
 
 Built because the gap between *"I know this"* and *"I can say this in ninety
@@ -21,7 +21,7 @@ open index.html           # macOS
 
 | Mode | What it is for |
 |------|----------------|
-| **Study** | Browse and search all 584 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
+| **Study** | Browse and search all 590 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
 | **Flashcards** | Recall, not recognition. Say the answer out loud, flip, then rate yourself. Cards you rate badly come back sooner — the schedule is SM-2-lite and lives in `localStorage`. |
 | **Quiz** | Multiple choice with an explanation after every question, optionally timed. Every wrong option is a real misconception, and the explanation says why the tempting answer is wrong. |
 | **Mock interview** | A timed round for a chosen role and level. Questions arrive one at a time with a clock and a target answer length. Reveal, self-rate, and get a report with your weakest topic and how often you ran long. |
@@ -44,7 +44,7 @@ open index.html           # macOS
 | Safety & guardrails | 28 | injection, memory poisoning, PII, tenant isolation, over-refusal, OWASP LLM Top 10 |
 | Production & cost | 42 | caching layers, routing, observability, incidents, SLOs, cost arithmetic |
 | Production drills | 40 | the scenario round: 10× spikes, provider outages, 429 storms, shedding, canaries, idempotency |
-| Data engineering | 24 | streaming a 5 GB file, external group-by, ingestion, freshness, Parquet, PDFs |
+| Data engineering | 30 | streaming a 5 GB file, external group-by, ingestion, freshness, Parquet, PDFs, page routing and OCR (HunyuanOCR-1.5, speculative decoding, fleet sizing) |
 | System design | 22 | long-form whiteboard questions with a structure to follow |
 | Behavioural | 20 | the questions that decide the offer, asked of AI engineers specifically |
 

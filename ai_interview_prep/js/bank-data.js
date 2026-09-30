@@ -112,7 +112,7 @@ writer.close()`,
 { id: 'dt08', topic: 'data', level: 2,
   q: 'How do you extract text from PDFs reliably?',
   lay: 'Badly, is the honest answer — PDFs describe where ink goes, not what the words mean. Two-column layouts interleave, tables become word soup, and scanned pages have no text at all.',
-  tech: 'A tiered approach: <ol><li><b>Native text extraction</b> (pdfplumber, PyMuPDF) for digitally-generated PDFs — fast and free, but layout-naive.</li><li><b>Layout-aware parsing</b> that understands reading order, columns and tables (Unstructured, LlamaParse, Docling, or a document-AI service).</li><li><b>OCR</b> for scanned pages (Tesseract, or a cloud OCR service).</li><li><b>Vision-model extraction</b> for complex layouts — render the page and ask a multimodal model. Expensive, and often the only thing that works on a bad table.</li></ol>Route per document by detecting whether a text layer exists and whether the layout is multi-column.',
+  tech: 'A tiered approach: <ol><li><b>Native text extraction</b> (pdfplumber, PyMuPDF) for digitally-generated PDFs — fast and free, but layout-naive.</li><li><b>Layout-aware parsing</b> that understands reading order, columns and tables (Unstructured, LlamaParse, Docling, or a document-AI service).</li><li><b>OCR</b> for scanned pages: classic engines (Tesseract) for plain text, or — now the usual choice — a small OCR vision-language model (HunyuanOCR-1.5, GLM-OCR, PaddleOCR-VL) that writes markdown with HTML tables and LaTeX.</li><li><b>General vision-model extraction</b> for the rest — render the page and ask a multimodal model. Expensive, and often the only thing that works on a truly bad page.</li></ol>Route <b>per page</b>, not per document: detect whether a clean text layer exists, whether the layout is multi-column, and whether the page holds tables (see dt26).',
   trap: 'Always sample the extracted text and read it. Teams debug retrieval for weeks when the actual problem is that every table in the corpus became a row of unrelated numbers.',
   tags: ['pdf', 'ingestion'] },
 
@@ -237,6 +237,65 @@ async def embed_all(chunks, concurrency=8, batch=64):
   lay: 'Treat the index as a copy that can always be rebuilt, push changes one way, and run a job that periodically checks the two agree.',
   tech: '<ol><li><b>One direction</b> — source → pipeline → index. Never write to the index by hand.</li><li><b>Event-driven</b> updates with idempotent upserts keyed deterministically.</li><li><b>Delete propagation</b>, tested.</li><li><b>Reconciliation</b> — a periodic job that diffs source ids against index ids and reports drift. Something always drifts.</li><li><b>Rebuildability</b> — you must be able to reconstruct the index from source in a bounded time, and you should have done it at least once.</li><li><b>Freshness SLO</b> — lag from source change to retrievable, measured and alarmed.</li></ol>',
   trap: 'Reconciliation is the item that separates people who have operated one of these from people who have built one. Indexes drift through failed jobs, partial writes and schema changes, and without a diff you find out from a customer.',
-  tags: ['ingestion', 'ops'], orig: 34 }
+  tags: ['ingestion', 'ops'], orig: 34 },
+
+{ id: 'dt25', topic: 'data', level: 2,
+  q: 'What is HunyuanOCR-1.5, and why is it fast?',
+  lay: 'A small model from Tencent that looks at a picture of a page and types it out properly: headings, tables and formulas included. It is fast because a much smaller helper guesses the next sixteen words at once, and the main model only has to check the guess instead of writing every word itself.',
+  tech: 'Tencent Hunyuan\'s <b>1B-parameter end-to-end OCR model</b> (v1.5 released July 2026; arXiv 2607.04884): a native-resolution ViT (~0.4B), an MLP connector that pools image features, and a 0.5B Hunyuan language model. Page image in; markdown out, with <b>tables as HTML</b> and <b>formulas as LaTeX</b>, plus eleven other task types (spotting, layout, charts, translation). It scores <b>94.74 on OmniDocBench v1.6</b>, ahead of Gemini 3 Pro in the authors\' comparison. The speed comes from <b>DFlash speculative decoding</b>: a 90.7M-parameter block-diffusion draft model (five layers initialised from the target\'s last five) proposes 16 tokens in one parallel pass, and the 1B model verifies them in one pass, keeping ~8.4–9.5 tokens per pass. Output is unchanged. Result: <b>1.408 s and 0.706 pages/s</b> for one request on vLLM (2.14× over plain decoding), 1.98 pages/s with 32 in flight. Runs on vLLM, transformers or llama.cpp; licence is the Tencent Hunyuan Community License, not Apache.',
+  trap: 'The speed is not because the model is small — an ordinary 1B OCR model writing 1,400 tokens a page one at a time is slow. Say "speculative decoding", then say why it is only 2.14× (dt27), and you have answered the question they were actually asking.',
+  tags: ['ocr', 'pdf', 'speculative-decoding'],
+  xref: [['Reading PDFs fast: HunyuanOCR-1.5', '../genai_flow/index.html']] },
+
+{ id: 'dt26', topic: 'data', level: 2,
+  q: 'How do you decide, page by page, whether a PDF needs OCR?',
+  lay: 'Look at what the page already stores. If it holds real, clean text, just read it: it is instant and cannot misread a number. Only pages that are pictures, carry garbled text from an old scan, or hold tables that would turn into a jumble go to the OCR model.',
+  tech: 'A per-page router, because one contract mixes typed pages with a scanned signature page:<ol><li><b>Text-layer size</b> — under ~50 characters means the page is a picture: OCR.</li><li><b>Junk ratio</b> — the share of words with replacement characters, stray symbols or letter-digit mixes ("br0wn"). High means an old OCR layer or flattened formulas: re-OCR.</li><li><b>Image coverage</b> — a page that is ~100% image under a thin text layer was OCR\'d before; do not trust that layer.</li><li><b>Tables</b> — a ruled born-digital table can go to a table extractor (PyMuPDF <span class="mono">find_tables</span>, Camelot); a borderless or scanned one to an OCR model that emits HTML tables.</li><li>Everything else: <b>read the text layer</b>, fixing reading order for columns.</li></ol>Log the route and the reason per page, so a bad answer can be traced to the extraction path.',
+  code: `def route(s):                       # s = page stats
+    if s["chars"] < 50:   return "ocr"      # a picture
+    if s["junk"] > 0.15:  return "ocr"      # a bad old OCR layer
+    if s["img"] > 0.9:    return "ocr"      # image under a thin layer
+    if s["tables"]:       return "ocr"      # or a table extractor
+    return "native"                          # milliseconds, exact`,
+  trap: 'Sending everything through OCR "for consistency" is slower, costs GPUs, and is <em>less</em> accurate on born-digital pages: the text layer is exact, the model can misread. Routing is the single biggest cost lever in document ingestion.',
+  tags: ['ocr', 'pdf', 'ingestion'] },
+
+{ id: 'dt27', topic: 'data', level: 3,
+  q: 'Why does speculative decoding give OCR 6.37× in one setup and 2.14× in another?',
+  lay: 'The trick only speeds up the writing, not the looking. Every page first costs about half a second to read the image, whatever you do. In a slow, simple setup the writing is almost all of the time, so the gain looks huge; in a tuned server the writing was already quick, so the same trick saves less.',
+  tech: 'Fit the paper\'s five vLLM length buckets to <b>latency = fixed + tokens × per-token</b>: plain decoding is <b>0.53 s + 1.79 ms/token</b>, DFlash is <b>0.53 s + 0.69 ms/token</b>. The fixed part (image encode, prefill, overhead) is untouched, so this is Amdahl\'s law: the ceiling is 1.79 / 0.69 ≈ <b>2.6×</b>, a 200-token page gets 1.31×, a 3,400-token table 2.30×. Per pass DFlash keeps ~9 tokens but a pass costs ~3.5 plain steps (draft + verify a 16-token block). In <b>plain transformers</b> each ordinary step is slow (34.9 s a page, ~41 tokens/s) because of per-step overhead that vLLM\'s engine already removes; DFlash pays that overhead once per ~9 tokens, so it wins <b>6.37×</b> there. Under load it shrinks again — 2.26× at 4 concurrent, <b>1.80× at 32</b> — because batching already fills the GPU and drafting competes for compute.',
+  compare: { cols: ['Plain transformers', 'vLLM, 1 request', 'vLLM, 32 in flight'],
+    rows: [
+      ['Plain decoding', '34.9 s / page', '3.03 s / page', '1.10 pages/s'],
+      ['With DFlash', '5.47 s / page', '1.41 s / page', '1.98 pages/s'],
+      ['Speedup', '6.37×', '2.14×', '1.80×'],
+      ['Why', 'huge per-step overhead to amortise', 'fixed 0.53 s is untouched', 'no idle compute left for drafting']] },
+  trap: 'Quoting 6.37× for a production estimate. Always ask "against which baseline, at what concurrency?" — the honest number for a busy vLLM fleet is under 2×.',
+  tags: ['ocr', 'speculative-decoding', 'latency'],
+  xref: [['The latency calculator in the chapter', '../genai_flow/index.html']] },
+
+{ id: 'dt28', topic: 'data', level: 2,
+  q: 'How do you size an OCR fleet for a million pages?',
+  lay: 'Work out how many pages really need the model, divide by how many pages one machine does per second when it is busy, and turn that into machine-hours. Then decide how fast you need it done and divide again.',
+  tech: '<ol><li><b>Route first</b> (dt26): only the OCR share counts. If half the pages have clean text layers, the job halves.</li><li><b>Use concurrent throughput</b>, not single-request latency: HunyuanOCR-1.5 does 1.98 pages/s per accelerator at 32 in flight with DFlash (1.10 without).</li><li><b>GPU-hours</b> = pages × OCR share ÷ pages/s ÷ 3600. A million pages, all OCR: 1e6 / 1.98 / 3600 ≈ <b>140 GPU-h</b>; with half routed away, ≈ 70.</li><li><b>Deadline</b>: 70 GPU-h in 24 h → 3 GPUs; add headroom for retries and long pages.</li><li><b>Pipeline around it</b>: render pages on CPU workers in parallel, content-hash pages to skip re-OCR, make the job resumable, and cap max_tokens so one looping page cannot stall a worker.</li></ol>',
+  code: `gpu_h = pages * ocr_share / pages_per_s / 3600
+gpus  = ceil(gpu_h / deadline_hours)
+# 1e6 * 0.5 / 1.98 / 3600 = 70 GPU-h  ->  3 GPUs for a 24 h deadline`,
+  trap: 'Multiplying the single-request speedup into a throughput plan. 2.14× is a latency number at concurrency 1; the fleet runs at concurrency 32, where it is 1.80×, and the absolute pages/s is what you plan with.',
+  tags: ['ocr', 'capacity', 'ingestion'] },
+
+{ id: 'dt29', topic: 'data', level: 2,
+  q: 'How do you know the OCR output is wrong?',
+  lay: 'The model never says "I could not read this" — it writes something believable. So you compare it with a small set of pages you checked by hand, and you check the numbers separately, because one wrong digit in a price hardly changes the overall score but is the only mistake anyone cares about.',
+  tech: '<ul><li><b>Labelled sample</b> of a few hundred of <em>your</em> pages, stratified by type (scans, tables, forms, languages). Benchmarks like OmniDocBench are a starting point, not your data.</li><li><b>Character error rate</b> = edit distance / reference length, for overall text quality. Tables: cell-level accuracy or TEDS. Formulas: render-and-compare.</li><li><b>Numbers diff</b>: extract amounts, dates and IDs and compare one by one. A 0.3% CER can hide a wrong contract fee.</li><li><b>Cross-check the text layer</b> where one exists: disagreement between OCR and the layer flags a page.</li><li><b>Hallucination and loop detectors</b>: output far longer than the page\'s ink suggests, repeated n-grams, or text in regions that were blank. HunyuanOCR\'s authors built CHAOS-Bench specifically to measure invented characters.</li><li><b>Downstream</b>: track which answers cite OCR\'d chunks and sample those for review.</li></ul>',
+  trap: 'Reporting CER alone. In the chapter\'s notebook one misread digit gives 0.32% CER and a wrong monthly fee — the metric looks excellent and the answer is wrong.',
+  tags: ['ocr', 'eval', 'hallucination'] },
+
+{ id: 'dt30', topic: 'data', level: 2,
+  q: 'What breaks when OCR output flows into a RAG index?',
+  lay: 'The page number disappears, tables get cut in half so rows lose their column names, and anything written on a scanned page — including instructions meant to trick the assistant — goes straight into the knowledge base.',
+  tech: '<ul><li><b>Headers and footers are dropped</b> by the default document-parsing prompt, and the page number with them. Carry page, source and route as metadata from your own loop, or citations point nowhere.</li><li><b>HTML tables</b>: a character splitter cuts through a <span class="mono">&lt;table&gt;</span> and rows lose their header. Parse tables and emit each row as a self-describing sentence ("Item: Express delivery; Qty: 1; Price: 25.00"), or keep small tables whole.</li><li><b>LaTeX</b> embeds poorly and matches nothing in BM25; keep it for display, add a plain-language gloss for retrieval.</li><li><b>Reading order</b> errors on complex layouts produce chunks that mix two topics.</li><li><b>Prompt injection</b>: text read from an image is untrusted input, exactly like a web page.</li><li><b>Versioning</b>: record the OCR model and prompt in the chunk metadata so a re-OCR can be diffed and rolled back.</li></ul>',
+  trap: 'Treating OCR output as "the document". It is a model\'s reading of the document, with a model version, a prompt and an error rate — store it like one.',
+  tags: ['ocr', 'rag', 'chunking'] }
 
 ]);

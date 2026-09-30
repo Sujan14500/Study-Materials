@@ -48,6 +48,7 @@ grandalf>=0.8              # ASCII drawings of graphs
 # --- retrieval ---------------------------------------------------------------
 rank-bm25>=0.2.2
 faiss-cpu>=1.9
+pymupdf>=1.26,<2          # PDF text layers, tables and page rendering (09_rag/08); AGPL licence
 
 # --- serving, validation, agents --------------------------------------------
 fastapi>=0.115

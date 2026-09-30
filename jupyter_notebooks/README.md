@@ -8,7 +8,7 @@ engineering — plus the hands-on coding rounds interviewers actually give ("bui
 
 It is the practical companion to [`../ai_interview_prep`](../ai_interview_prep/index.html): every notebook
 opens with a table of the theory questions it makes concrete, and [`INTERVIEW_MAP.md`](INTERVIEW_MAP.md)
-goes the other way — from any of the 584 theory questions to the notebook where you can run the answer.
+goes the other way — from any of the 590 theory questions to the notebook where you can run the answer.
 
 Everything is small on purpose: toy datasets, tiny models, CPU only, each notebook runs top to bottom in
 about a minute, and nothing costs money unless you choose to use a real API key.
@@ -70,7 +70,7 @@ and nothing else. `.env` is gitignored — never commit a key.
 | [`06_deep_learning`](06_deep_learning) | Backprop from scratch, training loops & LR schedules, regularisation & normalisation, CNNs, embeddings → RNNs → attention |
 | [`07_genai_foundations`](07_genai_foundations) | Tokenization (BPE), embeddings, attention, a tiny GPT trained from scratch, decoding, KV cache, quantization |
 | [`08_llm_apps`](08_llm_apps) | The OpenAI API, prompting, structured outputs, function calling, local LLMs with Ollama, conversation memory |
-| [`09_rag`](09_rag) | Chunking (incl. semantic), BM25, vector search (FAISS, HNSW), hybrid + RRF, reranking, a full pipeline, advanced RAG |
+| [`09_rag`](09_rag) | Chunking (incl. semantic), BM25, vector search (FAISS, HNSW), hybrid + RRF, reranking, a full pipeline, advanced RAG, and reading PDFs: text layers, two-column order, tables, a per-page OCR router, HunyuanOCR-1.5 and the maths of its speculative decoding |
 | [`10_huggingface`](10_huggingface) | Hub & pipelines, tokenizers & `generate`, `datasets`, sentence-transformers, the Trainer, bitsandbytes quantization |
 | [`11_finetuning`](11_finetuning) | When to fine-tune, SFT with loss masking, LoRA from scratch, LoRA with PEFT, QLoRA, DPO, distillation, the OpenAI fine-tuning API |
 | [`12_evaluation`](12_evaluation) | EM/F1/BLEU/ROUGE, LLM-as-judge and its biases, RAG evaluation, agent evaluation, statistics for evals |
