@@ -50,6 +50,10 @@ rank-bm25>=0.2.2
 faiss-cpu>=1.9
 pymupdf>=1.26,<2          # PDF text layers, tables and page rendering (09_rag/08); AGPL licence
 
+# --- progress bars and demo UIs (01_python_basics/17) -------------------------
+tqdm>=4.70,<5
+gradio>=6.20,<7           # brings gradio_client; Gradio 6 APIs (theme in launch(), api_visibility)
+
 # --- serving, validation, agents --------------------------------------------
 fastapi>=0.115
 httpx>=0.27,<1

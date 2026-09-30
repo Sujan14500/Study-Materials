@@ -40,8 +40,8 @@ open index.html           # macOS
 
 ### Package deep dives
 
-Chapter 10 introduces the data stack in five cards. These five pages are one per package, and they
-sit in their own sidebar group after chapter 11. They are unnumbered on purpose — reference pages
+Chapter 10 introduces the data stack in five cards. These pages are one per package — the five
+from that chapter, plus tqdm and Gradio — and they sit in their own sidebar group after chapter 11. They are unnumbered on purpose — reference pages
 you come back to, not steps in the path.
 
 | Page | The interactive bit |
@@ -51,6 +51,8 @@ you come back to, not steps in the path.
 | Matplotlib | **Clickable anatomy** of a figure — Figure, Axes, Axis, ticks, spines, artists, legend — and a **chart builder** whose generated code updates as you change kind, colour, grid, spines, figsize and dpi |
 | seaborn | Figure-level vs axes-level side by side; a which-plot-for-which-question quiz; a **facet builder** that shows the code jumping from `scatterplot` to `relplot` the moment you add `col=`; palette picker with the categorical/sequential/diverging rule |
 | SciPy | A **t-test lab** where dragging *n* makes the same difference "significant" — real Student's t p-values; **curve_fit** with a one-click outlier that drags the least-squares line; a distribution explorer (normal/binomial/poisson) with real pdf/cdf/pmf; a sparse-vs-dense memory model |
+| tqdm | **One line, every part** — a re-implementation of `tqdm.format_meter` that reproduces the real library's output character for character, with every part hoverable; an **ETA lab** where a job slows down or speeds up and you watch the overall average, the default `smoothing=0.3` and `smoothing=1` try to keep up; the API in eight moves; six traps |
+| Gradio | Eight things you will write (Interface, Blocks, ChatInterface, progress + tqdm, state, the Python client, mounting in FastAPI, concurrency), all run against Gradio 6.29; an **app builder** that writes the code, sketches the page and gives the client call; the click lifecycle; a **queue simulator** including the shared-function trap; Gradio vs Streamlit vs Chainlit vs FastAPI |
 
 Progress, XP and answers persist in `localStorage`.
 
@@ -62,6 +64,7 @@ css/styles.css    one theme, no framework
 js/content.js     every piece of course content — edit here to change the course
 js/demos.js       the interactive widgets
 js/packages.js    the five package deep-dive pages: their content AND their widgets
+js/tqdm-gradio.js the tqdm and Gradio deep dives, self-contained the same way
 js/app.js         navigation, progress, XP
 test.js           node test.js — fails if the course data goes inconsistent
 ```

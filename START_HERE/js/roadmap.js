@@ -4,7 +4,7 @@
    ============================================================ */
 window.COURSES = {
   python:     { n: 'Python Basics',            i: '🐍', href: '../python_basics/index.html',            ch: 13, hrs: '6-8 h',
-    d: 'Values, names, strings, collections, control flow, functions, errors, comprehensions, files and the gotchas that bite everyone.',
+    d: 'Values, names, strings, collections, control flow, functions, errors, comprehensions, files and the gotchas that bite everyone — plus package deep dives on NumPy, pandas, Matplotlib, seaborn, SciPy, tqdm and Gradio.',
     why: 'Most AI engineering is ordinary Python done carefully. Generators in particular are the answer to half the data questions in an interview.' },
   dsa:        { n: 'DSA Basics',               i: '🧮', href: '../dsa_basics/index.html',                ch: 15, hrs: '10-14 h',
     d: 'Big-O, arrays, strings, linked lists, stacks and queues, hash tables, trees, heaps, graphs, sorting, recursion, dynamic programming.',
@@ -33,8 +33,8 @@ window.COURSES = {
   projects:   { n: 'Projects Walkthrough',     i: '🔬', href: '../projects_walkthrough/index.html',      ch: 18, hrs: '6-8 h',
     d: 'Two real systems taken apart: a refund agent with a policy boundary, idempotency, sagas and approvals; and a support platform with tenant isolation, generated SQL, a confidence gate, memory and an eval gate.',
     why: 'Interviewers ask "tell me about something you shipped". This is what a good answer sounds like, and what to build so you have one.' },
-  interview:  { n: 'AI Interview Prep',        i: '🎯', href: '../ai_interview_prep/index.html',         ch: 590, hrs: 'ongoing', unit: 'questions',
-    d: '590 questions with a plain-English and a technical answer each, 254 multiple-choice questions, flashcards with spaced repetition, a timed mock interview and seven study paths.',
+  interview:  { n: 'AI Interview Prep',        i: '🎯', href: '../ai_interview_prep/index.html',         ch: 596, hrs: 'ongoing', unit: 'questions',
+    d: '596 questions with a plain-English and a technical answer each, 260 multiple-choice questions, flashcards with spaced repetition, a timed mock interview and seven study paths.',
     why: 'Where you find out whether you can say it out loud in ninety seconds, which is the thing that actually gets tested.' },
   tooling:    { n: 'AI Tooling Landscape',     i: '🧰', href: '../ai_tooling/index.html',                ch: 19, hrs: '5-7 h',
     d: 'Twelve layers of the AI stack and 97 named tools — LLMs, agent frameworks, RAG, embeddings, MCP, guardrails, observability, memory, agent SDKs, automation, vector databases and the FastAPI/Streamlit serving layer — with two lines and five interview points on every one.',

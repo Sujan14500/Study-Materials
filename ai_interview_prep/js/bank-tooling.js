@@ -316,6 +316,69 @@ async def agent(req: RunRequest, bg: BackgroundTasks):
       ['Best fit', 'startups, speed', 'regulated data, scale']
     ] },
   trap: 'Helicone is worth naming as the third shape — a gateway rather than an SDK, so integration is a base-URL change and you also get caching and per-user spend limits. The trade is that it sits in the critical path and must fail open.',
-  tags: ['tooling', 'production', 'eval'] }
+  tags: ['tooling', 'production', 'eval'] },
+
+{ id: 'tl33', topic: 'tooling', level: 1,
+  q: 'How does tqdm work, and where does its ETA come from?',
+  lay: 'It wraps your loop, counts the items as they go by, and every tenth of a second or so it redraws one line: how many are done, how fast, and how long is left. "How long is left" is just the items remaining divided by the recent speed, so if the job suddenly slows down the estimate is wrong until it notices.',
+  tech: '<span class="mono">tqdm(iterable)</span> returns an iterator that increments <span class="mono">n</span> per item and redraws at most every <span class="mono">mininterval</span> (0.1 s) — which is why it costs almost nothing per iteration. Remaining time is <span class="mono">(total − n) / rate</span>. The rate is <span class="mono">EMA(dn) / EMA(dt)</span> over redraws, with <span class="mono">smoothing=0.3</span> as the weight of the newest redraw and bias correction for the first few; <span class="mono">smoothing=0</span> means the overall average <span class="mono">n / elapsed</span>. So the ETA lags any change of speed: after a job slows at 60%, the overall average stays badly optimistic for most of the rest of the run, while 0.3 settles within a few seconds and 1.0 reacts instantly but jitters. Without <span class="mono">total</span> (a generator) there is no percentage, bar or ETA.',
+  code: `for batch in tqdm(loader, desc="train"):          # len(loader) gives total
+    ...
+with tqdm(total=size, unit="B", unit_scale=True, unit_divisor=1024) as bar:
+    for chunk in stream:
+        bar.update(len(chunk))                         # not one item per loop`,
+  trap: 'A "2 minutes left" that becomes 40 is not a bug; it is a moving average meeting a job that changed phase. Say that, then say how you would make the estimate honest: per-phase bars, or a total measured in the unit that actually costs time (bytes, tokens), not in items.',
+  tags: ['tooling', 'python', 'tqdm'],
+  xref: [['The tqdm deep dive', '../python_basics/index.html']] },
+
+{ id: 'tl34', topic: 'tooling', level: 2,
+  q: 'How do you use progress bars without breaking logs, notebooks or multiprocessing?',
+  lay: 'A progress bar redraws the same line over and over. That looks great in a terminal and terrible everywhere else: in a log file every redraw becomes a new line, several processes fight over the same line, and a normal print knocks the bar out of place. Each case has a one-line fix.',
+  tech: '<ul><li><b>Notebooks:</b> <span class="mono">from tqdm.auto import tqdm</span> picks the widget in Jupyter and text in a terminal.</li><li><b>CI and log files:</b> <span class="mono">disable=None</span> turns it off when stdout is not a TTY; or without code changes, <span class="mono">TQDM_DISABLE=1</span> / <span class="mono">TQDM_MININTERVAL=30</span> (every tqdm argument can be overridden by a <span class="mono">TQDM_*</span> environment variable).</li><li><b>Printing:</b> <span class="mono">tqdm.write()</span>, or <span class="mono">logging_redirect_tqdm()</span> from <span class="mono">tqdm.contrib.logging</span> for loggers.</li><li><b>Pools:</b> one bar in the parent with <span class="mono">thread_map</span> / <span class="mono">process_map</span> (pass <span class="mono">chunksize</span> for many small tasks), or explicit <span class="mono">position=</span> per bar.</li><li><b>Nested loops:</b> <span class="mono">leave=False</span> on the inner bar.</li><li><b>pandas:</b> <span class="mono">tqdm.pandas()</span> then <span class="mono">progress_apply</span>.</li></ul>',
+  trap: 'Hugging Face libraries print tqdm bars for every download and dataset map. In a service, silence them (HF_HUB_DISABLE_PROGRESS_BARS=1, TQDM_DISABLE=1) or a single deploy writes thousands of log lines.',
+  tags: ['tooling', 'python', 'tqdm', 'logging'] },
+
+{ id: 'tl35', topic: 'tooling', level: 1,
+  q: 'What is Gradio, and how does it turn a function into an app?',
+  lay: 'You write an ordinary Python function. Gradio looks at what it takes and what it gives back, builds a web page with a box for each input and each output, and puts a queue and an API in front of it. You get a demo you can share and an endpoint other code can call, from the same few lines.',
+  tech: 'The model is a mapping: <b>one component per argument, one per return value, one endpoint per event</b>. <span class="mono">gr.Interface(fn, inputs, outputs)</span> builds the whole page for one function; <span class="mono">gr.Blocks</span> lets you lay out rows, columns and tabs and wire events yourself (<span class="mono">btn.click(fn, inputs, outputs, api_name="x")</span>); <span class="mono">gr.ChatInterface(fn)</span> gives a chat UI where <span class="mono">fn(message, history)</span> receives the history as <span class="mono">{"role", "content"}</span> dicts. A call goes: join the queue → wait for a slot in the event\'s concurrency group → components <b>preprocess</b> the browser payload into Python values (validating ranges) → your function runs (sync in a worker thread, async on the loop; a generator streams each <span class="mono">yield</span>) → components <b>postprocess</b> the result back. Every event is also an API: <span class="mono">gradio_client.Client(url).predict(..., api_name="/x")</span>, or POST <span class="mono">/gradio_api/call/x</span>.',
+  code: `import gradio as gr
+
+def summarise(text, max_words):
+    return " ".join(text.split()[:max_words])
+
+gr.Interface(summarise,
+             [gr.Textbox(lines=6), gr.Slider(5, 100, value=30, step=5)],
+             gr.Textbox(), api_name="summarise").launch()`,
+  trap: 'Gradio 6 changed enough that older tutorials fail: theme and css moved to launch(), Chatbot no longer takes type= (the role/content format is the only one), and api_visibility replaced show_api / api_name=False.',
+  tags: ['tooling', 'gradio', 'serving'],
+  xref: [['The Gradio deep dive', '../python_basics/index.html']] },
+
+{ id: 'tl36', topic: 'tooling', level: 2,
+  q: 'Why does a Gradio app get slow with a few users, and how do you fix it?',
+  lay: 'Out of the box, each button in a Gradio app serves one person at a time and everyone else queues. That is deliberate — it stops two people crashing a GPU — but for a function that mostly waits on another service it makes the app feel broken as soon as a handful of people use it.',
+  tech: 'Every event has a <span class="mono">concurrency_limit</span>, and the default (<span class="mono">queue(default_concurrency_limit=...)</span>, or <span class="mono">GRADIO_DEFAULT_CONCURRENCY_LIMIT</span>) is <b>1</b>. Eight users × 0.5 s calls take 4 s for the last one at the default and 1 s at <span class="mono">concurrency_limit=4</span> (measured on Gradio 6.29 with HTTP overhead: 5.4 s vs 2.1 s). Fixes: raise it per event for I/O-bound work; keep it at what memory allows for a GPU model; make the function <span class="mono">async</span> if it waits on HTTP; cap the waiting room with <span class="mono">queue(max_size=...)</span>; stream partial results so waiting feels shorter. <b>The trap:</b> concurrency is grouped by <span class="mono">concurrency_id</span>, which defaults to the <em>function\'s id</em> — two endpoints wrapping the same function share one group and run at the lower limit. Measured on Gradio 6.29: limit 4 on one endpoint still ran one-at-a-time because another endpoint reused the function with the default. Wrap it in a second function or set <span class="mono">concurrency_id</span>. Also: <span class="mono">concurrency_limit=None</span> is still capped by <span class="mono">launch(max_threads=40)</span> for sync functions.',
+  trap: 'Saying "Gradio does not scale" is the weak answer. The strong one names the default limit of 1, the shared-function grouping, and the decision per event between throughput and GPU memory.',
+  tags: ['tooling', 'gradio', 'concurrency'] },
+
+{ id: 'tl37', topic: 'tooling', level: 2,
+  q: 'How do you show progress and stream output in a Gradio app?',
+  lay: 'For text that appears bit by bit, write your function so it hands back partial results as it goes, and the page updates each time. For a long job, give the function a progress tracker — and if the job already has tqdm progress bars inside it, Gradio can show those bars to the user directly.',
+  tech: '<b>Streaming:</b> make the function a generator — each <span class="mono">yield</span> is sent to the browser (and to <span class="mono">client.submit(...)</span> as intermediate outputs); ChatInterface streams into the bubble the same way. <b>Progress:</b> add a default argument <span class="mono">progress=gr.Progress()</span> and call <span class="mono">progress(0.4, desc="…")</span>, or iterate <span class="mono">progress.tqdm(items)</span>. With <span class="mono">gr.Progress(track_tqdm=True)</span>, every tqdm bar created during the call — yours or a library\'s, such as a Hugging Face download or a dataset map — is mirrored to the browser. <b>Per-user state:</b> <span class="mono">gr.State</span> as an input and an output; module-level globals are shared by every visitor.',
+  code: `from tqdm import tqdm
+
+def index(files, progress=gr.Progress(track_tqdm=True)):
+    for f in tqdm(files, desc="embedding"):     # shown in the browser
+        embed(f)
+    return f"{len(files)} files indexed"`,
+  trap: 'Storing chat history or uploaded files in a global list is the classic demo bug: the second visitor sees the first visitor\'s data. gr.State or the Chatbot history, always.',
+  tags: ['tooling', 'gradio', 'tqdm', 'streaming'] },
+
+{ id: 'tl38', topic: 'tooling', level: 2,
+  q: 'When is Gradio the right tool, and when should you not ship it?',
+  lay: 'Gradio is the quickest way to let a person try a model: a demo, an internal tool, a playground for the team. It is not a product front end. When you need accounts, billing, your own design or thousands of users, build a proper API and front end — and keep the Gradio app beside it as the playground.',
+  tech: '<b>Right:</b> model demos and Hugging Face Spaces, internal tools, labelling and review UIs, chat playgrounds, anything where "can I try it by Friday" is the requirement — and where an automatic API (<span class="mono">gradio_client</span>) is a bonus. <b>Wrong:</b> multi-tenant products, custom UX, heavy traffic. <b>Middle path:</b> <span class="mono">gr.mount_gradio_app(fastapi_app, demo, path="/ui")</span> puts it inside your FastAPI service. <b>Security:</b> <span class="mono">share=True</span> creates a public tunnel that lasts up to a week; add <span class="mono">auth=</span>, keep <span class="mono">allowed_paths</span> tight, never run it on a machine with secrets you would not hand to the link holder. Compared with Streamlit: Gradio wraps functions and events; Streamlit reruns a script per interaction, which suits dashboards and struggles with long model calls.',
+  trap: 'Presenting a Gradio or Streamlit demo as "the production service" is the tell interviewers look for. Name the split: FastAPI for software, Gradio for humans who want to try it.',
+  tags: ['tooling', 'gradio', 'serving'] }
 
 ]);

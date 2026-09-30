@@ -102,3 +102,59 @@ C.toolstrips.gotchas = {
       use: 'Any structure passed between functions or across a boundary.' }
   ]
 };
+
+/* ---------- deep dive: tqdm ---------- */
+C.toolstrips.progress = {
+  title: 'Tools & frameworks — progress bars',
+  sub: 'Pick by where the output goes: a terminal, a notebook, a rich console, or a browser.',
+  tools: [
+    { n: 'tqdm', by: 'tqdm developers', mark: 'tq', c: '#38bdf8',
+      what: 'Wrap any iterable for a bar with count, rate and ETA. Terminal, Jupyter and pandas support built in.',
+      pro: ['One function call, near-zero overhead', 'Works everywhere: scripts, notebooks, pandas, thread and process pools', 'Hugging Face and most ML libraries already use it'],
+      con: ['Plain look compared with rich', 'Carriage-return output clutters CI logs unless disabled'],
+      use: 'The default for any loop that takes more than a few seconds.' },
+    { n: 'rich.progress', by: 'Textualize', mark: 'ri', c: '#a78bfa',
+      what: 'Styled, multi-task progress displays inside the rich console library.',
+      pro: ['Several live tasks with colours, spinners and custom columns', 'Plays well with rich logging and tables'],
+      con: ['A heavier dependency than tqdm', 'More code for the simple case'],
+      use: 'Polished command-line tools that already use rich for output.' },
+    { n: 'alive-progress', by: 'rsalmei', mark: 'al', c: '#f472b6',
+      what: 'Animated bars with a live throughput spinner and a final receipt.',
+      pro: ['Very readable animations', 'Shows when a job has stalled'],
+      con: ['Terminal-first; weaker in notebooks', 'Smaller ecosystem than tqdm'],
+      use: 'Interactive terminal scripts where the look matters.' },
+    { n: 'gr.Progress', by: 'Hugging Face (Gradio)', mark: 'gr', c: '#f97316',
+      what: 'A progress bar in the browser for a running Gradio function. track_tqdm=True mirrors tqdm bars.',
+      pro: ['Reuses the tqdm loops you already have', 'The user sees progress instead of a spinner'],
+      con: ['Only inside a Gradio event', 'Adds a little overhead per update'],
+      use: 'Any Gradio function that takes more than a couple of seconds.' }
+  ]
+};
+
+/* ---------- deep dive: Gradio ---------- */
+C.toolstrips.webui = {
+  title: 'Tools & frameworks — putting a model in front of people',
+  sub: 'The split to keep clear: an API is for other software, a UI is for humans, and demo UIs are not products.',
+  tools: [
+    { n: 'Gradio', by: 'Hugging Face', mark: 'gr', c: '#f97316',
+      what: 'A web UI and HTTP API around Python functions, with a queue, streaming and a Python client.',
+      pro: ['Minutes from function to shareable demo', 'Every event is also an API endpoint', 'Free hosting on Hugging Face Spaces'],
+      con: ['Default concurrency limit of 1 surprises people', 'Look and flow are Gradio\'s, not yours', 'Breaking changes between major versions'],
+      use: 'Model demos, internal tools, chat playgrounds.' },
+    { n: 'Streamlit', by: 'Snowflake', mark: 'st', c: '#ff4b4b',
+      what: 'Turns a Python script into a data app by rerunning it on every interaction.',
+      pro: ['The fastest way to a dashboard', 'Great charts, tables and widgets'],
+      con: ['Reruns the whole script per click unless you cache', 'Awkward for long jobs and many users'],
+      use: 'Data exploration apps and internal dashboards.' },
+    { n: 'Chainlit', by: 'Chainlit', mark: 'cl', c: '#22d3ee',
+      what: 'A chat UI for LLM apps that shows intermediate steps, tool calls and sources.',
+      pro: ['Agent steps rendered for you', 'Integrations with LangChain and LlamaIndex'],
+      con: ['Chat-only', 'Smaller community than Gradio or Streamlit'],
+      use: 'Showing how an agent reached its answer.' },
+    { n: 'FastAPI', by: 'Sebastián Ramírez', mark: 'fa', c: '#34d399',
+      what: 'A typed HTTP API framework. Mount a Gradio app inside it with gr.mount_gradio_app.',
+      pro: ['The production answer for model serving', 'Validation and OpenAPI docs from type hints'],
+      con: ['No UI at all', 'You build the front end yourself'],
+      use: 'The service other software calls; keep Gradio beside it for humans.' }
+  ]
+};

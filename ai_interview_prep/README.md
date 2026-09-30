@@ -1,8 +1,8 @@
 # AI Interview Prep
 
-590 GenAI and AI-engineer interview questions, each answered twice — once in plain
+596 GenAI and AI-engineer interview questions, each answered twice — once in plain
 English so it sticks, once at interview depth so it survives the follow-up — plus
-254 multiple-choice questions, flashcards with spaced repetition, and a timed mock
+260 multiple-choice questions, flashcards with spaced repetition, and a timed mock
 interview that makes you answer out loud.
 
 Built because the gap between *"I know this"* and *"I can say this in ninety
@@ -21,7 +21,7 @@ open index.html           # macOS
 
 | Mode | What it is for |
 |------|----------------|
-| **Study** | Browse and search all 590 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
+| **Study** | Browse and search all 596 questions. Filter by topic, level and status. Every card opens to a plain-English answer, a technical answer, a comparison table or diagram where one helps, and *the follow-up they will ask*. Mark questions known or starred. |
 | **Flashcards** | Recall, not recognition. Say the answer out loud, flip, then rate yourself. Cards you rate badly come back sooner — the schedule is SM-2-lite and lives in `localStorage`. |
 | **Quiz** | Multiple choice with an explanation after every question, optionally timed. Every wrong option is a real misconception, and the explanation says why the tempting answer is wrong. |
 | **Mock interview** | A timed round for a chosen role and level. Questions arrive one at a time with a clock and a target answer length. Reveal, self-rate, and get a report with your weakest topic and how often you ran long. |
@@ -47,6 +47,7 @@ open index.html           # macOS
 | Data engineering | 30 | streaming a 5 GB file, external group-by, ingestion, freshness, Parquet, PDFs, page routing and OCR (HunyuanOCR-1.5, speculative decoding, fleet sizing) |
 | System design | 22 | long-form whiteboard questions with a structure to follow |
 | Behavioural | 20 | the questions that decide the offer, asked of AI engineers specifically |
+| Tooling | 38 | the named tools and when to use them: frameworks, vector stores, eval and observability tools, FastAPI vs Streamlit, tqdm progress bars and ETAs, Gradio apps and their queue |
 
 ## What is in an answer
 

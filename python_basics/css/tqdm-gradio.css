@@ -1,0 +1,44 @@
+/* ============================================================
+   tqdm-gradio.css — the tqdm and Gradio deep dives.
+   ============================================================ */
+
+/* ---------- tqdm: one line, taken apart ---------- */
+.tq-line{font-size:13px;white-space:pre;overflow-x:auto;margin:14px 0 10px}
+.tq-line [data-part]{cursor:help}
+.tq-parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-bottom:14px}
+.tq-part{background:rgba(0,0,0,.24);border:1px solid var(--line);border-radius:10px;padding:8px 11px;
+  font-size:12px;color:var(--txt-2);line-height:1.5;transition:border-color .15s,background .15s}
+.tq-part b{font-family:var(--mono);font-size:12px}
+.tq-part .mono{font-size:11px}
+.tq-part div{margin-top:3px}
+.tq-part.lit{border-color:var(--cyan);background:rgba(34,211,238,.08)}
+
+/* ---------- gradio: the mock browser ---------- */
+.gr-mock{background:#f7f7f8;color:#1f2937;border-radius:10px;padding:12px 14px;font-family:var(--sans);font-size:12px;
+  border:1px solid var(--line-2)}
+.gm-title{font-weight:700;font-size:14px;margin-bottom:8px}
+.gm-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gm-field{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:6px 8px;margin-bottom:8px}
+.gm-field>span{display:block;font-size:10.5px;color:#6b7280;margin-bottom:4px}
+.gm-box{height:34px;border:1px solid #e5e7eb;border-radius:6px;background:#fafafa}
+.gm-box.gm-dd{height:auto;padding:4px 8px;font-size:11px;color:#374151}
+.gm-slider{height:6px;border-radius:3px;background:#e5e7eb;position:relative;margin:8px 0}
+.gm-slider i{position:absolute;left:0;top:0;bottom:0;width:30%;background:#f97316;border-radius:3px}
+.gm-drop{border:1px dashed #cbd5e1;border-radius:6px;padding:14px 6px;text-align:center;color:#6b7280;font-size:11px}
+.gm-bars i{display:block;height:8px;border-radius:3px;background:#f97316;margin:4px 0}
+.gm-bars i+i{background:#fdba74}
+.gm-btns{display:flex;gap:6px}
+.gm-btns b,.gm-btns span{flex:1;text-align:center;padding:5px 0;border-radius:6px;font-size:11px}
+.gm-btns b{background:#f97316;color:#fff}
+.gm-btns span{background:#e5e7eb;color:#374151}
+.gm-prog{position:relative;height:18px;border-radius:6px;background:#e5e7eb;overflow:hidden}
+.gm-prog i{position:absolute;left:0;top:0;bottom:0;background:#fdba74}
+.gm-prog span{position:relative;font-size:10px;padding-left:6px;line-height:18px;color:#374151}
+.gm-ex{margin-top:6px;font-size:10.5px;color:#6b7280;font-family:var(--mono);word-break:break-all}
+.gm-chat{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:8px;min-height:80px}
+.gm-bubble{max-width:80%;padding:5px 9px;border-radius:9px;margin:4px 0;font-size:11.5px}
+.gm-bubble.u{margin-left:auto;background:#fed7aa}
+.gm-bubble.a{background:#f3f4f6}
+.gm-input{height:auto;padding:6px 8px;color:#9ca3af;font-size:11px}
+.gm-foot{margin-top:8px;font-size:10px;color:#9ca3af;font-family:var(--mono)}
+@media(max-width:640px){.gm-cols{grid-template-columns:1fr}}

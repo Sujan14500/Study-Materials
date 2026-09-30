@@ -18,8 +18,8 @@ time you have, and a button that opens whatever you should do next.
 | Folder | What it is | Size |
 |--------|-----------|------|
 | [`START_HERE`](START_HERE) | The roadmap, a skills tree that maps every skill to the course teaching it, and the course launcher | 1 page |
-| [`jupyter_notebooks`](jupyter_notebooks) | The practical half: runnable notebooks from Python basics, DSA, NumPy/Pandas/PyTorch and ML through LLM internals, RAG, Hugging Face, LoRA/QLoRA/DPO, evals, LangChain, LangGraph, agents, production and the live-coding interview rounds. CPU-only toy data, OpenAI / local Ollama / free offline stand-in, and an [interview map](jupyter_notebooks/INTERVIEW_MAP.md) from 393 theory questions to the code that answers them | 129 notebooks |
-| [`ai_interview_prep`](ai_interview_prep) | 590 interview questions with plain-English *and* technical answers, 254 multiple-choice questions, flashcards, timed mock interview | 590 questions |
+| [`jupyter_notebooks`](jupyter_notebooks) | The practical half: runnable notebooks from Python basics, DSA, NumPy/Pandas/PyTorch and ML through LLM internals, RAG, Hugging Face, LoRA/QLoRA/DPO, evals, LangChain, LangGraph, agents, production and the live-coding interview rounds. CPU-only toy data, OpenAI / local Ollama / free offline stand-in, and an [interview map](jupyter_notebooks/INTERVIEW_MAP.md) from 399 theory questions to the code that answers them | 130 notebooks |
+| [`ai_interview_prep`](ai_interview_prep) | 596 interview questions with plain-English *and* technical answers, 260 multiple-choice questions, flashcards, timed mock interview | 596 questions |
 | [`genai_flow`](genai_flow) | How LLMs actually work — tokens through to shipping, plus deep dives on one transformer block, a real Llama 3.2 3B print(model) taken apart line by line, decoding controls, chunking, reading PDFs fast with HunyuanOCR-1.5, the fine-tuning menu, LLM-as-judge, multimodal and beyond-RAG | 27 chapters |
 | [`ai_system_design_concepts`](ai_system_design_concepts) | AI/ML system design — metrics, latency budgets, capacity, vector indexes, serving, plus caching layers, parallelism, Elasticsearch and big-files-small-RAM, the nine vector search techniques drawn, eight latency fixes on a live waterfall, and the four FastAPI handler shapes with their throughput side by side | 24 chapters |
 | [`agentic_ai_flow`](agentic_ai_flow) | Agent architecture — the loop, tools, planning, memory, multi-agent, MCP, plus harness engineering and an eight-failure playbook | 17 chapters |
@@ -29,7 +29,7 @@ time you have, and a button that opens whatever you should do next.
 | [`dsa_basics`](dsa_basics) | Big-O through dynamic programming, every algorithm animated | 15 chapters |
 | [`langchain`](langchain) | Models, LCEL, splitters, retrievers, the RAG chain, agents | 13 chapters |
 | [`ml_fundamentals`](ml_fundamentals) | Splits, gradient descent, evaluation, overfitting, trees | 13 chapters |
-| [`python_basics`](python_basics) | Values through to files, projects and the gotchas | 13 chapters |
+| [`python_basics`](python_basics) | Values through to files, projects and the gotchas, plus package deep dives on NumPy, pandas, Matplotlib, seaborn, SciPy, tqdm and Gradio | 13 chapters |
 | [`dl_fundamentals`](dl_fundamentals) | Neurons, backpropagation, vanishing gradients, convolution — then PyTorch, with a real autograd graph animated forward and backward | 14 chapters |
 | [`datanyx2.0`](datanyx2.0) | Field guide and interview Q&A for the Datanyx project | 1 guide |
 | [`refund-agent`](refund-agent), [`support-platform`](support-platform) | The runnable source for the two systems in `projects_walkthrough` | code |

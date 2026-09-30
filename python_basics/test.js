@@ -382,7 +382,8 @@ assert(C.mlEcosystem.some(e => /scikit-learn/.test(e.code)),
 /* ---------------------------------------------------------------
    Wiring — every id the demos reach for must exist somewhere
    --------------------------------------------------------------- */
-const demos = fs.readFileSync('js/demos.js', 'utf8') + fs.readFileSync('js/packages.js', 'utf8');
+const demos = fs.readFileSync('js/demos.js', 'utf8') + fs.readFileSync('js/packages.js', 'utf8') +
+  fs.readFileSync('js/tqdm-gradio.js', 'utf8');
 const html = fs.readFileSync('index.html', 'utf8');
 const ids = new Set();
 for (const m of demos.matchAll(/\$\$?\('#([a-z0-9-]+)/g)) if (!m[1].endsWith('-')) ids.add(m[1]);
@@ -529,6 +530,72 @@ for (const lam of [0.5, 4, 15]) {
   let tot = 0;
   for (let k = 0; k <= 200; k++) tot += Math.exp(-lam + k * Math.log(lam) - P.lgamma(k + 1));
   near(tot, 1, 1e-9, `poisson(${lam}) pmf sums to 1`);
+}
+
+/* ---------------------------------------------------------------
+   Deep dives: tqdm and Gradio. formatMeter must print what tqdm 4.70.1
+   prints (these lines came from tqdm.format_meter itself), the ETA widget
+   must teach what it says, and every generated app must be well formed.
+   --------------------------------------------------------------- */
+{
+  const T = require('./js/tqdm-gradio.js');
+  const REAL = [
+    [[420, 1000, 12.17, { prefix: 'train', postfix: 'loss=0.231', ncols: 80 }], 'train:  42%|████████▊            | 420/1000 [00:12<00:16, 34.51it/s, loss=0.231]'],
+    [[3500000, 10485760, 4.2, { prefix: 'model.safetensors', unit: 'B', unitScale: true, unitDivisor: 1024, ncols: 90 }], 'model.safetensors:  33%|██████████                    | 3.34M/10.0M [00:04<00:08, 833kB/s]'],
+    [[37, null, 5, { prefix: 'stream' }], 'stream: 37it [00:05,  7.40it/s]'],
+    [[1000, 1000, 29.0, { ncols: 70 }], '100%|█████████████████████████████| 1000/1000 [00:29<00:00, 34.48it/s]'],
+    [[0, 50, 0, { prefix: 'embed', ncols: 60 }], 'embed:   0%|                         | 0/50 [00:00<?, ?it/s]'],
+    [[3, 12, 41.0, { prefix: 'pages', unit: 'page', ncols: 80 }], 'pages:  25%|████████▊                          | 3/12 [00:41<02:03, 13.67s/page]'],
+    [[5, 8, 3.9, { ncols: 0 }], ' 62% 5/8 [00:03<00:02,  1.28it/s]'],
+    [[733, 1200, 3725.0, { prefix: 'epoch 2', ncols: 100, rate: 0.42 }], 'epoch 2:  61%|█████████████████████████████▉                   | 733/1200 [1:02:05<18:31,  2.38s/it]']
+  ];
+  REAL.forEach(([args, want], i) => assert.strictEqual(T.formatMeter(...args), want, `formatMeter case ${i} differs from real tqdm`));
+  assert.strictEqual(T.formatInterval(3725), '1:02:05');
+  assert.strictEqual(T.formatSizeof(10485760, 1024), '10.0M');
+  /* tqdm's bias-corrected EMA, values from tqdm.std.EMA(0.3) */
+  const ema = T.makeEma(0.3);
+  assert.deepStrictEqual([10, 10, 2, 2, 2].map(x => +ema(x).toFixed(6)), [10, 10, 6.347032, 4.630872, 3.682161]);
+
+  /* the ETA lesson: after a slowdown the default beats both extremes */
+  const slow = T.SCENARIOS.filter(s => s.id === 'slow')[0], steady = T.SCENARIOS.filter(s => s.id === 'steady')[0];
+  const cu = sm => T.catchUp(T.simulate(slow, sm));
+  assert(cu(0.3) < cu(0) && cu(0.3) < cu(1), `smoothing 0.3 should settle first after a slowdown (0: ${cu(0)}, 0.3: ${cu(0.3)}, 1: ${cu(1)})`);
+  const jit = [0, 0.3, 1].map(sm => T.jitter(T.simulate(slow, sm)));
+  assert(jit[0] < jit[1] && jit[1] < jit[2], 'more smoothing weight on the newest redraw must mean a jumpier ETA');
+  const avg30 = T.simulate(slow, 0).pts.filter(p => p.t >= 30)[0];
+  assert(avg30.eta < avg30.truth * 0.6, 'the overall average must badly underestimate after the slowdown');
+  assert.strictEqual(T.catchUp(T.simulate(steady, 0.3)), 0, 'a steady job has no change to catch up with');
+  [0, 0.3, 1].forEach(sm => assert.strictEqual(JSON.stringify(T.simulate(slow, sm).pts.map(p => p.n)),
+    JSON.stringify(T.simulate(slow, 0).pts.map(p => p.n)), 'every smoothing value must see the very same run'));
+
+  /* the builder: one component per argument, and the right wrapper */
+  T.TEMPLATES.forEach(tpl => {
+    if (!tpl.chat) assert.strictEqual(tpl.inputs.length, tpl.params.length, `${tpl.id}: one input component per argument`);
+    [{}, { stream: true, progress: true, share: true, auth: true, limit: '4', examples: true }].forEach(extra => {
+      const o = Object.assign({ title: 'T', examples: false, stream: false, progress: false, limit: 'default', share: false, auth: false }, extra);
+      const code = T.buildCode(tpl, o);
+      assert(code.startsWith('import gradio as gr') && /demo\.launch\(/.test(code), `${tpl.id}: not a runnable app`);
+      assert(tpl.chat ? /gr\.ChatInterface\(/.test(code) && !/gr\.Interface\(/.test(code) : /gr\.Interface\(/.test(code), `${tpl.id}: wrong wrapper`);
+      assert(code.includes('api_name="' + tpl.fn + '"'), `${tpl.id}: endpoint name must match the client call`);
+      assert(!/Blocks\(theme/.test(code) && /demo\.launch\(.*theme=gr\.themes/.test(code), 'Gradio 6 takes theme in launch()');
+      if (o.progress) assert(code.includes('gr.Progress(track_tqdm=True)') && code.includes('from tqdm import tqdm'), `${tpl.id}: progress needs tqdm`);
+      if (o.stream && tpl.stream) assert(/\byield\b/.test(code), `${tpl.id}: streaming must yield`);
+      if (o.limit !== 'default') assert(code.includes('concurrency_limit=' + o.limit), `${tpl.id}: limit missing`);
+      tpl.inputs.concat(tpl.outputs).forEach(c => assert(code.includes('gr.' + c[0] + '('), `${tpl.id}: gr.${c[0]} missing`));
+    });
+    assert(T.clientCode(tpl).includes('api_name="/' + tpl.fn + '"'), `${tpl.id}: client calls the wrong endpoint`);
+  });
+
+  /* the queue: waves of `limit`, the thread cap, and the shared-function trap */
+  assert.strictEqual(T.queueRun(8, 0.5, 1).last, 4, '8 calls x 0.5 s one at a time');
+  assert.strictEqual(T.queueRun(8, 0.5, 4).last, 1, 'limit 4 runs two waves');
+  assert.strictEqual(T.queueRun(8, 0.5, null).last, 0.5, 'no limit runs them all at once');
+  assert.strictEqual(T.queueRun(100, 1, null).last, 3, 'sync functions are still capped by 40 worker threads');
+  assert.deepStrictEqual(T.sharedLimit(4, 1, true), [1, 1], 'events sharing a function share the lower limit');
+  assert.deepStrictEqual(T.sharedLimit(4, 1, false), [4, 1]);
+  assert(html.includes('js/tqdm-gradio.js') && html.includes('css/tqdm-gradio.css'), 'tqdm-gradio files not linked');
+  console.log(`  tqdm/gradio: ${REAL.length} real tqdm lines reproduced, ETA smoothing lesson holds, ` +
+              `${T.TEMPLATES.length} app templates well formed`);
 }
 
 /* ---- tools & frameworks strips ---- */

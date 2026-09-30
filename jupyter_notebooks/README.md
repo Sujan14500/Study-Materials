@@ -8,7 +8,7 @@ engineering — plus the hands-on coding rounds interviewers actually give ("bui
 
 It is the practical companion to [`../ai_interview_prep`](../ai_interview_prep/index.html): every notebook
 opens with a table of the theory questions it makes concrete, and [`INTERVIEW_MAP.md`](INTERVIEW_MAP.md)
-goes the other way — from any of the 590 theory questions to the notebook where you can run the answer.
+goes the other way — from any of the 596 theory questions to the notebook where you can run the answer.
 
 Everything is small on purpose: toy datasets, tiny models, CPU only, each notebook runs top to bottom in
 about a minute, and nothing costs money unless you choose to use a real API key.
@@ -62,7 +62,7 @@ and nothing else. `.env` is gitignored — never commit a key.
 | Folder | What you practise |
 |---|---|
 | [`00_start_here`](00_start_here) | Setup, the provider switch, study tracks, and quick answers to the most frequent interview topics |
-| [`01_python_basics`](01_python_basics) | 16 notebooks: types, strings, collections, control flow, functions, generators, OOP, errors, files/JSON, stdlib, decorators, type hints & Pydantic, async, testing, gotchas |
+| [`01_python_basics`](01_python_basics) | 17 notebooks: types, strings, collections, control flow, functions, generators, OOP, errors, files/JSON, stdlib, decorators, type hints & Pydantic, async, testing, gotchas, and tqdm progress bars + Gradio apps |
 | [`02_python_problems`](02_python_problems) | Warm-ups, string and list/dict problems, and the practical AI-engineer tasks (parse LLM JSON, chunk text, token budgets, backoff, rate limits, PII redaction) |
 | [`03_dsa`](03_dsa) | 14 notebooks, pattern by pattern: Big-O, two pointers, sliding window, stacks, linked lists, binary search, sorting, backtracking, trees, heaps/top-k, graphs, DP, greedy, tries/union-find/LRU |
 | [`04_numpy_pandas_pytorch`](04_numpy_pandas_pytorch) | The three libraries every AI engineer uses daily, plus matplotlib and Power BI-style quick charts |

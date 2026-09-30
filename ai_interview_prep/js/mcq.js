@@ -545,6 +545,19 @@ window.MCQ = (window.MCQ || []).concat([
 { topic: 'data', q: 'OCR output has a 0.3% character error rate. What is the risk?', o: ['none: under 1% is production quality', 'a single wrong digit in an amount or date that the average hides', 'the model has memorised the benchmark', 'the text will not embed well'], a: 1,
   e: 'CER averages over every character. One misread price barely moves it and is the only error a user notices, so diff numbers, dates and IDs separately.' },
 { topic: 'data', q: 'HunyuanOCR\'s default document prompt ignores headers and footers. What must the ingestion code do?', o: ['switch to a task that keeps them', 'carry the page number and source as chunk metadata from its own loop', 'OCR each page twice and merge the results', 'nothing: headers and footers are noise'], a: 1,
-  e: 'Dropping running headers is usually right for retrieval, but the page number goes with them. Citations need it, so the pipeline must attach it itself.' }
+  e: 'Dropping running headers is usually right for retrieval, but the page number goes with them. Citations need it, so the pipeline must attach it itself.' },
+/* ---------------- tqdm and Gradio ---------------- */
+{ topic: 'tooling', q: 'tqdm shows "?" instead of a percentage and an ETA. The most likely cause is...', o: ['the loop is too fast to measure', 'the iterable is a generator with no len(), and no total= was passed', 'smoothing is set to 0', 'the terminal does not support Unicode'], a: 1,
+  e: 'Without a total there is nothing to take a percentage of. Pass total= when you know it; do not call list() on the generator just to get a length.' },
+{ topic: 'tooling', q: 'A job slows sharply at 60% and tqdm\'s ETA stays far too optimistic for most of the remaining run. Which setting was it using?', o: ['smoothing=0.3, the default', 'smoothing=0, the overall average', 'smoothing=1, the latest redraw only', 'mininterval=0.1'], a: 1,
+  e: 'smoothing=0 averages over the whole run, so it remembers the fast phase forever. The default weights recent redraws and catches up within seconds; 1 reacts instantly but jitters.' },
+{ topic: 'tooling', q: 'Why does wrapping a tight loop in tqdm cost so little?', o: ['it runs in a separate thread', 'it redraws at most every mininterval (0.1 s), not every iteration', 'it samples one iteration in a hundred', 'it is written in C'], a: 1,
+  e: 'Each iteration only increments a counter; the expensive formatting and printing happen a few times a second. Forcing refresh() every step throws that away.' },
+{ topic: 'tooling', q: 'A Gradio app is fast for one user and slow for five, though the function only waits on an HTTP API. The first thing to change is...', o: ['a bigger server', 'the event\'s concurrency_limit, which defaults to 1', 'share=True', 'switching from Blocks to Interface'], a: 1,
+  e: 'By default each event runs one call at a time and the rest queue. For I/O-bound work, raise the limit (or use an async function); for a GPU model, raise it only as far as memory allows.' },
+{ topic: 'tooling', q: 'Endpoint A sets concurrency_limit=4 but still runs one call at a time. Endpoint B wraps the same Python function with the default limit. Why?', o: ['the queue ignores per-event limits', 'events sharing a function share one concurrency group, which takes the lower limit', 'Gradio only allows one endpoint per function', 'limits only apply to async functions'], a: 1,
+  e: 'concurrency_id defaults to the function\'s id. Wrap the function a second time, or give the events different concurrency_id values.' },
+{ topic: 'tooling', q: 'How do you show the tqdm bars inside your function as a progress bar in the Gradio UI?', o: ['print them to stdout', 'add a default argument progress=gr.Progress(track_tqdm=True)', 'return the tqdm object', 'use gr.Markdown to render the bar'], a: 1,
+  e: 'track_tqdm mirrors every tqdm bar created during the call, including ones inside libraries, to the browser.' }
 
 ]);
